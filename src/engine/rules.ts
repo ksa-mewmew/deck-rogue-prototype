@@ -1,0 +1,74 @@
+import type { GameState, NodeType, StatusKey } from "./types";
+
+export function uid() {
+  return Math.random().toString(16).slice(2) + "-" + Date.now().toString(16);
+}
+
+export function clampMin(n: number, min = 0) {
+  return n < min ? min : n;
+}
+
+export function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+export function pickOne<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+export function logMsg(g: GameState, msg: string) {
+  g.log.unshift(msg);
+  g.log = g.log.slice(0, 250);
+}
+
+export function aliveEnemies(g: GameState) {
+  return g.enemies.filter((e) => e.hp > 0);
+}
+
+export function applyStatus(target: { status: Record<StatusKey, number> }, key: StatusKey, n: number) {
+  target.status[key] = clampMin((target.status[key] ?? 0) + n, 0);
+}
+
+export function rollNodeOffers(g: GameState): NodeType[] {
+  // ✅ 다음 노드 번호 기준
+  const nextIndex = g.run.nodePickCount + 1;
+
+  // ✅ 30번째마다 보스 전투만 제시(=선택지 2개를 전투로 채움)
+  if (nextIndex % 30 === 0) {
+    return ["BATTLE", "BATTLE"];
+  }
+
+  const pool: NodeType[] = [];
+
+  const battleW = g.run.treasureObtained ? 15 : 14;
+  const restW = 5;
+  const eventW = 5;
+
+  const canOfferTreasure = !g.run.treasureObtained && g.run.nodePickCount >= 30;
+  const treasureW = canOfferTreasure ? 1 : 0;
+
+  for (let i = 0; i < battleW; i++) pool.push("BATTLE");
+  for (let i = 0; i < restW; i++) pool.push("REST");
+  for (let i = 0; i < eventW; i++) pool.push("EVENT");
+  for (let i = 0; i < treasureW; i++) pool.push("TREASURE");
+
+  const a = pickOne(pool);
+  let b = pickOne(pool);
+
+  // 보물+보물만 방지 (나머지는 중복 허용)
+  if (a === "TREASURE" && b === "TREASURE") {
+    let guard = 0;
+    do {
+      b = pickOne(pool);
+      guard++;
+      if (guard > 50) break;
+    } while (b === "TREASURE");
+  }
+
+  return [a, b];
+}

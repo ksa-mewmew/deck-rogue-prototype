@@ -1,0 +1,39 @@
+:root {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
+  color: #111;
+  background: #f6f6f6;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+#app { padding: 16px; display: grid; gap: 12px; }
+.row { display: grid; gap: 10px; }
+.top { grid-template-columns: 1fr 1fr; align-items: start; }
+.panel {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+}
+h2 { margin: 0 0 8px; font-size: 16px; }
+h3 { margin: 0 0 6px; font-size: 14px; }
+small { color: #444; }
+.stats { display: grid; grid-template-columns: repeat(7, max-content); gap: 10px 14px; align-items: center; }
+.badge { padding: 2px 8px; border: 1px solid #ddd; border-radius: 999px; background: #fafafa; font-size: 12px; }
+.grid6 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.slot { min-height: 88px; border: 1px dashed #bbb; border-radius: 10px; padding: 8px; background: #fcfcfc; display: grid; gap: 6px; }
+.slot.disabled { opacity: .55; outline: 2px solid #aaa; }
+.card { border: 1px solid #ddd; border-radius: 10px; padding: 8px; background: #fff; cursor: pointer; user-select: none; transition: transform .06s ease; }
+.card:hover { transform: translateY(-1px); }
+.card.selected { outline: 2px solid #111; }
+.card.vanish { border-color: #b11; }
+.cardTitle { font-weight: 700; margin-bottom: 4px; }
+.cardMeta { display: flex; gap: 6px; flex-wrap: wrap; }
+.cardText { font-size: 12px; color: #222; line-height: 1.35; margin-top: 6px; white-space: pre-wrap; }
+.hand { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; }
+button { border: 1px solid #ddd; background: #fff; border-radius: 10px; padding: 8px 10px; cursor: pointer; }
+button.primary { border-color: #111; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.log { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; white-space: pre-wrap; max-height: 260px; overflow: auto; background: #0b0b0b; color: #e8e8e8; border-radius: 12px; padding: 10px; }
+.hr { height: 1px; background: #eee; margin: 10px 0; }
