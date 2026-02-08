@@ -1,5 +1,6 @@
-import type { GameState, NodeOffer, PileKind } from "../engine/types";
+import type { GameState, NodeOffer, PileKind, StatusKey } from "../engine/types";
 
+/** root */
 export function mountRoot(): HTMLDivElement {
   const app = document.querySelector<HTMLDivElement>("#app")!;
   app.innerHTML = "";
@@ -10,7 +11,6 @@ export function render(g: GameState, actions: UIActions) {
   const app = mountRoot();
 
   const top = div("row top");
-
   const left = div("panel");
   const right = div("panel");
 
@@ -19,16 +19,15 @@ export function render(g: GameState, actions: UIActions) {
   header.appendChild(h2("상태"));
   left.appendChild(header);
   left.appendChild(statsRow(g));
-
   left.appendChild(hr());
 
   left.appendChild(h3("플레이어 상태"));
-  left.appendChild(
-    p(
-      `취약 ${g.player.status.vuln} / 약화 ${g.player.status.weak} / 출혈 ${g.player.status.bleed} / 교란 ${g.player.status.disrupt}`
-    )
-  );
+  const ps = statusBadges(g.player.status);
+  // 아무 것도 없으면 빈 줄 대신 안내를 원하면 아래 주석 해제
+  // if (ps.childNodes.length === 0) left.appendChild(p("(상태이상 없음)"));
+  left.appendChild(ps);
 
+  // ===== pile controls =====
   const pileControls = div("controls");
   pileControls.appendChild(button("덱 보기", () => actions.onViewPile("deck"), false));
   pileControls.appendChild(button("버림 보기", () => actions.onViewPile("discard"), false));
@@ -40,9 +39,10 @@ export function render(g: GameState, actions: UIActions) {
 
   left.appendChild(hr());
 
-  // ===== Targeting 상태 판단 =====
-  const targeting = !!g.pendingTarget || (g.pendingTargetQueue?.length ?? 0) > 0;
-  const remainingTargets = g.pendingTargetQueue?.length ?? 0;
+  // ===== Targeting 상태 =====
+  const targeting = g.pendingTarget != null || (g.pendingTargetQueue?.length ?? 0) > 0;
+  const remainingTargets =
+    (g.pendingTarget != null ? 1 : 0) + (g.pendingTargetQueue?.length ?? 0);
 
   left.appendChild(h3("적"));
 
@@ -93,25 +93,35 @@ export function render(g: GameState, actions: UIActions) {
       title.style.fontSize = "13px";
       box.appendChild(title);
 
-      box.appendChild(
-        p(
-          `취약 ${e.status.vuln} / 약화 ${e.status.weak} / 출혈 ${e.status.bleed} / 교란 ${e.status.disrupt}`
-        )
-      );
+      // ✅ 배지(면역/상태이상) — 있을 때만
+      const badges = div("badgesRow");
 
-      // ✅ 적 의도 표시
+      if (e.immuneThisTurn) badges.appendChild(badge("면역 ✨"));
+
+      const st = e.status;
+      if ((st.vuln ?? 0) > 0) badges.appendChild(badge(`취약 ${st.vuln}`));
+      if ((st.weak ?? 0) > 0) badges.appendChild(badge(`약화 ${st.weak}`));
+      if ((st.bleed ?? 0) > 0) badges.appendChild(badge(`출혈 ${st.bleed}`));
+      if ((st.disrupt ?? 0) > 0) badges.appendChild(badge(`교란 ${st.disrupt}`));
+
+      if (badges.childNodes.length > 0) box.appendChild(badges);
+
+      // ✅ 적 의도 표시: 공개 여부에 따라 표시를 바꾸고 싶으면 여기서 조정
       const def = g.content.enemiesById[e.id];
       const intent = def.intents[e.intentIndex % def.intents.length];
 
+      // soul stealer note는 현재 구현이 soulCastCount 기반이라 일단 유지
       let note = "";
       if (e.id === "boss_soul_stealer") {
-        const count = e.soulCastCount ?? 0;
+        const count = (e as any).soulCastCount ?? 0;
         const remain = Math.max(0, 5 - count);
         note = remain === 0 ? " (다음 행동: 50 피해!)" : ` (50피해까지 ${remain}턴)`;
       }
 
-      const intentRow = p(`의도: ${intent.label}${note}`);
-      intentRow.style.opacity = g.intentsRevealedThisTurn ? "1" : "0.9";
+      const intentRow = p(
+        g.intentsRevealedThisTurn ? `의도: ${intent.label}${note}` : `의도: (미공개)`
+      );
+      intentRow.style.opacity = g.intentsRevealedThisTurn ? "1" : "0.65";
       box.appendChild(intentRow);
 
       const btn = document.createElement("button");
@@ -127,7 +137,7 @@ export function render(g: GameState, actions: UIActions) {
   // ===== RIGHT: 진행 =====
   right.appendChild(h2("진행"));
 
-  // ✅ 현재 단계 표시 (유저가 “지금 뭘 해야 하는지” 확인 가능)
+  // 현재 단계 표시
   const phaseLabel = phaseToKorean(g.phase);
   const phaseInfo = div("banner banner-phase");
   phaseInfo.textContent = `현재 단계: ${phaseLabel} (${g.phase})`;
@@ -138,7 +148,7 @@ export function render(g: GameState, actions: UIActions) {
   phaseInfo.style.background = "rgba(255,255,255,0.04)";
   right.appendChild(phaseInfo);
 
-  // ✅ 타겟팅 배너(우측에도 크게)
+  // 타겟팅 배너(우측)
   if (targeting) {
     const banner = div("banner banner-target");
     banner.textContent = `⚠ 대상 선택 필요 (남은 선택 ${remainingTargets}) — 왼쪽 적 패널에서 대상을 고르세요.`;
@@ -171,18 +181,25 @@ export function render(g: GameState, actions: UIActions) {
   app.appendChild(bottom);
 }
 
+/** ===== stats ===== */
 function statsRow(g: GameState) {
   const row = div("stats");
-  row.appendChild(badge(`HP ${g.player.hp}/${g.player.maxHp}`));
-  row.appendChild(badge(`블록 ${g.player.block}`));
+  row.appendChild(badge(`HP ❤️ ${g.player.hp}/${g.player.maxHp}`));
+  row.appendChild(badge(`블록 🛡️ ${g.player.block}`));
   row.appendChild(badge(`S (보급) ${g.player.supplies}`));
   row.appendChild(badge(`F (피로도) ${g.player.fatigue}`));
-  row.appendChild(badge(`이번 전투에서 보급 없이 종료 ${g.player.zeroSupplyTurns}회`));
-  row.appendChild(badge(`이번 턴 사용한 카드의 수 ${g.usedThisTurn}`));
-  row.appendChild(badge(`겪은 인카운터 ${g.run.nodePickCount}회`));
+
+
+
+  row.appendChild(badge(`탈진 (S=0) ${g.player.zeroSupplyTurns}회`));
+  row.appendChild(badge(` ${g.run.nodePickCount}번 탐험`));
+
+  row.appendChild(badge(`덱 ${g.deck.length}장`));
+
   return row;
 }
 
+/** ===== Choice ===== */
 function renderChoice(root: HTMLElement, g: GameState, actions: UIActions) {
   root.appendChild(h3(g.choice!.title));
   if (g.choice!.prompt) root.appendChild(p(g.choice!.prompt));
@@ -198,11 +215,17 @@ function renderChoice(root: HTMLElement, g: GameState, actions: UIActions) {
   root.appendChild(box);
 }
 
+/** ===== NODE ===== */
 function nodeLabel(t: "BATTLE" | "REST" | "EVENT" | "TREASURE", isBoss: boolean) {
   if (t === "BATTLE") return isBoss ? "보스" : "전투";
   if (t === "REST") return "휴식";
   if (t === "EVENT") return "이벤트";
   return "저주받은 보물";
+}
+
+function labelList(offers: Array<{ type: "BATTLE" | "REST" | "EVENT" | "TREASURE" }>, isBoss: boolean) {
+  if (isBoss) return "보스"; // ✅ 보스면 이것만
+  return offers.map((o) => nodeLabel(o.type, false)).join(" / ");
 }
 
 function renderNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
@@ -212,19 +235,22 @@ function renderNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
   }
 
   root.appendChild(
-    p(`노드 ${g.run.nodePickCount} / 보물 ${g.run.treasureObtained ? "O" : "X"} / 보물 후 ${g.run.afterTreasureNodePicks}/10`)
+    p(`[선택 ${g.run.nodePickCount}회] [보물 ${g.run.treasureObtained ? "O" : "X"}] [보물 후 ${g.run.afterTreasureNodePicks}/10]`)
   );
 
   const nextIndex = g.run.nodePickCount + 1;
   const isBossNode = nextIndex % 30 === 0;
-  const isBossNext = (g.run.nodePickCount + 2) % 30 === 0;
+
+  // “A/B를 고르면 다음 선택지가 뭐냐” 미리보기는 “다음 노드” 기준이므로 +1 뒤를 봅니다.
+  const isBossNextAfterPick = (g.run.nodePickCount + 2) % 30 === 0;
 
   const offers = actions.getNodeOffers();
   const br = g.run.branchOffer;
 
   if (br) {
-    root.appendChild(p(`전자 선택 시 다음 선택지: ${br.nextIfA.map((o) => nodeLabel(o.type, isBossNext)).join(" / ")}`));
-    root.appendChild(p(`후자 선택 시 다음 선택지: ${br.nextIfB.map((o) => nodeLabel(o.type, isBossNext)).join(" / ")}`));
+    // ✅ 보스 턴이면 예고는 무조건 "보스"만 보여주기
+    root.appendChild(p(`전자 선택 시 다음 선택지: ${labelList(br.nextIfA, isBossNextAfterPick)}`));
+    root.appendChild(p(`후자 선택 시 다음 선택지: ${labelList(br.nextIfB, isBossNextAfterPick)}`));
     root.appendChild(hr());
   }
 
@@ -239,13 +265,13 @@ function renderNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
   root.appendChild(row);
 }
 
+/** ===== Combat ===== */
 function renderCombat(root: HTMLElement, g: GameState, actions: UIActions, targeting: boolean) {
   if (g.choice) {
     renderChoice(root, g, actions);
     return;
   }
 
-  // ===== 컨트롤 =====
   const controls = div("controls");
 
   controls.appendChild(
@@ -299,7 +325,6 @@ function renderCombat(root: HTMLElement, g: GameState, actions: UIActions, targe
   root.appendChild(controls);
   root.appendChild(hr());
 
-  // ===== 슬롯 배치 피드백 =====
   const hasSelected = !!g.selectedHandCardUid;
 
   root.appendChild(h3("전열 슬롯 (3)"));
@@ -338,7 +363,6 @@ function renderCombat(root: HTMLElement, g: GameState, actions: UIActions, targe
     const uid = g.backSlots[i];
     if (uid) s.appendChild(renderCard(g, uid, false));
 
-    // ✅ disabled면 클릭 자체 막기 (UX 개선)
     if (!disabled) {
       s.onclick = () => actions.onPlaceSelected("back", i);
     } else {
@@ -360,12 +384,13 @@ function renderCombat(root: HTMLElement, g: GameState, actions: UIActions, targe
   }
   root.appendChild(hand);
 
-  const help = small("사용법: 손패 카드 클릭 → 슬롯 클릭 배치. 정찰/화살 등 선택 피해는 왼쪽 적 버튼 클릭.");
+  const help = small("사용법: 손패 카드 클릭 → 슬롯 클릭 배치. 선택 피해(정찰/화살)는 왼쪽 적 버튼 클릭.");
   help.style.display = "block";
   help.style.marginTop = "8px";
   root.appendChild(help);
 }
 
+/** ===== Card ===== */
 function renderCard(g: GameState, cardUid: string, clickable: boolean, onClick?: (uid: string) => void) {
   const defId = g.cards[cardUid].defId;
   const def = g.content.cardsById[defId];
@@ -383,7 +408,6 @@ function renderCard(g: GameState, cardUid: string, clickable: boolean, onClick?:
   d.appendChild(meta);
 
   const txt = divText("cardText", `전열: ${def.frontText}\n후열: ${def.backText}`);
-  // ✅ 줄바꿈 표시
   txt.style.whiteSpace = "pre-line";
   d.appendChild(txt);
 
@@ -394,7 +418,7 @@ function renderCard(g: GameState, cardUid: string, clickable: boolean, onClick?:
   return d;
 }
 
-/** Phase label */
+/** ===== Phase label ===== */
 function phaseToKorean(phase: GameState["phase"]) {
   switch (phase) {
     case "NODE":
@@ -416,7 +440,7 @@ function phaseToKorean(phase: GameState["phase"]) {
   }
 }
 
-/** DOM helpers */
+/** ===== DOM helpers ===== */
 function div(className: string) {
   const e = document.createElement("div");
   e.className = className;
@@ -475,6 +499,22 @@ function button(label: string, onClick: () => void, disabled: boolean) {
   return b;
 }
 
+function statusBadges(s: Record<StatusKey, number>) {
+  const box = div("badgesRow");
+
+  const add = (label: string, n: number) => {
+    if (!n || n <= 0) return;
+    box.appendChild(badge(`${label} ${n}`));
+  };
+
+  add("취약", s.vuln ?? 0);
+  add("약화", s.weak ?? 0);
+  add("출혈", s.bleed ?? 0);
+  add("교란", s.disrupt ?? 0);
+
+  return box;
+}
+
 export type UIActions = {
   getNodeOffers: () => NodeOffer[];
   onChooseNode: (id: "A" | "B") => void;
@@ -489,6 +529,7 @@ export type UIActions = {
   onUpkeep: () => void;
   onDrawNextTurn: () => void;
   onFastPass: () => void;
+
   onViewPile: (pile: PileKind) => void;
   onChooseChoice: (key: string) => void;
   onNewRun: () => void;

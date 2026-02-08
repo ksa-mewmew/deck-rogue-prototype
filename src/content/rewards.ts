@@ -18,18 +18,18 @@ export type RewardEntry = { id: string; weight: number };
 
 // 원본 풀(절대 수정하지 않기)
 export const REWARD_POOL: RewardEntry[] = [
-  { id: "berserk", weight: 5 },
-  { id: "bandage", weight: 3 },
-  { id: "arrow_rain", weight: 5 },
-  { id: "smoke", weight: 1 },
-  { id: "redeploy", weight: 5 },
+  { id: "berserk", weight: 20 },
+  { id: "bandage", weight: 12 },
+  { id: "arrow_rain", weight: 20 },
+  { id: "smoke", weight: 0 },
+  { id: "redeploy", weight: 12 },
  
   { id: "secret_strike", weight: 1 },
   { id: "fire_scroll", weight: 1 },
-  { id: "caltrops", weight: 3 },
-  { id: "emergency_rations", weight: 3 },
-  { id: "painkiller", weight: 3 },
-  { id: "field_experience", weight: 3 },  
+  { id: "caltrops", weight: 12 },
+  { id: "emergency_rations", weight: 1 },
+  { id: "painkiller", weight: 1 },
+  { id: "field_experience", weight: 1 },  
   // ...
 ];
 

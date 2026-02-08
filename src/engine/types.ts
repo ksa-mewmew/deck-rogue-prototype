@@ -47,7 +47,13 @@ export type CombatPhase =
 
 export type TargetRequest =
   | { kind: "damageSelect"; amount: number }
+  | { kind: "statusSelect"; key: StatusKey; n: number }
   | null;
+
+export type PendingTargetItem =
+  | { kind: "damageSelect"; amount: number }
+  | { kind: "statusSelect"; key: StatusKey; n: number };
+
 
 export type PileKind = "deck" | "discard" | "exhausted" | "vanished" | "hand";
 
@@ -62,6 +68,10 @@ export type CardData = {
   design?: string;
   exhaustWhen?: ExhaustWhen; // ✅ 어느 위치에서 발동했을 때 소모되는지
   vanishWhen?: ExhaustWhen;  // (필요하면 소실도 동일 패턴)
+
+  onWinWhileInBack?: PlayerEffect[];
+  
+
 };
 
 export type EnemyData = {
@@ -112,14 +122,20 @@ export type PlayerEffect =
   | { op: "statusPlayer"; key: StatusKey; n: number }
   | { op: "immuneDisruptThisTurn" }
   | { op: "nullifyDamageThisTurn" }
+  | { op: "ifDrewThisTurn"; then: PlayerEffect[] }
   | { op: "triggerFrontOfBackSlot"; index: number }
   | { op: "damageEnemyByPlayerFatigue"; target: "random"; mult: number } // ✅ F*mult
-  | { op: "statusEnemyAll"; key: StatusKey; n: number }                 // ✅ 모든 적 상태
+  | { op: "statusEnemy"; target: "select" | "random" | "all"; key: StatusKey; n: number }
   | { op: "setSupplies"; n: number }                                     // ✅ S를 n으로
   | { op: "statusEnemiesAttackingThisTurn"; key: StatusKey; n: number }   // ✅ 이번 턴 공격한 적들
   | { op: "maxHp"; n: number }                                           // ✅ 최대체력 증가
   | { op: "hp"; n: number }                                             // ✅ HP 직접 증감(음수 가능)
   | { op: "statusEnemiesAttackingThisTurn"; key: StatusKey; n: number };
+
+
+export type PendingTarget =
+  | { kind: "damageSelect"; amount: number }
+  | { kind: "statusSelect"; key: "vuln" | "weak" | "bleed" | "disrupt"; n: number };
 
 
 export type EnemyEffect =
@@ -202,8 +218,11 @@ export type GameState = {
   frontPlacedThisTurn: number; // ✅ 이번 턴 전열에 배치한 카드 수
   selectedHandCardUid: string | null;
 
+  winHooksAppliedThisCombat: boolean;
 
+  drawCountThisTurn: number;
 
-  pendingTargetQueue: Array<{ kind: "damageSelect"; amount: number }>;
-  pendingTarget: TargetRequest;
+  pendingTarget: PendingTarget | null;
+  pendingTargetQueue: PendingTarget[];
+
 };

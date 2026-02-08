@@ -1,13 +1,17 @@
+// =======================================================
+// state.ts ✅ (전체 수정본)
+// - drawCountThisTurn 초기값 추가 (누락되어 있었음)
+// =======================================================
+
 import type { GameState, Content, CardInstance } from "./types";
-import { shuffle, uid } from "./rules";
-import { logMsg } from "./rules";
-import { rollBranchOffer } from "./rules";
+import { shuffle, uid, logMsg, rollBranchOffer } from "./rules";
 
 export function createInitialState(content: Content): GameState {
   const g: GameState = {
     phase: "NODE",
     log: [],
 
+    winHooksAppliedThisCombat: false,
 
     intentsRevealedThisTurn: false,
     disruptIndexThisTurn: null,
@@ -29,7 +33,6 @@ export function createInitialState(content: Content): GameState {
 
       battleCount: 0,
       enemyLastSeenBattle: {},
-      
     },
 
     player: {
@@ -69,10 +72,10 @@ export function createInitialState(content: Content): GameState {
     pendingTargetQueue: [],
     pendingTarget: null,
 
-    
+    drawCountThisTurn: 0, // ✅ 추가
   };
 
-  g.run.branchOffer = rollBranchOffer(g); 
+  g.run.branchOffer = rollBranchOffer(g);
   makeBasicDeck(g);
   logMsg(g, "새 런 시작. 다음 인카운터를 선택하세요.");
 
@@ -89,7 +92,6 @@ function addToDeck(g: GameState, defId: string, n: number) {
 }
 
 export function makeBasicDeck(g: GameState) {
-  // 기본 덱: 야전 식량 2, 정비 도구 2, 정찰 2, 방패 2, 강력한 화살 1, 화살 3
   addToDeck(g, "field_ration", 2);
   addToDeck(g, "maintenance", 2);
   addToDeck(g, "scout", 2);

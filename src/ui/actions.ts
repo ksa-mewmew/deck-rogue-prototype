@@ -406,9 +406,9 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
     },
 
     onChooseChoice: (key: string) => {
-      // 덱/더미 보기 닫기: 이전 choice 복구 + choiceHandler 유지
       if (g.choice?.kind === "VIEW_PILE" && key === "close") {
-        g.choice = g.choiceStack.pop() ?? null;
+        g.choice = null;
+        g.choiceStack = [];
         render(g, actions);
         return;
       }

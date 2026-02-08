@@ -1,13 +1,6 @@
 import type { EnemyData } from "../engine/types";
 
 export const ENEMIES: EnemyData[] = [
-  {
-    id: "wall",
-    name: "벽 발견",
-    maxHp: 50,
-    intents: [{ label: "아무 행동도 하지 않음", acts: [] }],
-  },
-
 
   {
     id: "other_adventurer",
@@ -79,8 +72,8 @@ export const ENEMIES: EnemyData[] = [
     intents: [
       { label: "다음 턴 동안 피해를 입지 않음", acts: [{ op: "enemyImmuneNextTurn" }] },
       {
-        label: "약화 2 부여 후 HP+=3",
-        acts: [{ op: "statusPlayer", key: "weak", n: 2 }],
+        label: "약화 3 부여 후 HP+=3",
+        acts: [{ op: "statusPlayer", key: "weak", n: 3 }],
       },
       { label: "6 피해", acts: [{ op: "damagePlayer", n: 6 }] },
     ],
