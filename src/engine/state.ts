@@ -1,6 +1,7 @@
 import type { GameState, Content, CardInstance } from "./types";
 import { shuffle, uid } from "./rules";
 import { logMsg } from "./rules";
+import { rollBranchOffer } from "./rules";
 
 export function createInitialState(content: Content): GameState {
   const g: GameState = {
@@ -19,11 +20,16 @@ export function createInitialState(content: Content): GameState {
       nextBattleSuppliesBonus: 0,
       bossPool: ["boss_cursed_wall", "boss_giant_orc", "boss_soul_stealer"],
       nodePickCount: 0,
+      branchOffer: null,
 
       nodeOfferQueue: [],
 
       currentNodeOffers: null,
-      nodePickByType: { BATTLE: 0, REST: 0, EVENT: 0, TREASURE: 0 }
+      nodePickByType: { BATTLE: 0, REST: 0, EVENT: 0, TREASURE: 0 },
+
+      battleCount: 0,
+      enemyLastSeenBattle: {},
+      
     },
 
     player: {
@@ -55,7 +61,7 @@ export function createInitialState(content: Content): GameState {
 
     enemies: [],
 
-
+    attackedEnemyIndicesThisTurn: [],
 
     usedThisTurn: 0,
     frontPlacedThisTurn: 0,
@@ -66,6 +72,7 @@ export function createInitialState(content: Content): GameState {
     
   };
 
+  g.run.branchOffer = rollBranchOffer(g); 
   makeBasicDeck(g);
   logMsg(g, "새 런 시작. 다음 인카운터를 선택하세요.");
 

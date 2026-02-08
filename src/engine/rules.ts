@@ -1,4 +1,39 @@
-import type { GameState, NodeType, StatusKey } from "./types";
+import type { GameState, NodeType, StatusKey, NodeOffer, BranchOffer } from "./types";
+
+function makePair(types: NodeType[]): [NodeOffer, NodeOffer] {
+  return [
+    { id: "A", type: types[0] },
+    { id: "B", type: types[1] },
+  ];
+}
+
+export type HasStatus = { status: Record<StatusKey, number> };
+
+export function applyStatusTo(target: HasStatus, key: StatusKey, n: number) {
+  target.status[key] = Math.max(0, (target.status[key] ?? 0) + n);
+}
+
+
+export function rollBranchOffer(g: GameState): BranchOffer {
+  const root = makePair(rollNodeOffers(g));
+  const nextIfA = makePair(rollNodeOffers(g));
+  const nextIfB = makePair(rollNodeOffers(g));
+  return { root, nextIfA, nextIfB };
+}
+
+export function advanceBranchOffer(g: GameState, pickedId: "A" | "B") {
+  if (!g.run.branchOffer) g.run.branchOffer = rollBranchOffer(g);
+  const br = g.run.branchOffer;
+
+  const nextRoot = pickedId === "A" ? br.nextIfA : br.nextIfB;
+
+  const fresh = rollBranchOffer(g);
+  g.run.branchOffer = {
+    root: nextRoot,
+    nextIfA: fresh.nextIfA,
+    nextIfB: fresh.nextIfB,
+  };
+}
 
 export function uid() {
   return Math.random().toString(16).slice(2) + "-" + Date.now().toString(16);

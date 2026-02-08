@@ -1,4 +1,4 @@
-import type { GameState, NodeType, PileKind, ChoiceState } from "../engine/types";
+import type { GameState, PileKind, ChoiceState, NodeOffer } from "../engine/types";
 import { render } from "./render";
 import {
   spawnEncounter,
@@ -11,8 +11,11 @@ import {
   drawStepStartNextTurn,
   revealIntentsAndDisrupt,
 } from "../engine/combat";
-import { logMsg, rollNodeOffers } from "../engine/rules";
+import { aliveEnemies, logMsg, rollNodeOffers, rollBranchOffer, advanceBranchOffer } from "../engine/rules";
 import { pickRandomEvent } from "../content/events";
+
+import type { EventOutcome } from "../content/events";
+
 import { removeCardByUid, addCardToDeck, obtainTreasure, offerRewardPair } from "../content/rewards";
 import { healPlayer, applyDamageToEnemy } from "../engine/effects";
 import { createInitialState } from "../engine/state";
@@ -21,12 +24,23 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
   let choiceHandler: ((key: string) => void) | null = null;
 
   const actions = {
-    getNodeOffers: () => {
-      if (!g.run.nodeOfferQueue || g.run.nodeOfferQueue.length === 0) {
-        g.run.nodeOfferQueue = [rollNodeOffers(g), rollNodeOffers(g), rollNodeOffers(g)];
+    getNodeOffers: (): NodeOffer[] => {
+      if (!g.run.branchOffer) g.run.branchOffer = rollBranchOffer(g);
+
+      const nextIndex = g.run.nodePickCount + 1;
+      const isBossNode = (nextIndex % 30 === 0);
+
+      // ✅ 보스 직행 노드는 버튼을 “보스/보스”로만 보여주고 실제 처리도 BATTLE 고정
+      if (isBossNode) {
+        return [
+          { id: "A", type: "BATTLE" },
+          { id: "B", type: "BATTLE" },
+        ];
       }
-      return g.run.nodeOfferQueue[0];
+
+      return g.run.branchOffer.root;
     },
+
     onViewPile: (pile: PileKind) => {
       const title =
         pile === "deck" ? "덱"
@@ -96,7 +110,7 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
       render(g, actions);
     },
 
-  onChooseNode: (t: NodeType) => {
+  onChooseNode: (id: "A" | "B") => {
     if (g.run.finished) return;
 
     // ✅ 전투/진행 중에는 노드 선택 금지
@@ -105,23 +119,25 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
       return;
     }
 
+    if (!g.run.branchOffer) g.run.branchOffer = rollBranchOffer(g);
+
     const nextIndex = g.run.nodePickCount + 1;
     const forceBossNow = (nextIndex % 30 === 0);
 
-    // ✅ 강제 보스 노드는 입력과 무관하게 BATTLE로 취급
-    const actual: NodeType = forceBossNow ? "BATTLE" : t;
+    // ✅ 이번에 고른 타입(보스면 무조건 BATTLE)
+    const pickedType = forceBossNow
+      ? "BATTLE"
+      : (id === "A" ? g.run.branchOffer.root[0].type : g.run.branchOffer.root[1].type);
+
+    // ✅ 강제 보스면 입력과 무관하게 BATTLE로 취급
+    const actual = pickedType;
 
     // ✅ 노드 카운트/집계
     g.run.nodePickCount = nextIndex;
     g.run.nodePickByType[actual] = (g.run.nodePickByType[actual] ?? 0) + 1;
 
-    // ✅ 노드 오퍼 큐 소비 + 보충(미리보기 2개 유지)
-    if (!g.run.nodeOfferQueue || g.run.nodeOfferQueue.length === 0) {
-      g.run.nodeOfferQueue = [rollNodeOffers(g), rollNodeOffers(g), rollNodeOffers(g)];
-    } else {
-      g.run.nodeOfferQueue.shift();
-      g.run.nodeOfferQueue.push(rollNodeOffers(g));
-    }
+    // ✅ 분기 전진: (보스 노드라도 전진은 시켜서 다음 화면이 계속 의미 있게 돌아가게)
+    advanceBranchOffer(g, id);
 
     // ✅ 보물 후 10회(노드 기반) — TREASURE 선택 자체는 카운트하지 않음
     if (g.run.treasureObtained && actual !== "TREASURE") {
@@ -159,7 +175,7 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
         prompt: "무엇을 하시겠습니까?",
         options: [
           { key: "rest:heal", label: "HP +15" },
-          { key: "rest:clear_f", label: "F = 0" },
+          { key: "rest:clear_f", label: "F -3" },
           { key: "rest:skip", label: "생략" },
         ],
       };
@@ -169,8 +185,8 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
           healPlayer(g, 15);
           logMsg(g, "휴식: HP +15");
         } else if (key === "rest:clear_f") {
-          g.player.fatigue = 0;
-          logMsg(g, "휴식: 피로 F=0");
+          g.player.fatigue = Math.max( 0, g.player.fatigue - 3 );
+          logMsg(g, "휴식: 피로 F-=3");
         } else {
           logMsg(g, "휴식: 생략");
         }
@@ -202,7 +218,7 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
         const picked = opts.find((o) => o.key === key);
         if (!picked) return;
 
-        const outcome = picked.apply(g);
+        const outcome: EventOutcome = picked.apply(g);
 
         // -------------------------
         // A) REMOVE_PICK: 카드 1장 제거 선택 UI로 전환
@@ -303,7 +319,16 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
         g.choice = null;
         choiceHandler = null;
 
+        if (typeof outcome === "object" && outcome.kind === "BATTLE_SPECIAL") {
+          logMsg(g, outcome.title ? `이벤트 전투: ${outcome.title}` : "이벤트 전투 발생!");
+          spawnEncounter(g, { forcePatternIds: outcome.enemyIds });
+          startCombat(g);
+          render(g, actions);
+          return;
+        }
+
         if (outcome === "BATTLE") {
+
           spawnEncounter(g);
           startCombat(g);
           render(g, actions);
@@ -493,26 +518,48 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
     },
 
     onSelectEnemy: (enemyIndex: number) => {
-      const cur = g.pendingTarget;
-      if (!cur || cur.kind !== "damageSelect") return;
+      if (!g.pendingTarget || g.pendingTarget.kind !== "damageSelect") return;
 
-      const enemy = g.enemies[enemyIndex];
-      if (!enemy || enemy.hp <= 0) return;
-
-      applyDamageToEnemy(g, enemy, cur.amount);
-
-      // ✅ 전멸이면 남은 타겟 자동 취소(막힘 방지)
-      if (g.enemies.filter(e => e.hp > 0).length === 0) {
-        const skipped = g.pendingTargetQueue.length;
+      // ✅ 남은 적이 없으면: 남은 대상 선택을 자동으로 해제
+      if (aliveEnemies(g).length === 0) {
         g.pendingTarget = null;
         g.pendingTargetQueue = [];
-        if (skipped > 0) logMsg(g, `적 전멸: 남은 대상 선택 ${skipped}회 자동 취소`);
+        logMsg(g, "대상 선택 취소: 남은 적이 없습니다.");
         render(g, actions);
         return;
       }
 
-      // ✅ 다음 타겟으로 넘김 (큐에서 1개 꺼내 현재로)
-      g.pendingTarget = g.pendingTargetQueue.shift() ?? null;
+      const enemy = g.enemies[enemyIndex];
+      if (!enemy || enemy.hp <= 0) {
+        // ✅ 죽은 적을 클릭하면 그냥 무시(대기 유지)
+        logMsg(g, "대상 선택: 살아있는 적을 클릭하세요.");
+        render(g, actions);
+        return;
+      }
+
+      // ✅ 이번 선택 1개 소비
+      const amount = g.pendingTarget.amount;
+      applyDamageToEnemy(g, enemy, amount);
+
+      // ✅ (권장) 피해 후 전투 종료 체크 → 종료면 pending을 정리
+      // checkEndConditions가 접근 가능할 때만 사용
+      // checkEndConditions(g);
+
+      // ✅ 다음 타겟으로 넘어가기
+      if (g.pendingTargetQueue.length > 0) {
+        const next = g.pendingTargetQueue.shift()!;
+        g.pendingTarget = next;
+        const remaining = 1 + g.pendingTargetQueue.length;
+        logMsg(g, `대상 선택 필요: 적을 클릭하세요. (남은 선택 ${remaining})`);
+      } else {
+        g.pendingTarget = null;
+      }
+
+      // ✅ 만약 이번 타격으로 적이 모두 죽었다면, 남은 선택을 자동 해제
+      if (aliveEnemies(g).length === 0) {
+        g.pendingTarget = null;
+        g.pendingTargetQueue = [];
+      }
 
       render(g, actions);
     },

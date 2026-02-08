@@ -25,7 +25,15 @@ export function healPlayer(g: GameState, n: number) {
 }
 
 export function applyDamageToEnemy(g: GameState, enemy: EnemyState, raw: number) {
+  const idx = g.enemies.indexOf(enemy);
+  if (idx >= 0 && !g.attackedEnemyIndicesThisTurn.includes(idx)) {
+    g.attackedEnemyIndicesThisTurn.push(idx);
+  }
   if (raw <= 0) return;
+
+
+  const attackerWeak = g.player.status.weak ?? 0;     // ✅ 플레이어 약화
+  const targetVuln   = enemy.status.vuln ?? 0;        // ✅ 적 취약
 
   // ✅ 슬라임 등: 이번 턴 피해 면역
   if (enemy.immuneThisTurn) {
@@ -33,16 +41,16 @@ export function applyDamageToEnemy(g: GameState, enemy: EnemyState, raw: number)
     return;
   }
 
-  const vuln = enemy.status.vuln ?? 0;
-  const dmg = raw + vuln;
+  let dmg = raw - attackerWeak + targetVuln;
+  if (dmg < 0) dmg = 0;
 
   enemy.hp -= dmg;
   if (enemy.hp < 0) enemy.hp = 0;
 
-  logMsg(g, `적(${enemy.name})에게 ${dmg} 피해${vuln ? `(취약 +${vuln})` : ""}. (HP ${enemy.hp}/${enemy.maxHp})`);
+  logMsg(g, `적(${enemy.name})에게 ${dmg} 피해. (HP ${enemy.hp}/${enemy.maxHp})`);
 }
 
-export function applyDamageToPlayer(g: GameState, raw: number) {
+export function applyDamageToPlayer(g: GameState, raw: number, sourceEnemy: EnemyState | null = null) {
   if (raw <= 0) return;
 
   if (g.player.nullifyDamageThisTurn) {
@@ -50,8 +58,12 @@ export function applyDamageToPlayer(g: GameState, raw: number) {
     return;
   }
 
-  const vuln = g.player.status.vuln ?? 0;
-  let dmg = raw + vuln;
+
+  const attackerWeak = sourceEnemy?.status.weak ?? 0; // ✅ 적 약화(없으면 0)
+  const targetVuln   = g.player.status.vuln ?? 0;     // ✅ 플레이어 취약
+
+  let dmg = raw - attackerWeak + targetVuln;
+  if (dmg < 0) dmg = 0;
 
   // 블록 흡수
   const blocked = Math.min(g.player.block, dmg);
@@ -63,7 +75,7 @@ export function applyDamageToPlayer(g: GameState, raw: number) {
 
   logMsg(
     g,
-    `플레이어가 ${raw}${vuln ? `+${vuln}` : ""} 피해 → 블록 ${blocked} 흡수, 실제 ${dmg} 피해. (HP ${g.player.hp}/${g.player.maxHp}, 블록 ${g.player.block})`
+    `플레이어 피해 → 블록 ${blocked} 흡수, 실제 ${dmg} 피해. (HP ${g.player.hp}/${g.player.maxHp}, 블록 ${g.player.block})`
   );
 }
 

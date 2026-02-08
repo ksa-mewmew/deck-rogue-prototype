@@ -14,16 +14,35 @@ function enemyStateFromId(g: GameState, enemyId: string): EnemyState {
     status: { vuln: 0, weak: 0, bleed: 0, disrupt: 0 },
     immuneThisTurn: false,
     immuneNextTurn: false,
-    
-    soulCastCount: enemyId === "boss_soul_stealer" ? 0 : undefined,
+
+    soulWarnCount: enemyId === "boss_soul_stealer" ? 0 : undefined,
+    soulArmed: enemyId === "boss_soul_stealer" ? false : undefined,
+    soulWillNukeThisTurn: enemyId === "boss_soul_stealer" ? false : undefined,
   };
 }
 
-export function spawnEncounter(g: GameState, opt?: { forceBoss?: boolean }) {
+
+function patternAllowedByCooldown(g: GameState, pattern: string[], cooldownBattles = 5) {
+  const now = g.run.battleCount + 1; // 이번에 시작될 전투 번호
+  for (const id of pattern) {
+    const last = g.run.enemyLastSeenBattle[id];
+    if (last != null && now - last < cooldownBattles) return false;
+  }
+  return true;
+}
+
+export function spawnEncounter(g: GameState, opt?: { forceBoss?: boolean; forcePatternIds?: string[] }) {
   const forceBoss = opt?.forceBoss ?? false;
 
   // ✅ “현재 노드 번호” (전부 노드 기준으로 통일)
   const nodeNo = g.run.nodePickCount; // onChooseNode에서 +1 된 뒤 호출된다고 가정
+
+
+  if (opt?.forcePatternIds && opt.forcePatternIds.length > 0) {
+    g.enemies = opt.forcePatternIds.map((id) => enemyStateFromId(g, id));
+    logMsg(g, `전투 시작! (노드 ${nodeNo}) 적: ${g.enemies.map((e) => e.name).join(", ")}`);
+    return;
+  }
 
   // ✅ 30노드마다 강제 보스 직행을 구현했다면, 여기서는 forceBoss만 보면 됨
   if (forceBoss) {
@@ -58,7 +77,20 @@ export function spawnEncounter(g: GameState, opt?: { forceBoss?: boolean }) {
 
   // ✅ 기준은 이제 “노드” (원하시면 10 대신 다른 값으로 바꿔도 됨)
   const patterns = nodeNo <= 10 ? earlyPatterns : latePatterns;
-  const chosen = pickOne(patterns);
+// ✅ 쿨다운 만족 패턴만 필터
+  const allowed = patterns.filter(p => patternAllowedByCooldown(g, p, 5));
+  const pickFrom = allowed.length > 0 ? allowed : patterns; // 전부 막히면 폴백
+
+  const chosen = pickOne(pickFrom);
+
+  // ✅ 전투 카운트 증가 + 마지막 등장 기록
+  g.run.battleCount += 1;
+  for (const id of chosen) {
+    g.run.enemyLastSeenBattle[id] = g.run.battleCount;
+  }
+
+  g.enemies = chosen.map((id) => enemyStateFromId(g, id));
+  logMsg(g, `전투 시작! (노드 ${nodeNo}) 적: ${g.enemies.map(e => e.name).join(", ")}`);
 
   g.enemies = chosen.map((id) => enemyStateFromId(g, id));
 
@@ -114,10 +146,16 @@ export function startCombat(g: GameState) {
   g.phase = "PLACE";
 }
 
+const SOUL_WARN_INTENT_INDEX = 2;     // ✅ 3번 의도 = intents[2]
+const SOUL_NUKE_CHANCE = 0.6;        // ✅ “언젠가” 확률(원하면 0.1~0.4 등 조절)
+
+
 
 export function revealIntentsAndDisrupt(g: GameState) {
   if (g.intentsRevealedThisTurn) return; // ✅ 중복 방지
   g.intentsRevealedThisTurn = true;
+
+  g.attackedEnemyIndicesThisTurn = [];
 
   g.phase = "REVEAL";
 
@@ -134,18 +172,41 @@ export function revealIntentsAndDisrupt(g: GameState) {
   // 적 의도 공개
   for (const e of aliveEnemies(g)) {
     const def = g.content.enemiesById[e.id];
+    const len = def.intents.length;
+    if (len <= 0) continue;
 
-    // ✅ 영혼 강탈자: 카운트다운 표시
+    e.intentIndex = Math.floor(Math.random() * len);
+
     if (e.id === "boss_soul_stealer") {
-      const count = e.soulCastCount ?? 0;
-      const remain = Math.max(0, 5 - count);
-      const note = remain === 0 ? " (다음 행동: 50 피해!)" : ` (50피해까지 ${remain}턴)`;
-      const intent = def.intents[e.intentIndex % def.intents.length];
-      logMsg(g, `적 의도: ${e.name} → ${intent.label}${note}`);
+      // ✅ 매 턴 공개 시점에 “이번 턴 폭발 여부”를 확정
+      e.soulWillNukeThisTurn = false;
+
+      const warn = e.soulWarnCount ?? 0;
+      const armed = !!e.soulArmed;
+
+      if (armed) {
+        // 확률로 이번 턴 50딜 확정
+        if (Math.random() < SOUL_NUKE_CHANCE) {
+          e.soulWillNukeThisTurn = true;
+          logMsg(g, `적 의도: ${e.name} → 영혼 폭발 (50 피해!)`);
+          continue;
+        }
+
+        // 폭발은 아니지만 “언젠가” 가능 상태임을 표시
+        e.intentIndex = Math.floor(Math.random() * len);
+        const intent = def.intents[e.intentIndex];
+        logMsg(g, `적 의도: ${e.name} → ${intent.label} (⚠ 폭발 가능 상태)`);
+        continue;
+      }
+
+      // ARMED 전: 일반 랜덤 의도 + 경고 카운트 표시
+      e.intentIndex = Math.floor(Math.random() * len);
+      const intent = def.intents[e.intentIndex];
+      logMsg(g, `적 의도: ${e.name} → ${intent.label} (경고 ${warn}/3)`);
       continue;
     }
 
-    const intent = def.intents[e.intentIndex % def.intents.length];
+    const intent = def.intents[e.intentIndex];
     logMsg(g, `적 의도: ${e.name} → ${intent.label}`);
   }
 
@@ -306,28 +367,44 @@ export function resolveEnemy(g: GameState) {
   logMsg(g, "=== 적 행동 ===");
 
   for (const e of aliveEnemies(g)) {
-    if (e.id === "boss_soul_stealer") {
-      const count = e.soulCastCount ?? 0;
-      if (count >= 5) {
-        applyDamageToPlayer(g, 50);
-        logMsg(g, "영혼 강탈자: 누적 5회 시전 → 50 피해!");
-        e.soulCastCount = 0;  // 발동 후 리셋(원하시면 리셋 없이 1회성으로도 가능)
-        e.intentIndex += 1;
-        continue; // 이번 턴은 50 피해로 대체
-      }
-    }
     const def = g.content.enemiesById[e.id];
     const intent = def.intents[e.intentIndex % def.intents.length];
 
+    if (e.id === "boss_soul_stealer") {
+      if (e.soulWillNukeThisTurn) {
+        applyDamageToPlayer(g, 50, e);
+        logMsg(g, "영혼 강탈자: 영혼 폭발 → 50 피해!");
+
+        // ✅ 폭발 후 리셋(다시 경고 0부터)
+        e.soulWillNukeThisTurn = false;
+        e.soulArmed = false;
+        e.soulWarnCount = 0;
+        continue;
+      }
+
+
+      for (const act of intent.acts) {
+        resolveEnemyEffect(g, e, act);
+      }
+
+      // ✅ “3번 의도”가 실행된 경우에만 경고 카운트 +1
+      if (e.intentIndex === SOUL_WARN_INTENT_INDEX) {
+        e.soulWarnCount = (e.soulWarnCount ?? 0) + 1;
+        logMsg(g, `영혼 강탈자: 경고 +1 (${e.soulWarnCount}/3)`);
+
+        if ((e.soulWarnCount ?? 0) >= 3) {
+          e.soulArmed = true;
+          logMsg(g, "영혼 강탈자: 경고 3회 완료 → 폭발 가능 상태!");
+        }
+      }
+
+      continue;
+    }
+
+      // ✅ 일반 적 처리(이게 없어서 지금 ‘적 행동이 안 함’이 발생)
     for (const act of intent.acts) {
       resolveEnemyEffect(g, e, act);
     }
-
-    if (e.id === "boss_soul_stealer") {
-      e.soulCastCount = (e.soulCastCount ?? 0) + 1;
-    }
-
-    e.intentIndex += 1;
   }
 
   g.phase = "UPKEEP";
@@ -336,17 +413,17 @@ export function resolveEnemy(g: GameState) {
 function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
   switch (act.op) {
     case "damagePlayer":
-      applyDamageToPlayer(g, act.n);
+      applyDamageToPlayer(g, act.n, enemy);
       break;
 
     case "damagePlayerFormula":
       if (act.kind === "goblin_raider") {
         const dmg = Math.max(0, 12 - g.usedThisTurn);
-        applyDamageToPlayer(g, dmg);
+        applyDamageToPlayer(g, dmg, enemy);
         logMsg(g, `고블린 약탈자: 12 - 사용 ${g.usedThisTurn}장 = ${dmg} 피해`);
       } else {
         const dmg = 4 + g.usedThisTurn;          // 감시 석상
-        applyDamageToPlayer(g, dmg);
+        applyDamageToPlayer(g, dmg, enemy);
       }
       break;
 
@@ -367,10 +444,15 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
 
     case "enemyImmuneThisTurn":
       enemy.immuneThisTurn = true;
-      logMsg(g, `적(${enemy.name})이(가) 다음 턴 피해 면역 상태가 됨`);
+      logMsg(g, `적(${enemy.name})이(가) 피해 면역 상태가 됨`);
       break;
     
-    case "fatiguePlayer":
+    case "enemyImmuneNextTurn":
+      enemy.immuneNextTurn = true;
+      logMsg(g, `적(${enemy.name})이(가) 다음 턴 피해 면역 상태가 됨`);
+      break;
+
+      case "fatiguePlayer":
       g.player.fatigue = Math.max(0, g.player.fatigue + act.n);
       logMsg(g, `적 효과: 피로 F ${act.n >= 0 ? "+" : ""}${act.n} (현재 ${g.player.fatigue})`);
       break;
@@ -401,6 +483,7 @@ export function upkeepEndTurn(g: GameState) {
   }
   if (frontCount > 0) logMsg(g, `전열 유지비 처리: 전열 ${frontCount}장`);
 
+
   // S=0 종료 패널티
   if (g.player.supplies === 0) {
     g.player.zeroSupplyTurns += 1;
@@ -417,6 +500,22 @@ export function upkeepEndTurn(g: GameState) {
     if (g.player.hp < 0) g.player.hp = 0;
     logMsg(g, `출혈로 HP -${bleed} (현재 ${g.player.hp}/${g.player.maxHp})`);
   }
+
+  for (const en of aliveEnemies(g)) {
+    const b = en.status.bleed ?? 0;
+    if (b > 0) {
+      if (!en.immuneThisTurn) {
+        en.hp = Math.max(0, en.hp - b);
+        logMsg(g, `적(${en.name}) 출혈로 HP -${b} (HP ${en.hp}/${en.maxHp})`);
+      } else {
+        logMsg(g, `적(${en.name})은(는) 이번 턴 면역이라 출혈 피해 무시`);
+      }
+    }
+  }
+
+
+  // 초기화
+  g.frontPlacedThisTurn = 0
 
   // 상태 감소(프로토타입: 1씩 감소)
   decayStatuses(g);
@@ -524,6 +623,7 @@ export function checkEndConditions(g: GameState) {
     // 전투 승리 처리(phase는 drawStep에서 NODE로 전환)
     logMsg(g, "승리: 적을 모두 처치!");
     endCombatReturnAllToDeck(g);
+    g.player.zeroSupplyTurns = 0
     g.phase = "NODE";
     if (g.run.treasureObtained) g.run.afterTreasureNodePicks += 1;
 
@@ -573,6 +673,8 @@ export function endCombatReturnAllToDeck(g: GameState) {
   // 전투 중 잔재(있으면)
   g.pendingTarget = null as any;
   if ((g as any).pendingTargetQueue) (g as any).pendingTargetQueue = [];
+
+
 
   // 섞기(전투 종료마다 섞기 원하면 유지)
   shuffleInPlace(g.deck);

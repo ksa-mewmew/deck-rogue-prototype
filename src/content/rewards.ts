@@ -23,6 +23,13 @@ export const REWARD_POOL: RewardEntry[] = [
   { id: "arrow_rain", weight: 5 },
   { id: "smoke", weight: 1 },
   { id: "redeploy", weight: 5 },
+ 
+  { id: "secret_strike", weight: 1 },
+  { id: "fire_scroll", weight: 1 },
+  { id: "caltrops", weight: 3 },
+  { id: "emergency_rations", weight: 3 },
+  { id: "painkiller", weight: 3 },
+  { id: "field_experience", weight: 3 },  
   // ...
 ];
 
@@ -85,10 +92,16 @@ export function removeRandomCardFromDeck(g: GameState) {
   logMsg(g, `카드 제거: [${g.content.cardsById[c.defId].name}]`);
 }
 
+const CURSED_TREASURE_ID = "goal_treasure";
+
 export function removeCardByUid(g: GameState, uid: string) {
   const inst = g.cards[uid];
   if (!inst) return;
 
+  if (inst.defId === CURSED_TREASURE_ID) {
+    logMsg(g, "저주받은 보물은 덱에서 제거할 수 없습니다.");
+    return; // ✅ 제거 막기
+  }  
   // zone 제거
   g.deck = g.deck.filter((x) => x !== uid);
   g.hand = g.hand.filter((x) => x !== uid);

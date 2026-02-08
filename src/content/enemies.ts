@@ -8,19 +8,36 @@ export const ENEMIES: EnemyData[] = [
     intents: [{ label: "아무 행동도 하지 않음", acts: [] }],
   },
 
+
+  {
+    id: "other_adventurer",
+    name: "보물을 노리는 다른 모험가",
+    maxHp: 40,
+    intents: [
+      { label: "10 피해", acts: [{ op: "damagePlayer", n: 10 }] },
+      { label: "교란/출혈2/취약2/약화2", acts: [
+          { op: "statusPlayer", key: "disrupt", n: 1 },
+          { op: "statusPlayer", key: "bleed", n: 2 },
+          { op: "statusPlayer", key: "vuln", n: 2 },
+          { op: "statusPlayer", key: "weak", n: 2 },
+        ],
+      },
+    ],
+  }, 
+
   // 10회 이하에만 등장
   {
     id: "goblin_raider",
     name: "고블린 약탈자",
-    maxHp: 20,
+    maxHp: 15,
     intents: [
       {
         label: "(12-이번 턴에 사용한 카드의 수) 피해",
         acts: [{ op: "damagePlayerFormula", kind: "goblin_raider" }],
       },
       {
-        label: "S -= 2",
-        acts: [{ op: "supplies", n: -2 }],
+        label: "S -= 4",
+        acts: [{ op: "supplies", n: -4 }],
       },
     ],
   },
@@ -40,8 +57,8 @@ export const ENEMIES: EnemyData[] = [
     name: "조약돌 골렘",
     maxHp: 25,
     intents: [
-      { label: "4 피해", acts: [{ op: "damagePlayer", n: 4 }] },
-      { label: "자신 HP 4 회복", acts: [{ op: "enemyHealSelf", n: 4 }] },
+      { label: "6 피해", acts: [{ op: "damagePlayer", n: 6 }] },
+      { label: "자신 HP 6 회복", acts: [{ op: "enemyHealSelf", n: 6 }] },
     ],
   },
 
@@ -60,7 +77,7 @@ export const ENEMIES: EnemyData[] = [
     name: "슬라임",
     maxHp: 30,
     intents: [
-      { label: "이번 턴 동안 피해를 입지 않음", acts: [{ op: "enemyImmuneThisTurn" }] },
+      { label: "다음 턴 동안 피해를 입지 않음", acts: [{ op: "enemyImmuneNextTurn" }] },
       {
         label: "약화 2 부여 후 HP+=3",
         acts: [{ op: "statusPlayer", key: "weak", n: 2 }],
@@ -75,6 +92,7 @@ export const ENEMIES: EnemyData[] = [
     maxHp: 100,
     intents: [
       { label: "F += 1", acts: [{ op: "fatiguePlayer", n: 1 }] },
+      { label: "아무 행동도 하지 않음", acts: [] },
     ],
   },
 
@@ -84,7 +102,7 @@ export const ENEMIES: EnemyData[] = [
     maxHp: 70,
     intents: [
       { label: "피해 15", acts: [{ op: "damagePlayer", n: 15 }] },
-      { label: "이번 턴 동안 피해를 입지 않음", acts: [{ op: "enemyImmuneThisTurn" }] },
+      { label: "다음 턴 동안 피해를 입지 않음", acts: [{ op: "enemyImmuneNextTurn" }] },
     ],
   },
 

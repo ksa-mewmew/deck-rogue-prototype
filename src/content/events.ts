@@ -1,26 +1,31 @@
 import type { GameState } from "../engine/types";
-import { logMsg, pickOne } from "../engine/rules";
+import { logMsg } from "../engine/rules";
 import { addFatigue } from "../engine/effects";
 
-export type EventOptionOutcome =
+export type EventOutcome =
   | "NONE"
   | "BATTLE"
   | "REWARD_PICK"
-  | { kind: "REMOVE_PICK"; title: string; prompt?: string; then: "NONE" | "REWARD_PICK" | "BATTLE"; };
+  | { kind: "REMOVE_PICK"; title: string; prompt?: string; then: "NONE" | "REWARD_PICK" | "BATTLE" }
+  | { kind: "BATTLE_SPECIAL"; enemyIds: string[]; title?: string };
 
 export type EventOption = {
   key: string;
   label: string;
   detail?: string;
-  apply: (g: GameState) => EventOptionOutcome;
+  apply: (g: GameState) => EventOutcome; // ✅ 핵심
 };
 
 export type EventDef = {
   id: string;
   name: string;
-  prompt?: string;
-  options: (g: GameState) => EventOption[];
+  prompt: string;
+  options: (g: GameState) => EventOption[]; // ✅ 핵심
 };
+
+export function pickRandomEvent(): EventDef {
+  return EVENTS[Math.floor(Math.random() * EVENTS.length)];
+}
 
 export const EVENTS: EventDef[] = [
   {
@@ -51,7 +56,7 @@ export const EVENTS: EventDef[] = [
   {
     id: "hide_from_monster",
     name: "몬스터로부터 숨기",
-    prompt: "전투를 피하거나, 대가를 치르고 숨을 수 있습니다.",
+    prompt: "전투하거나, 대가를 치르고 숨을 수 있습니다.",
     options: () => [
       {
         key: "fight",
@@ -80,10 +85,10 @@ export const EVENTS: EventDef[] = [
     options: () => [
       {
         key: "accept",
-        label: "F += (덱 매수)/10 (버림)",
+        label: "F += (덱 매수)/5 (버림)",
         apply: (g) => {
           const deckSize = Object.values(g.cards).filter((c) => ["deck", "hand", "discard"].includes(c.zone)).length;
-          const add = Math.floor(deckSize / 10);
+          const add = Math.floor(deckSize / 5);
           addFatigue(g, add);
           logMsg(g, `이벤트: 과중량 (덱 ${deckSize}장 → F +${add})`);
           return "NONE";
@@ -96,16 +101,19 @@ export const EVENTS: EventDef[] = [
     id: "find_adventurer",
     name: "다른 모험가 발견",
     prompt: "거래를 하거나, 보물을 가진 상태라면 싸움을 피하기 어렵습니다.",
-    options: (g) => {
+    options: (g: GameState) => {
+      // ✅ 보물을 가진 상태면: 즉시 “모험가 전투”로 확정
       if (g.run.treasureObtained) {
         return [
           {
-            key: "forced_battle",
-            label: "보물을 노린다! → 전투 돌입",
-            apply: (gg) => {
-              logMsg(gg, "이벤트: 다른 모험가 발견(보물 보유) → 전투 강제");
-              return "BATTLE";
-            },
+            key: "adventurer:forced_battle",
+            label: "대치한다",
+            detail: "보물을 노리고 덤벼든다.",
+            apply: (_g: GameState) => ({
+              kind: "BATTLE_SPECIAL",
+              enemyIds: ["other_adventurer"],
+              title: "보물을 노리는 모험가",
+            }),
           },
         ];
       }
@@ -150,7 +158,3 @@ export const EVENTS: EventDef[] = [
     ],
   },
 ];
-
-export function pickRandomEvent(): EventDef {
-  return pickOne(EVENTS);
-}
