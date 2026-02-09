@@ -120,7 +120,7 @@ export const CARDS: CardData[] = [
     id: "redeploy",
     name: "재배치",
     frontText: "S +2",
-    backText: "2번 슬롯에 있는 후열 카드의 전열 효과 발동",
+    backText: "3번 슬롯에 있는 후열 카드의 전열 효과 발동",
     front: [{ op: "supplies", n: 2 }],
     back: [{ op: "triggerFrontOfBackSlot", index: 2 }],
   },

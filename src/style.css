@@ -1,52 +1,258 @@
+/* =========================
+   Theme tokens
+========================= */
 :root {
+  --bg: #f6f7fb;
+  --panel: #ffffff;
+  --text: #121417;
+  --muted: #5b6472;
+  --line: rgba(17, 24, 39, 0.12);
+
+  --shadow: 0 10px 30px rgba(16, 24, 40, 0.08);
+  --shadow-sm: 0 2px 10px rgba(16, 24, 40, 0.06);
+
+  --r-lg: 16px;
+  --r-md: 12px;
+  --r-sm: 10px;
+
+  --accent: #111;       /* 버튼 강조(기존 컨셉 유지) */
+  --accent-soft: rgba(17, 17, 17, 0.08);
+
   font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
-  color: #111;
-  background: #f6f6f6;
+  color: var(--text);
+  background: var(--bg);
 }
+
 * { box-sizing: border-box; }
 body { margin: 0; }
-#app { padding: 16px; display: grid; gap: 12px; }
-.row { display: grid; gap: 10px; }
-.top { grid-template-columns: 1fr 1fr; align-items: start; }
-.panel {
-  background: #fff;
-  border: 1px solid #ddd;
-  border-radius: 12px;
-  padding: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+
+/* 살짝 여백/레이아웃 정돈 */
+#app {
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+  max-width: 1200px;
+  margin: 0 auto;
 }
-h2 { margin: 0 0 8px; font-size: 16px; }
-h3 { margin: 0 0 6px; font-size: 14px; }
-small { color: #444; }
-.stats { display: grid; grid-template-columns: repeat(7, max-content); gap: 10px 14px; align-items: center; }
-.badge { padding: 2px 8px; border: 1px solid #ddd; border-radius: 999px; background: #fafafa; font-size: 12px; }
-.grid6 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.slot { min-height: 88px; border: 1px dashed #bbb; border-radius: 10px; padding: 8px; background: #fcfcfc; display: grid; gap: 6px; }
-.slot.disabled { opacity: .55; outline: 2px solid #aaa; }
-.card { border: 1px solid #ddd; border-radius: 10px; padding: 8px; background: #fff; cursor: pointer; user-select: none; transition: transform .06s ease; }
-.card:hover { transform: translateY(-1px); }
-.card.selected { outline: 2px solid #111; }
-.card.vanish { border-color: #b11; }
-.cardTitle { font-weight: 700; margin-bottom: 4px; }
+
+.row { display: grid; gap: 12px; }
+.top { grid-template-columns: 1fr 1fr; align-items: start; }
+
+/* =========================
+   Panels
+========================= */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 14px;
+  box-shadow: var(--shadow-sm);
+}
+
+/* 타이포 조금 더 부드럽게 */
+h2 {
+  margin: 0 0 10px;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+small { color: var(--muted); }
+
+/* =========================
+   Badges / Stats
+========================= */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(7, max-content);
+  gap: 10px 14px;
+  align-items: center;
+}
+
+.badge {
+  padding: 3px 9px;
+  border: 1px solid rgba(17, 24, 39, 0.14);
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.03);
+  font-size: 12px;
+  color: rgba(17, 24, 39, 0.9);
+}
+
+/* =========================
+   Slots
+========================= */
+.grid6 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+
+.slot {
+  min-height: 92px;
+  border: 1px dashed rgba(17, 24, 39, 0.25);
+  border-radius: var(--r-md);
+  padding: 10px;
+  background: linear-gradient(180deg, rgba(17,24,39,0.02), rgba(17,24,39,0.01));
+  display: grid;
+  gap: 8px;
+}
+
+.slot.placeable {
+  border-style: solid;
+  border-color: rgba(17, 17, 17, 0.22);
+}
+
+.slot.dropHover {
+  outline: 2px solid rgba(17,17,17,0.25);
+  background: rgba(17,17,17,0.04);
+}
+
+.slot.disabled {
+  opacity: .58;
+  outline: 2px solid rgba(17, 24, 39, 0.20);
+}
+
+/* =========================
+   Cards
+========================= */
+.card {
+  border: 1px solid rgba(17, 24, 39, 0.14);
+  border-radius: var(--r-md);
+  padding: 10px;
+  background: #fff;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.06);
+  transition: transform .08s ease, box-shadow .12s ease, border-color .12s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.10);
+}
+
+.card.selected { outline: 2px solid rgba(17,17,17,0.65); outline-offset: 1px; }
+
+.card.vanish { border-color: rgba(177, 17, 17, 0.55); }
+.card.exhaust { border-color: rgba(17, 24, 39, 0.35); opacity: 0.96; }
+
+.cardTitle { font-weight: 800; margin-bottom: 4px; letter-spacing: -0.01em; }
 .cardMeta { display: flex; gap: 6px; flex-wrap: wrap; }
-.cardText { font-size: 12px; color: #222; line-height: 1.35; margin-top: 6px; white-space: pre-wrap; }
-.hand { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
-.controls { display: flex; flex-wrap: wrap; gap: 8px; }
-button { border: 1px solid #ddd; background: #fff; border-radius: 10px; padding: 8px 10px; cursor: pointer; }
-button.primary { border-color: #111; }
-button:disabled { opacity: .5; cursor: not-allowed; }
-.log { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; white-space: pre-wrap; max-height: 260px; overflow: auto; background: #0b0b0b; color: #e8e8e8; border-radius: 12px; padding: 10px; }
-.hr { height: 1px; background: #eee; margin: 10px 0; }
+
+.cardText {
+  font-size: 12px;
+  color: rgba(17, 24, 39, 0.88);
+  line-height: 1.45;
+  margin-top: 6px;
+  white-space: pre-wrap;
+}
+
+/* 손패: 살짝 더 여유 */
+.hand {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+/* 드롭핸드 하이라이트 */
 .hand.dropHoverHand {
   outline: 2px dashed rgba(255,160,0,0.8);
   background: rgba(255,160,0,0.06);
+  border-radius: var(--r-lg);
+  padding: 8px;
 }
+
+/* =========================
+   Buttons / Controls
+========================= */
+.controls { display: flex; flex-wrap: wrap; gap: 8px; }
+
+button {
+  border: 1px solid rgba(17, 24, 39, 0.16);
+  background: #fff;
+  border-radius: 12px;
+  padding: 9px 12px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  transition: transform .08s ease, box-shadow .12s ease, background .12s ease, border-color .12s ease;
+}
+
+button:hover {
+  background: rgba(17,17,17,0.03);
+  border-color: rgba(17,17,17,0.22);
+  box-shadow: 0 10px 20px rgba(16,24,40,0.08);
+  transform: translateY(-1px);
+}
+
+button:active { transform: translateY(0); box-shadow: none; }
+
+button.primary {
+  border-color: rgba(17,17,17,0.85);
+  background: linear-gradient(180deg, rgba(17,17,17,0.06), rgba(17,17,17,0.02));
+}
+
+button.primary:hover {
+  background: linear-gradient(180deg, rgba(17,17,17,0.10), rgba(17,17,17,0.04));
+}
+
+button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* =========================
+   Rulebook / Choice text
+========================= */
+/* ✅ 룰북: 라이트 테마에 맞게 */
 .rulebook {
+  font-family: inherit;
   white-space: pre-wrap;
-  line-height: 1.4;
+  line-height: 1.6;
+  font-size: 14px;
+
   max-height: 60vh;
   overflow: auto;
-  padding: 12px;
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 12px;
+
+  padding: 14px;
+  border: 1px solid rgba(17, 24, 39, 0.14);
+  border-radius: var(--r-lg);
+  background: rgba(17, 24, 39, 0.02);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
 }
+
+/* 긴 목록(덱/버림 보기)이면 버튼 텍스트가 길어지니까 보기 좋게 */
+button.primary {
+  text-align: left;
+  line-height: 1.25;
+}
+
+/* =========================
+   Log
+========================= */
+.log, pre.log {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 260px;
+  overflow: auto;
+
+  background: #0b0b0b;
+  color: #e8e8e8;
+  border-radius: var(--r-lg);
+  padding: 12px;
+  box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+}
+
+/* =========================
+   Divider
+========================= */
+hr { border: 0; border-top: 1px solid rgba(17, 24, 39, 0.10); margin: 12px 0; }
+.hr { height: 1px; background: rgba(17, 24, 39, 0.10); margin: 12px 0; }

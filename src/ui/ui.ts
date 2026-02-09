@@ -17,6 +17,7 @@ const RULEBOOK_TEXT = `# Deck Rogue Prototype — 룰북 (플레이어용)
 덱을 섞을 때 피로도만큼 피해를 입습니다. 피로도는 전투가 끝나도 유지됩니다.
 
 보급이 부족한 채로 턴을 마칠 때, 사용한 전열 카드 한 장 당 HP를 3 잃으며, F가 1 증가합니다.
+이 효과는 보급 자체에 의한 HP 손실과 별개입니다!
 
 [3] 전투 흐름
 배치 → 후열 발동 → 전열 발동 → 적 행동 → 정리 → 드로우
@@ -36,6 +37,7 @@ const RULEBOOK_TEXT = `# Deck Rogue Prototype — 룰북 (플레이어용)
 - 1~3: 전열 배치 / Shift+1~3: 후열 배치
 - 드래그: 손패→슬롯 배치, 슬롯↔슬롯 스왑, 슬롯→손패 회수
 `;
+
 
 
 
@@ -82,6 +84,13 @@ type DragState =
 
 type SlotDrop = { side: Side; idx: number };
 
+type Overlay =
+  | { kind: "RULEBOOK" }
+  | { kind: "PILE"; pile: PileKind };
+
+let overlay: Overlay | null = null;
+let overlayStack: Overlay[] = [];
+
 let uiMounted = false;
 let drag: DragState = null;
 let hoverSlot: SlotDrop | null = null;
@@ -92,6 +101,11 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
   const actions = {
     rerender: () => render(g, actions),
 
+    onCloseOverlay: () => {
+      overlay = overlayStack.pop() ?? null;
+      render(g, actions);
+    },
+
     onNewRun: () => {
       // ✅ createInitialState는 content 필요
       const next = createInitialState(g.content);
@@ -99,16 +113,11 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
     },
 
     onViewRulebook: () => {
-      // 룰북은 “단일 모달”로만 보이게: 스택 비우기
-      g.choiceStack = [];
-      g.choice = {
-        kind: "VIEW_PILE", // ✅ 기존 kind 재사용(타입 건드리지 않으려고)
-        title: "룰북",
-        prompt: RULEBOOK_TEXT,
-        options: [{ key: "close", label: "닫기" }],
-      };
+      if (overlay) overlayStack.push(overlay);
+      overlay = { kind: "RULEBOOK" };
       render(g, actions);
     },
+
 
     onReturnSlotToHand: (fromSide: Side, fromIdx: number) => {
       if (g.run.finished) return;
@@ -144,56 +153,8 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
     },
 
     onViewPile: (pile: PileKind) => {
-      const title =
-        pile === "deck"
-          ? "덱"
-          : pile === "discard"
-          ? "버림 더미"
-          : pile === "exhausted"
-          ? "소모(이번 전투에서 제거)"
-          : pile === "vanished"
-          ? "소실(영구 제거)"
-          : "손패";
-
-      const uids =
-        pile === "deck"
-          ? g.deck
-          : pile === "discard"
-          ? g.discard
-          : pile === "exhausted"
-          ? g.exhausted
-          : pile === "vanished"
-          ? g.vanished
-          : g.hand;
-
-      const sortedUids = [...uids].sort((a, b) => {
-        const da = g.content.cardsById[g.cards[a].defId];
-        const db = g.content.cardsById[g.cards[b].defId];
-        const nameCmp = da.name.localeCompare(db.name, "ko");
-        if (nameCmp !== 0) return nameCmp;
-        return a.localeCompare(b);
-      });
-
-      g.choiceStack = [];
-
-      g.choice = {
-        kind: "VIEW_PILE",
-        title: `${title} (${uids.length})`,
-        prompt: "목록을 확인하세요.",
-        options: [
-          ...sortedUids.map((uid) => {
-            const def = g.content.cardsById[g.cards[uid].defId];
-            return {
-              key: `noop:${uid}`,
-              label: def.name,
-              detail: `전열: ${def.frontText} / 후열: ${def.backText}`,
-              cardUid: uid,
-            };
-          }),
-          { key: "close", label: "닫기" },
-        ],
-      };
-
+      if (overlay) overlayStack.push(overlay);
+      overlay = { kind: "PILE", pile };
       render(g, actions);
     },
 
@@ -468,18 +429,6 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
 
     onChooseChoice: (key: string) => {
       if (!g.choice) return;
-
-      // VIEW_PILE 닫기
-      if (g.choice.kind === "VIEW_PILE") {
-        if (key === "close") {
-          // ✅ 한 번에 다 닫기
-          g.choice = null;
-          g.choiceStack = [];
-          render(g, actions);
-        }
-        return;
-      }
-
       if (!choiceHandler) return;
       choiceHandler(key);
     },
@@ -687,8 +636,9 @@ export function render(g: GameState, actions: UIActions) {
 
   if (g.run.finished) {
     right.appendChild(p("런 종료"));
+  } else if (overlay) {
+    renderOverlay(right, g, actions, overlay);
   } else if (g.choice) {
-    // ✅ NODE여도 choice가 있으면 먼저 띄운다
     renderChoice(right, g, actions);
   } else if (g.phase === "NODE") {
     renderNodeSelect(right, g, actions);
@@ -1020,10 +970,14 @@ function labelList(offers: Array<{ type: "BATTLE" | "REST" | "EVENT" | "TREASURE
   return offers.map((o) => nodeLabel(o.type, false)).join(" / ");
 }
 function renderNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
-  root.appendChild(
-    p(`[선택 ${g.run.nodePickCount}회] [보물 ${g.run.treasureObtained ? "O" : "X"}] [보물 후 ${g.run.afterTreasureNodePicks}/10]`)
-  );
+  const parts: string[] = [`[선택 ${g.run.nodePickCount}회]`];
 
+  if (g.run.treasureObtained) {
+    parts.push(`[보물 후 ${g.run.afterTreasureNodePicks}/10]`);
+  }
+
+  root.appendChild(p(parts.join(" ")));
+  
   const nextIndex = g.run.nodePickCount + 1;
   const isBossNode = nextIndex % 30 === 0;
   const isBossNextAfterPick = (g.run.nodePickCount + 2) % 30 === 0;
@@ -1163,4 +1117,64 @@ function logBox(text: string) {
   pre.className = "log";
   pre.textContent = text;
   return pre;
+}
+
+function renderOverlay(root: HTMLElement, g: GameState, actions: UIActions & { onCloseOverlay: () => void }, ov: Overlay) {
+  const title =
+    ov.kind === "RULEBOOK"
+      ? "룰북"
+      : ov.pile === "deck"
+      ? "덱"
+      : ov.pile === "discard"
+      ? "버림 더미"
+      : ov.pile === "exhausted"
+      ? "소모(이번 전투)"
+      : ov.pile === "vanished"
+      ? "소실(영구)"
+      : "손패";
+
+  root.appendChild(h3(title));
+
+  // 본문
+  if (ov.kind === "RULEBOOK") {
+    const pre = document.createElement("pre");
+    pre.className = "rulebook";
+    pre.textContent = RULEBOOK_TEXT;
+    root.appendChild(pre);
+  } else {
+    const uids =
+      ov.pile === "deck"
+        ? g.deck
+        : ov.pile === "discard"
+        ? g.discard
+        : ov.pile === "exhausted"
+        ? g.exhausted
+        : ov.pile === "vanished"
+        ? g.vanished
+        : g.hand;
+
+    const sortedUids = [...uids].sort((a, b) => {
+      const da = g.content.cardsById[g.cards[a].defId];
+      const db = g.content.cardsById[g.cards[b].defId];
+      const nameCmp = da.name.localeCompare(db.name, "ko");
+      if (nameCmp !== 0) return nameCmp;
+      return a.localeCompare(b);
+    });
+
+    const list = div("controls");
+    for (const uid of sortedUids) {
+      const def = g.content.cardsById[g.cards[uid].defId];
+      const b = document.createElement("button");
+      b.className = "primary";
+      b.textContent = `${def.name} — 전열: ${def.frontText} / 후열: ${def.backText}`;
+      b.onclick = () => {}; // 정보만 보여주려면 noop
+      list.appendChild(b);
+    }
+    root.appendChild(list);
+  }
+
+  // 닫기
+  const row = div("controls");
+  row.appendChild(button("닫기", actions.onCloseOverlay, false));
+  root.appendChild(row);
 }
