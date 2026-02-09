@@ -431,7 +431,12 @@ export function upkeepEndTurn(g: GameState) {
   if (g.phase !== "UPKEEP") return;
   logMsg(g, "=== 유지비 / 상태 처리 ===");
 
+
+  
   const frontCount = g.frontPlacedThisTurn;
+
+  if (frontCount > 0) logMsg(g, `전열 유지비 처리: 전열 ${frontCount}장`);
+
   for (let i = 0; i < frontCount; i++) {
     if (g.player.supplies > 0) {
       g.player.supplies -= 1;
@@ -442,7 +447,7 @@ export function upkeepEndTurn(g: GameState) {
       logMsg(g, `전열 유지비 부족: HP -3, F +1 (HP ${g.player.hp}, F ${g.player.fatigue})`);
     }
   }
-  if (frontCount > 0) logMsg(g, `전열 유지비 처리: 전열 ${frontCount}장`);
+
 
   if (g.player.supplies === 0) {
     g.player.zeroSupplyTurns += 1;
@@ -495,10 +500,18 @@ function decayStatuses(g: GameState) {
 export function drawStepStartNextTurn(g: GameState) {
   if (g.phase !== "DRAW") return;
 
-  // ✅ 새 턴 시작을 위해 의도 공개 플래그를 반드시 리셋해야 함
-
+  // ✅ 새 턴 시작 플래그 리셋
   g.intentsRevealedThisTurn = false;
   g.disruptIndexThisTurn = null;
+
+  // ✅ 먼저 종료 조건부터 확인 (전투가 끝났으면 드로우/리셔플 자체를 하지 않음)
+  checkEndConditions(g);
+  if (g.run.finished) return;
+
+  if (aliveEnemies(g).length === 0) {
+    g.phase = "NODE";
+    return;
+  }
 
   const n = g.usedThisTurn;
   g.usedThisTurn = 0;
@@ -510,16 +523,9 @@ export function drawStepStartNextTurn(g: GameState) {
     logMsg(g, "방어(블록) 소실");
   }
 
-  checkEndConditions(g);
-  if (g.run.finished) return;
-
-  if (aliveEnemies(g).length === 0) {
-    g.phase = "NODE";
-    return;
-  }
-
   revealIntentsAndDisrupt(g);
 }
+
 
 export function drawCards(g: GameState, n: number): number {
   let drawn = 0;

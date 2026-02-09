@@ -41,3 +41,12 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   outline: 2px dashed rgba(255,160,0,0.8);
   background: rgba(255,160,0,0.06);
 }
+.rulebook {
+  white-space: pre-wrap;
+  line-height: 1.4;
+  max-height: 60vh;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 12px;
+}

@@ -1,4 +1,44 @@
 // src/ui/ui.ts
+
+const RULEBOOK_TEXT = `# Deck Rogue Prototype — 룰북 (플레이어용)
+
+이 문서는 스포일러를 최소화합니다.
+
+[1] 개요
+노드를 선택하며 진행하고, 전투에서 살아남아 성장합니다. 목표는 무엇일까요?
+모든 카드는 전열과 후열이 있습니다. 배치에 따라 역할이 달라집니다.
+
+[2] 보급과 피로도
+
+보급(S): 전열 카드 및 일부 효과의 발동에 사용됩니다. 보통 10으로 시작합니다.
+보급이 부족한 상태로 턴 종료 시, HP를 보급 없이 종료한 턴의 횟수만큼 잃습니다.
+
+피로도(F): 덱을 섞을 때 피로도가 1 올라가며, 일부 카드의 효과로도 변합니다.
+덱을 섞을 때 피로도만큼 피해를 입습니다. 피로도는 전투가 끝나도 유지됩니다.
+
+보급이 부족한 채로 턴을 마칠 때, 사용한 전열 카드 한 장 당 HP를 3 잃으며, F가 1 증가합니다.
+
+[3] 전투 흐름
+배치 → 후열 발동 → 전열 발동 → 적 행동 → 정리 → 드로우
+※ “대상 선택 필요”가 뜨면 살아있는 적을 클릭해 대상을 정하세요.
+
+[4] 용어
+- 소모: 이번 전투에서 사용할 수 없게 되는 것입니다.
+- 소실: 런 전체에서 해당 카드가 사라지는 것입니다.
+- 취약: 받는 피해가 (취약)만큼 증가합니다.
+- 약화: 주는 피해가 (약화)만큼 감소합니다.
+- 출혈: 턴 종료 시 (출혈)만큼 피해를 입습니다.
+- 교란: 당신을 방해합니다. 무엇일까요?
+
+[6] 조작
+- Esc: 선택 해제
+- Tab: 손패 선택 이동
+- 1~3: 전열 배치 / Shift+1~3: 후열 배치
+- 드래그: 손패→슬롯 배치, 슬롯↔슬롯 스왑, 슬롯→손패 회수
+`;
+
+
+
 import type { GameState, PileKind, NodeOffer, Side } from "../engine/types";
 import {
   spawnEncounter,
@@ -56,6 +96,18 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
       // ✅ createInitialState는 content 필요
       const next = createInitialState(g.content);
       setGame(next);
+    },
+
+    onViewRulebook: () => {
+      // 룰북은 “단일 모달”로만 보이게: 스택 비우기
+      g.choiceStack = [];
+      g.choice = {
+        kind: "VIEW_PILE", // ✅ 기존 kind 재사용(타입 건드리지 않으려고)
+        title: "룰북",
+        prompt: RULEBOOK_TEXT,
+        options: [{ key: "close", label: "닫기" }],
+      };
+      render(g, actions);
     },
 
     onReturnSlotToHand: (fromSide: Side, fromIdx: number) => {
@@ -559,6 +611,7 @@ export function render(g: GameState, actions: UIActions) {
   pileControls.appendChild(button("소모", () => actions.onViewPile("exhausted"), false));
   pileControls.appendChild(button("소실", () => actions.onViewPile("vanished"), false));
   pileControls.appendChild(button("손패", () => actions.onViewPile("hand"), false));
+  pileControls.appendChild(button("룰 북", actions.onViewRulebook, false));
   pileControls.appendChild(button("새 런", actions.onNewRun, false));
   left.appendChild(pileControls);
 
@@ -938,7 +991,12 @@ function renderDragOverlay(app: HTMLElement, g: GameState) {
 // =========================
 function renderChoice(root: HTMLElement, g: GameState, actions: UIActions) {
   root.appendChild(h3(g.choice!.title));
-  if (g.choice!.prompt) root.appendChild(p(g.choice!.prompt));
+  if (g.choice!.prompt) {
+    const pre = document.createElement("pre");
+    pre.className = "rulebook";
+    pre.textContent = g.choice!.prompt;
+    root.appendChild(pre);
+  }
 
   const box = div("controls");
   for (const opt of g.choice!.options) {
