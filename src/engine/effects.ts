@@ -1,5 +1,5 @@
 import type { GameState, EnemyState } from "./types";
-import { logMsg, clampMin } from "./rules";
+import { logMsg, clampMin, aliveEnemies } from "./rules";
 
 export function addBlock(g: GameState, n: number) {
   if (n <= 0) return;
@@ -22,6 +22,12 @@ export function healPlayer(g: GameState, n: number) {
   const before = g.player.hp;
   g.player.hp = Math.min(g.player.maxHp, g.player.hp + n);
   logMsg(g, `HP +${g.player.hp - before} (현재 ${g.player.hp}/${g.player.maxHp})`);
+}
+
+function cleanupPendingTargetsIfNoEnemies(g: GameState) {
+  if (aliveEnemies(g).length !== 0) return;
+  g.pendingTarget = null;
+  g.pendingTargetQueue = [];
 }
 
 export function applyDamageToEnemy(g: GameState, enemy: EnemyState, raw: number) {
@@ -48,6 +54,8 @@ export function applyDamageToEnemy(g: GameState, enemy: EnemyState, raw: number)
   if (enemy.hp < 0) enemy.hp = 0;
 
   logMsg(g, `적(${enemy.name})에게 ${dmg} 피해. (HP ${enemy.hp}/${enemy.maxHp})`);
+
+  cleanupPendingTargetsIfNoEnemies(g);
 }
 
 export function applyDamageToPlayer(g: GameState, raw: number, sourceEnemy: EnemyState | null = null) {

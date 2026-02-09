@@ -7,7 +7,7 @@
 // - status select 큐까지 포함해서 "완성본"으로 맞춤
 // =======================================================
 
-import type { EnemyEffect, GameState, Side, EnemyState, PendingTarget } from "./types";
+import type { EnemyEffect, GameState, Side, EnemyState } from "./types";
 import { aliveEnemies, applyStatus, clampMin, logMsg, pickOne, shuffle, applyStatusTo } from "./rules";
 import { applyDamageToPlayer, applyDamageToEnemy } from "./effects";
 import { resolvePlayerEffects } from "./resolve";
@@ -141,6 +141,17 @@ export function revealIntentsAndDisrupt(g: GameState) {
 
   g.player.immuneToDisruptThisTurn = false;
   g.player.nullifyDamageThisTurn = false;
+
+  // ✅ 교란(disrupt) 처리: 이번 턴 후열 슬롯 1칸 무효화
+  // - 결정/적용은 엔진에서만 수행(UI는 표시만)
+  g.disruptIndexThisTurn = null;
+  g.backSlotDisabled = [false, false, false];
+
+  const disrupt = g.player.status.disrupt ?? 0;
+  if (disrupt > 0) {
+    g.disruptIndexThisTurn = Math.floor(Math.random() * 3); // 0..2
+    g.backSlotDisabled[g.disruptIndexThisTurn] = true;
+  }
 
   for (const e of g.enemies) {
     e.immuneThisTurn = e.immuneNextTurn;
@@ -485,6 +496,7 @@ export function drawStepStartNextTurn(g: GameState) {
   if (g.phase !== "DRAW") return;
 
   // ✅ 새 턴 시작을 위해 의도 공개 플래그를 반드시 리셋해야 함
+
   g.intentsRevealedThisTurn = false;
   g.disruptIndexThisTurn = null;
 
@@ -547,8 +559,17 @@ function maybeReshuffle(g: GameState) {
 export function resolveTargetSelection(g: GameState, enemyIndex: number) {
   if (!g.pendingTarget) return;
 
+  if (aliveEnemies(g).length === 0) {
+    g.pendingTarget = null;
+    g.pendingTargetQueue = [];
+    return;
+  }
+
   const target = g.enemies[enemyIndex];
-  if (!target || target.hp <= 0) return;
+  if (!target || target.hp <= 0) {
+    // ✅ 정책 A: 생략(소모)하지 않음. 그냥 무시.
+    return;
+  }
 
   const req = g.pendingTarget;
 
@@ -559,8 +580,7 @@ export function resolveTargetSelection(g: GameState, enemyIndex: number) {
     logMsg(g, `적(${target.name}) 상태: ${req.key} ${req.n >= 0 ? "+" : ""}${req.n}`);
   }
 
-  const next = g.pendingTargetQueue.shift() ?? null;
-  g.pendingTarget = next;
+  g.pendingTarget = g.pendingTargetQueue.shift() ?? null;
 }
 
 export function checkEndConditions(g: GameState) {

@@ -29,7 +29,7 @@ export const ENEMIES: EnemyData[] = [
         acts: [{ op: "damagePlayerFormula", kind: "goblin_raider" }],
       },
       {
-        label: "S -= 4",
+        label: "S -4",
         acts: [{ op: "supplies", n: -4 }],
       },
     ],
@@ -72,8 +72,8 @@ export const ENEMIES: EnemyData[] = [
     intents: [
       { label: "다음 턴 동안 피해를 입지 않음", acts: [{ op: "enemyImmuneNextTurn" }] },
       {
-        label: "약화 3 부여 후 HP+=3",
-        acts: [{ op: "statusPlayer", key: "weak", n: 3 }],
+        label: "약화 4 부여 후 자신 HP 3 회복",
+        acts: [{ op: "statusPlayer", key: "weak", n: 4 }, { op: "enemyHealSelf", n: 3 }],
       },
       { label: "6 피해", acts: [{ op: "damagePlayer", n: 6 }] },
     ],
@@ -96,6 +96,7 @@ export const ENEMIES: EnemyData[] = [
     intents: [
       { label: "피해 15", acts: [{ op: "damagePlayer", n: 15 }] },
       { label: "다음 턴 동안 피해를 입지 않음", acts: [{ op: "enemyImmuneNextTurn" }] },
+      { label: "자신 HP 15 회복", acts: [{ op: "enemyHealSelf", n: 15 }]}
     ],
   },
 
@@ -104,8 +105,8 @@ export const ENEMIES: EnemyData[] = [
     name: "영혼 강탈자",
     maxHp: 50,
     intents: [
-      { label: "피해 7, S-=1", acts: [{ op: "damagePlayer", n: 7 }, { op: "supplies", n: -1 }] },
-      { label: "F += 1", acts: [{ op: "fatiguePlayer", n: 1 }] },
+      { label: "피해 7, S -2", acts: [{ op: "damagePlayer", n: 7 }, { op: "supplies", n: -2 }] },
+      { label: "피해 7, F +1", acts: [{ op: "damagePlayer", n: 7 }, { op: "fatiguePlayer", n: 1 }] },
       { label: "준비(카운트 진행)", acts: [] },
       // ✅ 50 피해는 엔진(combat.ts)에서 카운트 조건으로 강제 발동하므로,
       // 콘텐츠에는 굳이 op를 두지 않아도 됩니다(분리 유지하면서도 안정적).

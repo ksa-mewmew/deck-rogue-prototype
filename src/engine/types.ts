@@ -45,15 +45,6 @@ export type CombatPhase =
   | "DRAW"
   | "NODE";
 
-export type TargetRequest =
-  | { kind: "damageSelect"; amount: number }
-  | { kind: "statusSelect"; key: StatusKey; n: number }
-  | null;
-
-export type PendingTargetItem =
-  | { kind: "damageSelect"; amount: number }
-  | { kind: "statusSelect"; key: StatusKey; n: number };
-
 
 export type PileKind = "deck" | "discard" | "exhausted" | "vanished" | "hand";
 
@@ -129,13 +120,12 @@ export type PlayerEffect =
   | { op: "setSupplies"; n: number }                                     // ✅ S를 n으로
   | { op: "statusEnemiesAttackingThisTurn"; key: StatusKey; n: number }   // ✅ 이번 턴 공격한 적들
   | { op: "maxHp"; n: number }                                           // ✅ 최대체력 증가
-  | { op: "hp"; n: number }                                             // ✅ HP 직접 증감(음수 가능)
-  | { op: "statusEnemiesAttackingThisTurn"; key: StatusKey; n: number };
+  | { op: "hp"; n: number }                                             // ✅ HP 직접 증감(음수 가능);
 
 
 export type PendingTarget =
   | { kind: "damageSelect"; amount: number }
-  | { kind: "statusSelect"; key: "vuln" | "weak" | "bleed" | "disrupt"; n: number };
+  | { kind: "statusSelect"; key: StatusKey; n: number };
 
 
 export type EnemyEffect =

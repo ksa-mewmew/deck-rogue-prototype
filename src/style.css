@@ -37,3 +37,7 @@ button.primary { border-color: #111; }
 button:disabled { opacity: .5; cursor: not-allowed; }
 .log { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; white-space: pre-wrap; max-height: 260px; overflow: auto; background: #0b0b0b; color: #e8e8e8; border-radius: 12px; padding: 10px; }
 .hr { height: 1px; background: #eee; margin: 10px 0; }
+.hand.dropHoverHand {
+  outline: 2px dashed rgba(255,160,0,0.8);
+  background: rgba(255,160,0,0.06);
+}

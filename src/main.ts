@@ -2,8 +2,8 @@ import "./style.css";
 
 import { createInitialState } from "./engine/state";
 import { buildContent } from "./content"; // 프로젝트에 맞게
-import { render } from "./ui/render";
-import { makeUIActions } from "./ui/actions";
+import { render } from "./ui/ui";
+import { makeUIActions } from "./ui/ui";
 
 const content = buildContent();
 

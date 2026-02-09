@@ -31,7 +31,7 @@ export const CARDS: CardData[] = [
     id: "scout",
     name: "정찰",
     frontText: "선택한 적에게 3 피해, 방어 +2",
-    backText: "손패 크기 +1, S +2",
+    backText: "드로우 1, 손패 크기 +1, S +2",
     front: [
       { op: "damageEnemy", target: "select", n: 3 },
       { op: "block", n: 2 },
@@ -75,7 +75,7 @@ export const CARDS: CardData[] = [
     back: [{ op: "supplies", n: -1 }, { op: "fatigue", n: 1 }],
   },
 
-  // 파밍 카드
+  // 파밍 카드 0.1.0
   {
     id: "berserk",
     name: "광폭화",
@@ -98,7 +98,7 @@ export const CARDS: CardData[] = [
     tags: ["EXHAUST"],
     exhaustWhen: "BOTH",
     frontText: "모든 적에게 10 피해, S -1, F +1, 소모",
-    backText: "손패 크기 +2, S +2, F +1, 소모",
+    backText: "드로우 2, 손패 크기 +2, S +2, F +1, 소모",
     front: [
       { op: "damageEnemy", target: "all", n: 10 },
       { op: "supplies", n: -1 },
@@ -120,10 +120,14 @@ export const CARDS: CardData[] = [
     id: "redeploy",
     name: "재배치",
     frontText: "S +2",
-    backText: "3번 슬롯에 있는 후열 카드의 전열 효과 발동",
+    backText: "2번 슬롯에 있는 후열 카드의 전열 효과 발동",
     front: [{ op: "supplies", n: 2 }],
     back: [{ op: "triggerFrontOfBackSlot", index: 2 }],
   },
+
+
+  // 파밍 카드 0.1.1
+  // 1) 비장의 일격
 
   {
     id: "secret_strike",
@@ -226,9 +230,9 @@ export const CARDS: CardData[] = [
   {
     id: "taunt",
     name: "독설",
-    frontText: "선택한 적에게 약화 +3",
+    frontText: "선택한 적에게 약화 +4",
     backText: "모든 적에게 취약 +2 및 약화 +2",
-    front: [{ op: "statusEnemy", target: "select", key: "weak", n: 3 }],
+    front: [{ op: "statusEnemy", target: "select", key: "weak", n: 4 }],
     back: [
       { op: "statusEnemy", target: "all", key: "vuln", n: 2 },
       { op: "statusEnemy", target: "all", key: "weak", n: 2 },
@@ -239,12 +243,12 @@ export const CARDS: CardData[] = [
   {
     id: "rapid_fire",
     name: "연속 사격",
-    frontText: "선택한 적에게 3 피해, 3번 발동",
+    frontText: "선택한 적에게 2 피해, 3번 발동",
     backText: "이번 턴에 카드를 뽑았으면 무작위 적에게 8 피해",
     front: [
-      { op: "damageEnemy", target: "select", n: 3 },
-      { op: "damageEnemy", target: "select", n: 3 },
-      { op: "damageEnemy", target: "select", n: 3 },
+      { op: "damageEnemy", target: "select", n: 2 },
+      { op: "damageEnemy", target: "select", n: 2 },
+      { op: "damageEnemy", target: "select", n: 2 },
     ],
     back: [{ op: "ifDrewThisTurn", then: [{ op: "damageEnemy", target: "random", n: 8 }] }],
   },
