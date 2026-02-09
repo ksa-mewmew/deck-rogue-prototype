@@ -232,92 +232,107 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
       }
 
       if (actual === "REST") {
-        g.choice = {
-          kind: "EVENT",
-          title: "휴식",
-          prompt: "무엇을 하시겠습니까?",
-          options: [
-            { key: "rest:heal", label: "HP +15" },
-            { key: "rest:clear_f", label: "F -3" },
-            { key: "rest:upgrade", label: "카드 강화 (+1)" },
-            { key: "rest:skip", label: "생략" },
-          ],
-        };
+        const showRestMenu = () => {
+          g.choice = {
+            kind: "EVENT",
+            title: "휴식",
+            prompt: "무엇을 하시겠습니까?",
+            options: [
+              { key: "rest:heal", label: "HP +15" },
+              { key: "rest:clear_f", label: "F -3" },
+              { key: "rest:upgrade", label: "카드 강화 (+1)" },
+              { key: "rest:skip", label: "생략" },
+            ],
+          };
 
-        choiceHandler = (key: string) => {
-          if (key === "rest:heal") {
-            g.player.hp = Math.min(g.player.maxHp, g.player.hp + 15);
-            logMsg(g, "휴식: HP +15");
-          } else if (key === "rest:clear_f") {
-            g.player.fatigue = Math.max(0, g.player.fatigue - 3);
-            logMsg(g, "휴식: 피로 F-=3");
-          } else if (key === "rest:upgrade") {
-            // ✅ 강화 카드 선택 UI
-            const candidates = Object.values(g.cards)
-              .filter((c) => (c.zone === "deck" || c.zone === "hand" || c.zone === "discard"))
-              .map((c) => c.uid)
-              .filter((uid) => canUpgradeUid(g, uid));
-
-            if (candidates.length === 0) {
-              logMsg(g, "강화할 수 있는 카드가 없습니다.");
+          choiceHandler = (key: string) => {
+            if (key === "rest:heal") {
+              g.player.hp = Math.min(g.player.maxHp, g.player.hp + 15);
+              logMsg(g, "휴식: HP +15");
               g.choice = null;
               choiceHandler = null;
               render(g, actions);
               return;
             }
 
-            g.choice = {
-              kind: "PICK_CARD",
-              title: "카드 강화",
-              prompt: "강화할 카드 1장을 선택하세요.",
-              options: [
-                ...candidates.map((uid) => {
-                  const def = getCardDefFor(g, uid);
-                  return {
-                    key: `upgrade:${uid}`,
-                    label: cardNameWithUpgrade(g, uid),
-                    detail: `전열: ${def.frontText} / 후열: ${def.backText}`,
-                    cardUid: uid,
-                  };
-                }),
-                { key: "cancel", label: "취소" },
-              ],
-            };
-
-            // ✅ 여기서부터는 강화 선택 핸들러로 교체
-            choiceHandler = (k: string) => {
-              if (k === "cancel") {
-                g.choice = null;
-                choiceHandler = null;
-                render(g, actions);
-                return;
-              }
-              if (!k.startsWith("upgrade:")) return;
-
-              const uid = k.slice("upgrade:".length);
-              if (upgradeCardByUid(g, uid)) {
-                logMsg(g, `강화 완료: ${cardNameWithUpgrade(g, uid)}`);
-              } else {
-                logMsg(g, "강화 실패(최대 강화/대상 없음)");
-              }
-
-              // 휴식 종료
+            if (key === "rest:clear_f") {
+              g.player.fatigue = Math.max(0, g.player.fatigue - 3);
+              logMsg(g, "휴식: 피로 F-=3");
               g.choice = null;
               choiceHandler = null;
               render(g, actions);
-            };
+              return;
+            }
 
+            if (key === "rest:upgrade") {
+              // (아래 2)에서 강화 화면을 띄우는 함수로 분리해서 호출)
+              showUpgradePick();
+              return;
+            }
+
+            // rest:skip
+            logMsg(g, "휴식: 생략");
+            g.choice = null;
+            choiceHandler = null;
+            render(g, actions);
+          };
+        };
+        const showUpgradePick = () => {
+          const candidates = Object.values(g.cards)
+            .filter((c) => c.zone === "deck" || c.zone === "hand" || c.zone === "discard")
+            .map((c) => c.uid)
+            .filter((uid) => canUpgradeUid(g, uid));
+
+          if (candidates.length === 0) {
+            logMsg(g, "강화할 수 있는 카드가 없습니다.");
+            // ✅ 휴식 메뉴로 복귀
+            showRestMenu();
             render(g, actions);
             return;
-          } else {
-            logMsg(g, "휴식: 생략");
           }
 
-          g.choice = null;
-          choiceHandler = null;
+          g.choice = {
+            kind: "PICK_CARD",
+            title: "카드 강화",
+            prompt: "강화할 카드 1장을 선택하세요.",
+            options: [
+              ...candidates.map((uid) => {
+                return {
+                  key: `upgrade:${uid}`,
+                  label: nextUpgradeLabel(g, uid),   // 원하셨던 "야전식량 +1" 스타일
+                  detail: nextUpgradeText(g, uid),   // "강화 후 텍스트"만
+                  cardUid: uid,
+                };
+              }),
+              { key: "cancel", label: "취소" },
+            ],
+          };
+
+          choiceHandler = (k: string) => {
+            if (k === "cancel") {
+              // ✅ 강화만 취소하고 휴식 메뉴로 복귀
+              showRestMenu();
+              render(g, actions);
+              return;
+            }
+            if (!k.startsWith("upgrade:")) return;
+
+            const uid = k.slice("upgrade:".length);
+            if (upgradeCardByUid(g, uid)) {
+              logMsg(g, `강화 완료: ${cardNameWithUpgrade(g, uid)}`);
+            } else {
+              logMsg(g, "강화 실패(최대 강화/대상 없음)");
+            }
+
+            // ✅ 강화는 휴식 1회 사용으로 치고 종료(원하면 여기서도 showRestMenu()로 복귀 가능)
+            g.choice = null;
+            choiceHandler = null;
+            render(g, actions);
+          };
           render(g, actions);
         };
 
+        showRestMenu();
         render(g, actions);
         return;
       }
@@ -521,8 +536,28 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
 
     onChooseChoice: (key: string) => {
       if (!g.choice) return;
-      if (!choiceHandler) return;
-      choiceHandler(key);
+
+      // 기존 핸들러가 있으면 그걸 우선
+      if (choiceHandler) {
+        choiceHandler(key);
+        return;
+      }
+
+      // ✅ 엔진이 만든 REWARD 처리(fallback)
+      if (g.choice.kind === "REWARD") {
+        if (key === "skip") {
+          logMsg(g, "카드 보상 생략");
+        } else if (key.startsWith("pick:")) {
+          const [, defId, upStr] = key.split(":");
+          const up = Number(upStr ?? "0") || 0;
+          addCardToDeck(g, defId, { upgrade: up });
+        }
+
+        g.choice = null;
+        g.phase = "NODE";      // ✅ 여기서 노드로 복귀
+        render(g, actions);
+        return;
+      }
     },
 
     // ===== Combat =====
@@ -1059,7 +1094,8 @@ function renderChoice(root: HTMLElement, g: GameState, actions: UIActions) {
   for (const opt of g.choice!.options) {
     const b = document.createElement("button");
     b.className = "primary";
-    b.textContent = opt.detail ? `${opt.label} — ${opt.detail}` : opt.label;
+    b.style.whiteSpace = "pre-line";
+    b.textContent = opt.detail ? `${opt.label}\n${opt.detail}` : opt.label;
     b.onclick = () => actions.onChooseChoice(opt.key);
     box.appendChild(b);
   }
@@ -1290,4 +1326,31 @@ function renderOverlay(root: HTMLElement, g: GameState, actions: UIActions & { o
   const row = div("controls");
   row.appendChild(button("닫기", actions.onCloseOverlay, false));
   root.appendChild(row);
+}
+
+// =========================
+// Upgrade preview helpers
+// =========================
+
+
+function nextUpgradeText(g: GameState, uid: string) {
+  const inst = g.cards[uid];
+  const nextLv = (inst.upgrade ?? 0) + 1;
+
+  // 다음 강화 버전의 카드 정의(패치 반영)
+  const next = getCardDefByIdWithUpgrade(g.content, inst.defId, nextLv);
+
+  // 보여줄 건 강화 후 텍스트만
+  return `\n전열: ${next.frontText}\n후열: ${next.backText}`;
+}
+
+function nextUpgradeLabel(g: GameState, uid: string) {
+  const inst = g.cards[uid];
+  const curLv = inst.upgrade ?? 0;
+  const nextLv = curLv + 1;
+
+  const baseName = g.content.cardsById[inst.defId].name; // 업그레이드 패치로 name 바꾸는 경우까지 반영하려면 아래 주석 버전 사용
+  // const baseName = getCardDefByIdWithUpgrade(g.content, inst.defId, nextLv).name;
+
+  return nextLv > 0 ? `${baseName} +${nextLv}` : baseName;
 }

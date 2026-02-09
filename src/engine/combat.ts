@@ -12,7 +12,9 @@ import { aliveEnemies, applyStatus, clampMin, logMsg, pickOne, shuffle, applySta
 import { applyDamageToPlayer, applyDamageToEnemy } from "./effects";
 import { resolvePlayerEffects } from "./resolve";
 import { getCardDefFor } from "../content/cards";
-import { cardNameWithUpgrade } from "../content/cards";
+import { cardNameWithUpgrade, getCardDefByIdWithUpgrade } from "../content/cards";
+import { offerRewardPair } from "../content";
+
 
 function enemyStateFromId(g: GameState, enemyId: string): EnemyState {
   const def = g.content.enemiesById[enemyId];
@@ -32,59 +34,128 @@ function enemyStateFromId(g: GameState, enemyId: string): EnemyState {
   };
 }
 
-function patternAllowedByCooldown(g: GameState, pattern: string[], cooldownBattles = 5) {
-  const now = g.run.battleCount + 1;
+function patternAllowedByCooldown(
+  g: GameState,
+  pattern: string[],
+  nowBattleNo: number,
+  cooldownBattles = 5
+) {
   for (const id of pattern) {
     const last = g.run.enemyLastSeenBattle[id];
-    if (last != null && now - last < cooldownBattles) return false;
+    if (last != null && nowBattleNo - last < cooldownBattles) return false;
   }
   return true;
 }
 
-export function spawnEncounter(g: GameState, opt?: { forceBoss?: boolean; forcePatternIds?: string[] }) {
+
+export function spawnEncounter(
+  g: GameState,
+  opt?: { forceBoss?: boolean; forcePatternIds?: string[] }
+) {
   const forceBoss = opt?.forceBoss ?? false;
+
+  // ✅ 티어 기준: 노드 번호
+  // onChooseNode에서 nodePickCount를 +1한 뒤 spawnEncounter를 호출하는 흐름을 전제로 함
   const nodeNo = g.run.nodePickCount;
 
+  // ✅ 쿨다운/기록 기준: 전투 번호(이번에 실제로 전투가 시작될 때만 +1)
+  const battleNo = g.run.battleCount + 1;
+
+  // -------------------------
+  // (0) 강제 패턴(이벤트 전투 등)
+  // -------------------------
   if (opt?.forcePatternIds && opt.forcePatternIds.length > 0) {
-    g.enemies = opt.forcePatternIds.map((id) => enemyStateFromId(g, id));
-    logMsg(g, `전투 시작! (노드 ${nodeNo}) 적: ${g.enemies.map((e) => e.name).join(", ")}`);
+    const chosen = opt.forcePatternIds;
+
+    // 전투 시작 확정 기록
+    g.run.battleCount = battleNo;
+    for (const id of chosen) g.run.enemyLastSeenBattle[id] = battleNo;
+
+    g.enemies = chosen.map((id) => enemyStateFromId(g, id));
+    logMsg(
+      g,
+      `전투 시작! (노드 ${nodeNo}, 전투 ${battleNo}회차) 적: ${g.enemies.map((e) => e.name).join(", ")}`
+    );
     return;
   }
 
+  // -------------------------
+  // (1) 보스 강제
+  // -------------------------
   if (forceBoss) {
     if (g.run.bossPool.length === 0) {
+      // 보스 풀이 비면 일반 전투로 폴백
       logMsg(g, `보스 풀이 비었습니다. 일반 전투로 진행합니다. (노드 ${nodeNo})`);
+      // 아래 일반 패턴 선택으로 계속 진행
     } else {
       const bossId = pickOne(g.run.bossPool);
       g.run.bossPool = g.run.bossPool.filter((x) => x !== bossId);
 
+      // 전투 시작 확정 기록
+      g.run.battleCount = battleNo;
+      g.run.enemyLastSeenBattle[bossId] = battleNo;
+
       g.enemies = [enemyStateFromId(g, bossId)];
-      logMsg(g, `보스 등장! (노드 ${nodeNo}) 적: ${g.enemies[0].name}`);
+      logMsg(g, `보스 등장! (노드 ${nodeNo}, 전투 ${battleNo}회차) 적: ${g.enemies[0].name}`);
       return;
     }
   }
 
-  const earlyPatterns: string[][] = [["goblin_raider"], ["watching_statue"], ["pebble_golem"], ["slime"]];
-  const latePatterns: string[][] = [
-    ["goblin_raider", "goblin_raider", "goblin_raider"],
-    ["rock_golem"],
-    ["pebble_golem", "pebble_golem"],
-    ["slime", "goblin_raider"],
+  // -------------------------
+  // (2) 노드 기준 티어 테이블
+  // -------------------------
+  const patternsByTier: string[][][] = [
+    // 1~10 노드
+    [["goblin_raider"], ["watching_statue"], ["pebble_golem"], ["slime"]],
+
+    // 11~20 노드
+    [
+      ["goblin_raider", "slime"],
+      ["pebble_golem", "pebble_golem"],
+      ["rock_golem"],
+      ["goblin_raider", "goblin_raider"],
+      ["poison_spider"],
+    ],
+
+    // 21~30 노드
+    [
+      ["goblin_raider", "goblin_raider", "goblin_raider"],
+      ["pebble_golem", "pebble_golem", "slime"],
+      ["rock_golem", "pebble_golem"],
+      ["slime", "slime"],
+      ["poison_spider", "slime"]
+    ],
   ];
 
-  const patterns = nodeNo <= 10 ? earlyPatterns : latePatterns;
+  // ✅ 노드 기준 tier: 1~10 => 0, 11~20 => 1, ...
+  const tier = Math.min(patternsByTier.length - 1, Math.floor((nodeNo - 1) / 10));
+  const patterns = patternsByTier[tier];
 
-  const allowed = patterns.filter((p) => patternAllowedByCooldown(g, p, 5));
-  const pickFrom = allowed.length > 0 ? allowed : patterns;
+  // -------------------------
+  // (3) 쿨다운 필터(전투 기준)
+  // -------------------------
+  const cooldownBattles = 5;
+  const allowed = patterns.filter((p) => patternAllowedByCooldown(g, p, battleNo, cooldownBattles));
+  const pickFrom = allowed.length > 0 ? allowed : patterns; // 전부 막히면 폴백
 
   const chosen = pickOne(pickFrom);
 
-  g.run.battleCount += 1;
-  for (const id of chosen) g.run.enemyLastSeenBattle[id] = g.run.battleCount;
+  // -------------------------
+  // (4) 전투 시작 확정 기록(전투 기준)
+  // -------------------------
+  g.run.battleCount = battleNo;
+  for (const id of chosen) g.run.enemyLastSeenBattle[id] = battleNo;
 
+  // -------------------------
+  // (5) 스폰 + 로그(노드/전투 둘 다 표기)
+  // -------------------------
   g.enemies = chosen.map((id) => enemyStateFromId(g, id));
-  logMsg(g, `전투 시작! (노드 ${nodeNo}) 적: ${g.enemies.map((e) => e.name).join(", ")}`);
+  logMsg(
+    g,
+    `전투 시작! (노드 ${nodeNo}, 전투 ${battleNo}회차) 적: ${g.enemies.map((e) => e.name).join(", ")}`
+  );
 }
+
 
 export function startCombat(g: GameState) {
   g.phase = "REVEAL";
@@ -603,20 +674,47 @@ export function checkEndConditions(g: GameState) {
     return;
   }
 
+  // 승리: 적 전멸
   if (aliveEnemies(g).length === 0 && g.phase !== "NODE") {
     applyWinHooksWhileInBackThisTurn(g);
     logMsg(g, "승리: 적을 모두 처치!");
     endCombatReturnAllToDeck(g);
     g.player.zeroSupplyTurns = 0;
-    g.phase = "NODE";
-    if (g.run.treasureObtained) g.run.afterTreasureNodePicks += 1;
 
+    // ✅ 보물 승리 조건 체크(런 종료면 보상 없이 끝낼지, 보상 줄지 선택)
     if (g.run.treasureObtained && g.run.afterTreasureNodePicks >= 10) {
       g.run.finished = true;
       logMsg(g, "승리! 저주받은 보물을 얻은 후 10턴 동안 살아남았습니다.");
+      return;
     }
+
+    // ✅ 전투 보상: 여기서 choice를 만든다
+    const [a, b] = offerRewardPair();
+
+    const da = getCardDefByIdWithUpgrade(g.content, a.defId, a.upgrade);
+    const db = getCardDefByIdWithUpgrade(g.content, b.defId, b.upgrade);
+
+    const la = a.upgrade > 0 ? `${da.name} +${a.upgrade}` : da.name;
+    const lb = b.upgrade > 0 ? `${db.name} +${b.upgrade}` : db.name;
+
+    g.choice = {
+      kind: "REWARD",
+      title: "전투 보상",
+      prompt: "두 장 중 한 장을 선택하거나 생략합니다.",
+      options: [
+        { key: `pick:${a.defId}:${a.upgrade}`, label: la, detail: `전열: ${da.frontText} / 후열: ${da.backText}` },
+        { key: `pick:${b.defId}:${b.upgrade}`, label: lb, detail: `전열: ${db.frontText} / 후열: ${db.backText}` },
+        { key: "skip", label: "생략" },
+      ],
+    };
+
+    // ✅ 지금은 보상 화면을 띄울 거라 NODE로 안 넘김
+    // g.phase를 별도로 두면 더 깔끔하지만, 최소 수정이면 그냥 유지
+    // (UI는 overlay/choice 우선 렌더링이라 괜찮음)
+    return;
   }
 }
+
 
 export function endCombatReturnAllToDeck(g: GameState) {
   const pool: string[] = [];

@@ -31,7 +31,7 @@ export const EVENTS: EventDef[] = [
   {
     id: "drop_bag",
     name: "짐 버리기",
-    prompt: "짐을 줄여 피로를 낮춘다.",
+    prompt: "짐을 줄여 피로를 낮추자.",
     options: () => [
       {
         key: "drop",
@@ -92,6 +92,25 @@ export const EVENTS: EventDef[] = [
           addFatigue(g, add);
           logMsg(g, `이벤트: 과중량 (덱 ${deckSize}장 → F +${add})`);
           return "NONE";
+        },
+      },
+    ],
+  },
+
+  {
+    id: "goblin_ambush_low_supplies",
+    name: "매복한 약탈자들",
+    prompt:
+      "고블린들이 보급을 약탈했다.\n" +
+      "이번 전투는 보급(S) 5로 시작합니다.",
+    options: () => [
+      {
+        key: "fight",
+        label: "맞서 싸운다",
+        detail: "고블린 약탈자 2마리 전투 (S=5 시작)",
+        apply: (g: any) => {
+          g.run.nextBattleSuppliesBonus = -5; // ✅ 10 + (-5) = 5
+          return { kind: "BATTLE_SPECIAL", title: "고블린 매복", enemyIds: ["goblin_raider", "goblin_raider"] };
         },
       },
     ],

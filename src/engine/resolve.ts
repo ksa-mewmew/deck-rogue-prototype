@@ -104,6 +104,13 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
         }
         break;
 
+      case "clearStatusSelf": {
+        const k = e.key;
+        g.player.status[k] = 0;
+        logMsg(g, `상태 해제: ${k} = 0`);
+        break;
+      }
+      
       case "damageEnemyBy": {
         if (e.target !== "random") break;
         const alive = aliveEnemies(g);
@@ -119,13 +126,27 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
       }
 
       case "damageEnemyByPlayerFatigue": {
-        if (e.target !== "random") break;
-        const alive = aliveEnemies(g);
-        if (alive.length === 0) break;
         const amount = Math.max(0, g.player.fatigue * e.mult);
-        applyDamageToEnemy(g, pickOne(alive), amount);
+
+        if (e.target === "random") {
+          const alive = aliveEnemies(g);
+          if (alive.length === 0) break;
+          applyDamageToEnemy(g, pickOne(alive), amount);
+          break;
+        }
+
+        if (e.target === "select") {
+          // ✅ 기존 타겟팅 요청 형식("damageSelect")으로 큐에 넣기
+          if (amount <= 0) break; // 0이면 굳이 선택 안 시킴(원하면 제거)
+          g.pendingTargetQueue.push({ kind: "damageSelect", amount });
+          g.pendingTarget = g.pendingTarget ?? g.pendingTargetQueue.shift() ?? null;
+          break;
+        }
+
         break;
       }
+
+
 
       case "statusPlayer":
         g.player.status[e.key] = Math.max(0, (g.player.status[e.key] ?? 0) + e.n);

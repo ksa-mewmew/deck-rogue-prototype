@@ -7,8 +7,9 @@ export const ENEMIES: EnemyData[] = [
     name: "보물을 노리는 다른 모험가",
     maxHp: 40,
     intents: [
-      { label: "10 피해", acts: [{ op: "damagePlayer", n: 10 }] },
-      { label: "출혈4/취약4/약화4", acts: [
+      { label: "5 피해, 3번 발동", acts:
+        [{ op: "damagePlayer", n: 5 }, { op: "damagePlayer", n: 5 }, { op: "damagePlayer", n: 5 }] },
+      { label: "출혈4, 취약4, 약화4", acts: [
           { op: "statusPlayer", key: "bleed", n: 4 },
           { op: "statusPlayer", key: "vuln", n: 4 },
           { op: "statusPlayer", key: "weak", n: 4 },
@@ -79,6 +80,34 @@ export const ENEMIES: EnemyData[] = [
   },
 
   {
+    id: "poison_spider",
+    name: "독거미",
+    maxHp: 28,
+    intents: [
+      {
+        label: "출혈 4 부여",
+        acts: [{ op: "statusPlayer", key: "bleed", n: 4 }],
+      },
+      {
+        label: "7 피해",
+        acts: [{ op: "damagePlayer", n: 7 }],
+      },
+      {
+        label: "출혈 2 부여, 6 피해)",
+        acts: [
+          { op: "statusPlayer", key: "bleed", n: 2 },
+          { op: "damagePlayer", n: 6 },
+        ],
+      },
+
+    ],
+  },
+
+
+
+
+  
+  {
     id: "boss_cursed_wall",
     name: "저주받은 벽",
     maxHp: 100,
@@ -93,7 +122,7 @@ export const ENEMIES: EnemyData[] = [
     name: "거대한 오크",
     maxHp: 70,
     intents: [
-      { label: "피해 15", acts: [{ op: "damagePlayer", n: 15 }] },
+      { label: "15 피해", acts: [{ op: "damagePlayer", n: 15 }] },
       { label: "다음 턴 동안 피해를 입지 않음", acts: [{ op: "enemyImmuneNextTurn" }] },
       { label: "자신 HP 15 회복", acts: [{ op: "enemyHealSelf", n: 15 }]}
     ],
@@ -104,9 +133,9 @@ export const ENEMIES: EnemyData[] = [
     name: "영혼 강탈자",
     maxHp: 50,
     intents: [
-      { label: "피해 7, S -2", acts: [{ op: "damagePlayer", n: 7 }, { op: "supplies", n: -2 }] },
-      { label: "피해 7, F +1", acts: [{ op: "damagePlayer", n: 7 }, { op: "fatiguePlayer", n: 1 }] },
-      { label: "준비(카운트 진행)", acts: [] },
+      { label: "7 피해, S -2", acts: [{ op: "damagePlayer", n: 7 }, { op: "supplies", n: -2 }] },
+      { label: "7 피해, F +1", acts: [{ op: "damagePlayer", n: 7 }, { op: "fatiguePlayer", n: 1 }] },
+      { label: "카운트 진행", acts: [] },
       // ✅ 50 피해는 엔진(combat.ts)에서 카운트 조건으로 강제 발동하므로,
       // 콘텐츠에는 굳이 op를 두지 않아도 됩니다(분리 유지하면서도 안정적).
     ],

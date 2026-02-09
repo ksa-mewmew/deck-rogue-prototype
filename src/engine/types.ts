@@ -59,7 +59,8 @@ export type CardData = {
   design?: string;
   exhaustWhen?: ExhaustWhen; // ✅ 어느 위치에서 발동했을 때 소모되는지
   vanishWhen?: ExhaustWhen;  // (필요하면 소실도 동일 패턴)
-  upgrades?: Array<Partial<Pick<CardData, "name"|"frontText"|"backText"|"front"|"back"|"tags"|"onWinWhileInBack">>>;
+  upgrades?: Array<Partial<Pick<CardData,
+  "name"|"frontText"|"backText"|"front"|"back"|"tags"|"onWinWhileInBack"|"exhaustWhen"|"vanishWhen">>>;
   onWinWhileInBack?: PlayerEffect[];
   
 
@@ -116,12 +117,13 @@ export type PlayerEffect =
   | { op: "nullifyDamageThisTurn" }
   | { op: "ifDrewThisTurn"; then: PlayerEffect[] }
   | { op: "triggerFrontOfBackSlot"; index: number }
-  | { op: "damageEnemyByPlayerFatigue"; target: "random"; mult: number } // ✅ F*mult
+  | { op: "damageEnemyByPlayerFatigue"; target: "random" | "select"; mult: number } // ✅ F*mult
   | { op: "statusEnemy"; target: "select" | "random" | "all"; key: StatusKey; n: number }
   | { op: "setSupplies"; n: number }                                     // ✅ S를 n으로
   | { op: "statusEnemiesAttackingThisTurn"; key: StatusKey; n: number }   // ✅ 이번 턴 공격한 적들
   | { op: "maxHp"; n: number }                                           // ✅ 최대체력 증가
   | { op: "hp"; n: number }                                             // ✅ HP 직접 증감(음수 가능);
+  | { op: "clearStatusSelf"; key: StatusKey }
 
 
 export type PendingTarget =

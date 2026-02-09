@@ -34,7 +34,7 @@ export const REWARD_POOL: RewardEntry[] = [
 
   { id: "camp_prep", weight: 20 },
   { id: "vital_shot", weight: 12 },
-  { id: "taunt", weight: 20 },
+  { id: "taunt", weight: 12 },
   { id: "rapid_fire", weight: 12 },
 
   // ...
