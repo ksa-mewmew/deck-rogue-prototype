@@ -10,6 +10,7 @@ import type { GameState, Side, PlayerEffect, EnemyState } from "./types";
 import { aliveEnemies, logMsg, applyStatusTo, pickOne } from "./rules";
 import { addBlock, addFatigue, addSupplies, applyDamageToEnemy, healPlayer } from "./effects";
 import { drawCards } from "./combat";
+import { cardNameWithUpgrade, getCardDefFor } from "../content/cards";
 
 export type ResolveCtx = {
   game: GameState;
@@ -174,12 +175,13 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
       case "triggerFrontOfBackSlot": {
         const uid0 = g.backSlots[e.index];
         if (!uid0) {
-          logMsg(g, `재배치: 후열 ${e.index}번 슬롯이 비어 있음`);
+          logMsg(g, `재배치: 후열 ${e.index + 1}번 슬롯이 비어 있음`);
           break;
         }
-        const defId = g.cards[uid0].defId;
-        const def = g.content.cardsById[defId];
-        logMsg(g, `재배치: [${def.name}]의 전열 효과를 추가 발동`);
+
+        const def = getCardDefFor(g, uid0); // 업그레이드 반영된 정의
+        logMsg(g, `재배치: [[${cardNameWithUpgrade(g, uid0)}]]의 전열 효과를 추가 발동`);
+
         resolvePlayerEffects({ game: g, side: "front", cardUid: uid0 }, def.front);
         break;
       }

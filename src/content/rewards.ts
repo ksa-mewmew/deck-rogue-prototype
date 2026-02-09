@@ -1,13 +1,14 @@
 import type { GameState } from "../engine/types";
-import { uid, shuffle, logMsg, pickOne } from "../engine/rules";
+import { shuffle, logMsg, pickOne } from "../engine/rules";
+import { getCardDefFor } from "./cards";
 
 export function obtainTreasure(g: GameState) {
   if (g.run.treasureObtained) return;
 
   g.run.treasureObtained = true;
 
-  const id = uid();
-  g.cards[id] = { uid: id, defId: "goal_treasure", zone: "deck" };
+  const id = newUid(g);
+  g.cards[id] = { uid: id, defId: "goal_treasure", zone: "deck", upgrade: 0 };
   g.deck.push(id);
   g.deck = shuffle(g.deck);
 
@@ -63,24 +64,34 @@ function pickWeightedOne(items: Array<{ id: string; w: number }>): string {
 }
 
 // ✅ 매번 “원본 풀에서 새로” 2장(서로 다르게) 뽑는다 = 풀은 항상 초기 상태
-export function offerRewardPair(): [string, string] {
-  const items = buildWeightMap(REWARD_POOL); // 로컬 계산(원본 불변)
-  if (items.length < 2) throw new Error("Reward pool must have at least 2 distinct ids.");
+export type OfferedCard = { defId: string; upgrade: number };
 
-  const a = pickWeightedOne(items);
-  const items2 = items.filter(x => x.id !== a); // 로컬 필터(원본 불변)
-  const b = pickWeightedOne(items2);
-
-  return [a, b];
+export function rollOfferedUpgrade(): number {
+  return Math.random() < 0.1 ? 1 : 0; // 10%
 }
 
+export function offerRewardPair(): [OfferedCard, OfferedCard] {
+  const mapA = buildWeightMap(REWARD_POOL);
+  const idA = pickWeightedOne(mapA);
 
-export function addCardToDeck(g: GameState, defId: string) {
-  const id = uid();
-  g.cards[id] = { uid: id, defId, zone: "deck" };
-  g.deck.push(id);
-  g.deck = shuffle(g.deck);
-  logMsg(g, `보상 획득: [${g.content.cardsById[defId].name}] 덱에 추가`);
+  const mapB = mapA.filter((x) => x.id !== idA);
+  const idB = pickWeightedOne(mapB);
+
+  return [
+    { defId: idA, upgrade: rollOfferedUpgrade() },
+    { defId: idB, upgrade: rollOfferedUpgrade() },
+  ];
+}
+
+export function newUid(g: GameState) {
+  g.uidSeq += 1;
+  return `c_${g.uidSeq}`;
+}
+
+export function addCardToDeck(g: GameState, defId: string, opt?: { upgrade?: number }) {
+  const uid = newUid(g);
+  g.cards[uid] = { uid, defId, zone: "deck", upgrade: opt?.upgrade ?? 0 };
+  g.deck.push(uid);
 }
 
 export function removeRandomCardFromDeck(g: GameState) {
@@ -95,7 +106,7 @@ export function removeRandomCardFromDeck(g: GameState) {
   g.hand = g.hand.filter((x) => x !== c.uid);
   g.discard = g.discard.filter((x) => x !== c.uid);
 
-  logMsg(g, `카드 제거: [${g.content.cardsById[c.defId].name}]`);
+  logMsg(g, `카드 제거: [${getCardDefFor(g, c.uid).name} +${g.cards[c.uid].upgrade ?? 0}]`);
 }
 
 const CURSED_TREASURE_ID = "goal_treasure";
@@ -120,4 +131,22 @@ export function removeCardByUid(g: GameState, uid: string) {
   // 영구 제거(소실처럼 취급)
   inst.zone = "vanished";
   g.vanished.push(uid);
+
+  logMsg(g, `카드 제거: [${getCardDefFor(g, inst.uid).name} +${g.cards[inst.uid].upgrade ?? 0}]`);
+}
+
+export function canUpgradeUid(g: GameState, uid: string): boolean {
+  const inst = g.cards[uid];
+  if (!inst) return false;
+  const def = g.content.cardsById[inst.defId];
+  const max = def.upgrades?.length ?? 0; // upgrades 없으면 강화 불가
+  return (inst.upgrade ?? 0) < max;
+}
+
+export function upgradeCardByUid(g: GameState, uid: string): boolean {
+  if (!canUpgradeUid(g, uid)) return false;
+
+  g.cards[uid].upgrade = (g.cards[uid].upgrade ?? 0) + 1;
+
+  return true;
 }

@@ -80,9 +80,9 @@ export function rollNodeOffers(g: GameState): NodeType[] {
 
   const pool: NodeType[] = [];
 
-  const battleW = g.run.treasureObtained ? 15 : 14;
-  const restW = 5;
-  const eventW = 5;
+  const battleW = g.run.treasureObtained ? 20 : 19;
+  const restW = 4;
+  const eventW = 6;
 
   const canOfferTreasure = !g.run.treasureObtained && g.run.nodePickCount >= 30;
   const treasureW = canOfferTreasure ? 1 : 0;

@@ -8,11 +8,10 @@ export const ENEMIES: EnemyData[] = [
     maxHp: 40,
     intents: [
       { label: "10 피해", acts: [{ op: "damagePlayer", n: 10 }] },
-      { label: "교란/출혈2/취약2/약화2", acts: [
-          { op: "statusPlayer", key: "disrupt", n: 1 },
-          { op: "statusPlayer", key: "bleed", n: 2 },
-          { op: "statusPlayer", key: "vuln", n: 2 },
-          { op: "statusPlayer", key: "weak", n: 2 },
+      { label: "출혈4/취약4/약화4", acts: [
+          { op: "statusPlayer", key: "bleed", n: 4 },
+          { op: "statusPlayer", key: "vuln", n: 4 },
+          { op: "statusPlayer", key: "weak", n: 4 },
         ],
       },
     ],

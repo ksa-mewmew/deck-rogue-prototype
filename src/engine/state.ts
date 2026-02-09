@@ -11,11 +11,12 @@ export function createInitialState(content: Content): GameState {
     phase: "NODE",
     log: [],
 
+    uidSeq: 0,
     winHooksAppliedThisCombat: false,
 
     intentsRevealedThisTurn: false,
     disruptIndexThisTurn: null,
-
+    backUidsThisTurn: [],
     run: {
       encounterCount: 0,
       treasureObtained: false,
@@ -85,7 +86,7 @@ export function createInitialState(content: Content): GameState {
 function addToDeck(g: GameState, defId: string, n: number) {
   for (let i = 0; i < n; i++) {
     const id = uid();
-    const inst: CardInstance = { uid: id, defId, zone: "deck" };
+    const inst: CardInstance = { uid: id, defId, zone: "deck", upgrade: 0 };
     g.cards[id] = inst;
     g.deck.push(id);
   }

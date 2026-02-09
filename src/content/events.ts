@@ -31,7 +31,7 @@ export const EVENTS: EventDef[] = [
   {
     id: "drop_bag",
     name: "짐 버리기",
-    prompt: "짐을 줄여 피로를 낮춥니다.",
+    prompt: "짐을 줄여 피로를 낮춘다.",
     options: () => [
       {
         key: "drop",
@@ -56,7 +56,7 @@ export const EVENTS: EventDef[] = [
   {
     id: "hide_from_monster",
     name: "몬스터로부터 숨기",
-    prompt: "전투하거나, 대가를 치르고 숨을 수 있습니다.",
+    prompt: "전투하거나, 대가를 치르고 숨을 수 있다.",
     options: () => [
       {
         key: "fight",
@@ -81,7 +81,7 @@ export const EVENTS: EventDef[] = [
   {
     id: "overweight",
     name: "과중량",
-    prompt: "너무 많은 짐이 피로를 부릅니다.",
+    prompt: "너무 많은 짐이 피로를 부른다.",
     options: () => [
       {
         key: "accept",
@@ -100,7 +100,7 @@ export const EVENTS: EventDef[] = [
   {
     id: "find_adventurer",
     name: "다른 모험가 발견",
-    prompt: "거래를 하거나, 보물을 가진 상태라면 싸움을 피하기 어렵습니다.",
+    prompt: "거래한다.",
     options: (g: GameState) => {
       // ✅ 보물을 가진 상태면: 즉시 “모험가 전투”로 확정
       if (g.run.treasureObtained) {

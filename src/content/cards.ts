@@ -6,9 +6,34 @@
 // =======================================================
 
 import type { CardData } from "../engine/types";
+import type { Content, GameState } from "../engine/types";
+
+export function getCardDefFor(g: GameState, uid: string) {
+  const inst = g.cards[uid];
+  const base = g.content.cardsById[inst.defId];
+  const u = inst.upgrade ?? 0;
+  const patch = base.upgrades?.[u - 1]; // +1이면 index0
+  return patch ? { ...base, ...patch } : base;
+}
+
+export function getCardDefByIdWithUpgrade(content: Content, defId: string, upgrade: number): CardData {
+  const base = content.cardsById[defId];
+  const u = Math.max(0, upgrade | 0);
+  if (u <= 0) return base;
+
+  const patch = base.upgrades?.[u - 1];
+  return patch ? ({ ...base, ...patch } as CardData) : base;
+}
+
+export function cardNameWithUpgrade(g: GameState, uid: string) {
+  const inst = g.cards[uid];
+  const u = inst.upgrade ?? 0;
+  const def = getCardDefFor(g, uid);
+  return u > 0 ? `${def.name} +${u}` : def.name;
+}
 
 export const CARDS: CardData[] = [
-  // 기본 카드
+  // 기본 카드 6장
   {
     id: "field_ration",
     name: "야전 식량",
@@ -16,7 +41,18 @@ export const CARDS: CardData[] = [
     backText: "S +2",
     front: [{ op: "block", n: 3 }],
     back: [{ op: "supplies", n: 2 }],
+
+    upgrades: [
+      {
+        frontText: "방어 +5",
+        front: [{ op: "block", n: 5 }],
+        backText: "S +3",
+        back: [{ op: "supplies", n: 3 }],
+      },
+    ]
+
   },
+
   {
     id: "maintenance",
     name: "정비 도구",
@@ -26,6 +62,17 @@ export const CARDS: CardData[] = [
     backText: "F -1, 소모",
     front: [{ op: "block", n: 3 }],
     back: [{ op: "fatigue", n: -1 }],
+
+    upgrades: [
+      {
+        frontText: "방어 +5",
+        front: [{ op: "block", n: 5 }],
+        backText: "F -1, S +1, 소모",
+        back: [{ op: "fatigue", n: -1 }, { op: "supplies", n: 1 }],
+      },
+    ]    
+  
+
   },
   {
     id: "scout",
@@ -61,6 +108,14 @@ export const CARDS: CardData[] = [
     backText: "선택한 적에게 5 피해, S -1",
     front: [{ op: "damageEnemy", target: "select", n: 5 }],
     back: [{ op: "supplies", n: -1 }, { op: "damageEnemy", target: "select", n: 5 }],
+    upgrades: [
+      {
+        frontText: "선택한 적에게 7 피해",
+        front: [{ op: "damageEnemy", target: "select", n: 7 }],
+        backText: "선택한 적에게 7 피해, S -1",
+        back: [{ op: "supplies", n: -1 }, { op: "damageEnemy", target: "select", n: 7 }],
+      },
+    ]
   },
 
   // 목표한 보물
@@ -68,14 +123,14 @@ export const CARDS: CardData[] = [
     id: "goal_treasure",
     name: "저주받은 보물",
     tags: ["EXHAUST"],
-    exhaustWhen: "FRONT",
+    exhaustWhen: "BOTH",
     frontText: "F +1, 소모",
     backText: "S -1, F +1, 소모",
     front: [{ op: "fatigue", n: 1 }],
     back: [{ op: "supplies", n: -1 }, { op: "fatigue", n: 1 }],
   },
 
-  // 파밍 카드 0.1.0
+  // 파밍 카드 0.1.0 5장
   {
     id: "berserk",
     name: "광폭화",
@@ -126,7 +181,7 @@ export const CARDS: CardData[] = [
   },
 
 
-  // 파밍 카드 0.1.1
+  // 파밍 카드 0.1.1 10장
   // 1) 비장의 일격
 
   {
@@ -200,6 +255,21 @@ export const CARDS: CardData[] = [
     front: [{ op: "damageEnemy", target: "all", n: 3 }],
     back: [],
     onWinWhileInBack: [{ op: "maxHp", n: 2 }],
+
+    upgrades: [
+      {
+        frontText: "모든 적에게 4 피해",
+        backText: "이 카드가 후열에 있는 턴에 승리하면 최대 체력 +3, 소모",
+        front: [{ op: "damageEnemy", target: "all", n: 4 }],
+        onWinWhileInBack: [{ op: "maxHp", n: 3 }],
+      },
+//      {
+//        frontText: "모든 적에게 5 피해",
+//        backText: "이 카드가 후열에 있는 턴에 승리하면 최대 체력 +4, 소모",
+//        front: [{ op: "damageEnemy", target: "all", n: 5 }],
+//        onWinWhileInBack: [{ op: "maxHp", n: 4 }],
+//      }, 강화는 우선 하나만.
+    ],
   },
 
   // 7) 야영 준비

@@ -59,7 +59,7 @@ export type CardData = {
   design?: string;
   exhaustWhen?: ExhaustWhen; // ✅ 어느 위치에서 발동했을 때 소모되는지
   vanishWhen?: ExhaustWhen;  // (필요하면 소실도 동일 패턴)
-
+  upgrades?: Array<Partial<Pick<CardData, "name"|"frontText"|"backText"|"front"|"back"|"tags"|"onWinWhileInBack">>>;
   onWinWhileInBack?: PlayerEffect[];
   
 
@@ -82,6 +82,7 @@ export type CardInstance = {
   uid: string;
   defId: string;
   zone: Zone;
+  upgrade: number; // 0 = 기본
 };
 
 export type EnemyState = {
@@ -176,6 +177,8 @@ export type Content = {
 
 export type GameState = {
 
+  uidSeq: number;
+
   intentsRevealedThisTurn: boolean;
   disruptIndexThisTurn: number | null; // ✅ 이번 턴 교란된 후열 슬롯(없으면 null)
   attackedEnemyIndicesThisTurn: number[];
@@ -214,5 +217,7 @@ export type GameState = {
 
   pendingTarget: PendingTarget | null;
   pendingTargetQueue: PendingTarget[];
+
+  backUidsThisTurn: string[];
 
 };

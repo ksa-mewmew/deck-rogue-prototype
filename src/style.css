@@ -256,3 +256,107 @@ button.primary {
 ========================= */
 hr { border: 0; border-top: 1px solid rgba(17, 24, 39, 0.10); margin: 12px 0; }
 .hr { height: 1px; background: rgba(17, 24, 39, 0.10); margin: 12px 0; }
+
+
+/* =========================
+   Mobile / Responsive
+========================= */
+
+/* 1) 레이아웃: 모바일에서 2열 -> 1열 */
+@media (max-width: 900px) {
+  #app {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .top {
+    grid-template-columns: 1fr; /* 좌/우 패널 세로 스택 */
+  }
+
+  /* 2) stats 뱃지 줄바꿈 (현재 repeat(7, max-content)가 모바일에서 터짐) */
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .badge {
+    display: inline-flex;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  /* 3) 손패: 카드 폭을 줄여서 1~2열로 안정화 */
+  .hand {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 8px;
+  }
+
+  /* 4) 슬롯: 터치 편의 */
+  .slot {
+    min-height: 78px;
+    padding: 10px;
+  }
+
+  /* 5) 버튼: 터치 타겟 키우기 */
+  button {
+    min-height: 44px; /* 모바일 터치 권장 크기 */
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  /* 6) 패널 간격/타이포 */
+  h2 { font-size: 16px; }
+  h3 { font-size: 14px; }
+}
+
+/* 2열 유지하되, 중간 폭(태블릿)에서 여백 조금만 조정 */
+@media (max-width: 1100px) {
+  .stats {
+    grid-template-columns: repeat(4, max-content);
+  }
+}
+
+/* =========================
+   Sticky Combat Controls
+   - ui.ts에서 controls에 "combatControls" 클래스를 추가하면 작동
+========================= */
+.combatControls {
+  position: sticky;
+  top: 10px;           /* 상단에서 살짝 띄움 */
+  z-index: 20;
+  padding: 10px;
+  border-radius: var(--r-lg);
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(17, 24, 39, 0.10);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(10px);
+}
+
+/* 모바일에서는 상단에 딱 붙여서 조작이 더 편하게 */
+@media (max-width: 900px) {
+  .combatControls {
+    top: 8px;
+  }
+}
+
+/* =========================
+   Optional: Collapsible Log
+   - ui.ts에서 log wrapper에 "logPanel" / 접힘 시 "collapsed" 토글하면 작동
+========================= */
+.logPanel.collapsed .log,
+.logPanel.collapsed pre.log {
+  display: none;
+}
+
+.banner-left {
+  position: sticky;
+  top: 64px; /* combatControls 아래로 */
+  z-index: 15;
+  padding: 10px 12px;
+  border-radius: var(--r-lg);
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  background: rgba(255, 245, 230, 0.95);
+}
+
+.card { touch-action: none; }
+.slot { touch-action: none; }

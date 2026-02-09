@@ -22,6 +22,11 @@ const RULEBOOK_TEXT = `# Deck Rogue Prototype — 룰북 (플레이어용)
 [3] 전투 흐름
 배치 → 후열 발동 → 전열 발동 → 적 행동 → 정리 → 드로우
 ※ “대상 선택 필요”가 뜨면 살아있는 적을 클릭해 대상을 정하세요.
+※ 후열 발동을 누르면 턴이 진행되어, 카드의 배치를 변경할 수 없습니다.
+보급 및 그에 따른 변화는 정리 단계에서 처리합니다.
+
+손패는 턴이 종료되어도 유지됩니다.
+카드는 매 턴마다 사용한 만큼 뽑습니다. 즉, 카드로 인한 드로우는 패의 매수 자체를 늘리는 효과가 있습니다.
 
 [4] 용어
 - 소모: 이번 전투에서 사용할 수 없게 되는 것입니다.
@@ -54,12 +59,13 @@ import {
   upkeepEndTurn,
   drawStepStartNextTurn,
 } from "../engine/combat";
-import { logMsg, rollBranchOffer, advanceBranchOffer } from "../engine/rules";
+import { logMsg, rollBranchOffer, advanceBranchOffer} from "../engine/rules";
 import { createInitialState } from "../engine/state";
 
 import type { EventOutcome } from "../content/events";
 import { pickRandomEvent } from "../content/events";
-import { removeCardByUid, addCardToDeck, offerRewardPair } from "../content/rewards";
+import { removeCardByUid, addCardToDeck, offerRewardPair, upgradeCardByUid, canUpgradeUid } from "../content/rewards";
+import { getCardDefFor, getCardDefByIdWithUpgrade, cardNameWithUpgrade } from "../content/cards";
 
 // =========================
 // UI Actions
@@ -88,6 +94,8 @@ type Overlay =
   | { kind: "RULEBOOK" }
   | { kind: "PILE"; pile: PileKind };
 
+let logCollapsed = false;
+  
 let overlay: Overlay | null = null;
 let overlayStack: Overlay[] = [];
 
@@ -100,6 +108,12 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
 
   const actions = {
     rerender: () => render(g, actions),
+
+    onToggleLog: () => {
+      logCollapsed = !logCollapsed;
+      render(g, actions);
+    },
+
 
     onCloseOverlay: () => {
       overlay = overlayStack.pop() ?? null;
@@ -135,8 +149,7 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
       g.hand.push(uid);
       g.cards[uid].zone = "hand";
 
-      const def = g.content.cardsById[g.cards[uid].defId];
-      logMsg(g, `[${def.name}] 회수: ${fromSide}${fromIdx + 1} → 손패`);
+      logMsg(g, `[${cardNameWithUpgrade(g, uid)}] 회수: ${fromSide}${fromIdx + 1} → 손패`);
 
       render(g, actions);
     },
@@ -226,6 +239,7 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
           options: [
             { key: "rest:heal", label: "HP +15" },
             { key: "rest:clear_f", label: "F -3" },
+            { key: "rest:upgrade", label: "카드 강화 (+1)" },
             { key: "rest:skip", label: "생략" },
           ],
         };
@@ -237,6 +251,64 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
           } else if (key === "rest:clear_f") {
             g.player.fatigue = Math.max(0, g.player.fatigue - 3);
             logMsg(g, "휴식: 피로 F-=3");
+          } else if (key === "rest:upgrade") {
+            // ✅ 강화 카드 선택 UI
+            const candidates = Object.values(g.cards)
+              .filter((c) => (c.zone === "deck" || c.zone === "hand" || c.zone === "discard"))
+              .map((c) => c.uid)
+              .filter((uid) => canUpgradeUid(g, uid));
+
+            if (candidates.length === 0) {
+              logMsg(g, "강화할 수 있는 카드가 없습니다.");
+              g.choice = null;
+              choiceHandler = null;
+              render(g, actions);
+              return;
+            }
+
+            g.choice = {
+              kind: "PICK_CARD",
+              title: "카드 강화",
+              prompt: "강화할 카드 1장을 선택하세요.",
+              options: [
+                ...candidates.map((uid) => {
+                  const def = getCardDefFor(g, uid);
+                  return {
+                    key: `upgrade:${uid}`,
+                    label: cardNameWithUpgrade(g, uid),
+                    detail: `전열: ${def.frontText} / 후열: ${def.backText}`,
+                    cardUid: uid,
+                  };
+                }),
+                { key: "cancel", label: "취소" },
+              ],
+            };
+
+            // ✅ 여기서부터는 강화 선택 핸들러로 교체
+            choiceHandler = (k: string) => {
+              if (k === "cancel") {
+                g.choice = null;
+                choiceHandler = null;
+                render(g, actions);
+                return;
+              }
+              if (!k.startsWith("upgrade:")) return;
+
+              const uid = k.slice("upgrade:".length);
+              if (upgradeCardByUid(g, uid)) {
+                logMsg(g, `강화 완료: ${cardNameWithUpgrade(g, uid)}`);
+              } else {
+                logMsg(g, "강화 실패(최대 강화/대상 없음)");
+              }
+
+              // 휴식 종료
+              g.choice = null;
+              choiceHandler = null;
+              render(g, actions);
+            };
+
+            render(g, actions);
+            return;
           } else {
             logMsg(g, "휴식: 생략");
           }
@@ -288,10 +360,10 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
               prompt: outcome.prompt ?? "제거할 카드 1장을 선택하세요.",
               options: [
                 ...candidates.map((uid) => {
-                  const def = g.content.cardsById[g.cards[uid].defId];
+                  const def = getCardDefFor(g, uid);
                   return {
                     key: `remove:${uid}`,
-                    label: def.name,
+                    label: cardNameWithUpgrade(g, uid),
                     detail: `전열: ${def.frontText} / 후열: ${def.backText}`,
                     cardUid: uid,
                   };
@@ -328,23 +400,32 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
 
               if (outcome.then === "REWARD_PICK") {
                 const [a, b] = offerRewardPair();
-                const da = g.content.cardsById[a];
-                const db = g.content.cardsById[b];
+
+                const da = getCardDefByIdWithUpgrade(g.content, a.defId, a.upgrade);
+                const db = getCardDefByIdWithUpgrade(g.content, b.defId, b.upgrade);
+
+                const la = a.upgrade > 0 ? `${da.name} +${a.upgrade}` : da.name;
+                const lb = b.upgrade > 0 ? `${db.name} +${b.upgrade}` : db.name;
 
                 g.choice = {
                   kind: "REWARD",
                   title: "카드 보상",
                   prompt: "두 장 중 한 장을 선택하거나 생략합니다.",
                   options: [
-                    { key: `pick:${a}`, label: da.name, detail: `전열: ${da.frontText} / 후열: ${da.backText}` },
-                    { key: `pick:${b}`, label: db.name, detail: `전열: ${db.frontText} / 후열: ${db.backText}` },
+                    { key: `pick:${a.defId}:${a.upgrade}`, label: la, detail: `전열: ${da.frontText} / 후열: ${da.backText}` },
+                    { key: `pick:${b.defId}:${b.upgrade}`, label: lb, detail: `전열: ${db.frontText} / 후열: ${db.backText}` },
                     { key: "skip", label: "생략" },
                   ],
                 };
 
                 choiceHandler = (kk: string) => {
-                  if (kk.startsWith("pick:")) addCardToDeck(g, kk.slice("pick:".length));
-                  else logMsg(g, "카드 보상 생략");
+                  if (kk.startsWith("pick:")) {
+                    const [, defId, upStr] = kk.split(":");
+                    const up = Number(upStr ?? "0") || 0;
+                    addCardToDeck(g, defId, { upgrade: up });
+                  } else {
+                    logMsg(g, "카드 보상 생략");
+                  }
 
                   g.choice = null;
                   choiceHandler = null;
@@ -388,24 +469,33 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
 
           // (4) REWARD_PICK
           if (outcome === "REWARD_PICK") {
-            const [a, b] = offerRewardPair();
-            const da = g.content.cardsById[a];
-            const db = g.content.cardsById[b];
+            const [a, b] = offerRewardPair(); // a,b: { defId, upgrade }
+
+            const da = getCardDefByIdWithUpgrade(g.content, a.defId, a.upgrade);
+            const db = getCardDefByIdWithUpgrade(g.content, b.defId, b.upgrade);
+
+            const la = a.upgrade > 0 ? `${da.name} +${a.upgrade}` : da.name;
+            const lb = b.upgrade > 0 ? `${db.name} +${b.upgrade}` : db.name;
 
             g.choice = {
               kind: "REWARD",
               title: "카드 보상",
               prompt: "두 장 중 한 장을 선택하거나 생략합니다.",
               options: [
-                { key: `pick:${a}`, label: da.name, detail: `전열: ${da.frontText} / 후열: ${da.backText}` },
-                { key: `pick:${b}`, label: db.name, detail: `전열: ${db.frontText} / 후열: ${db.backText}` },
+                { key: `pick:${a.defId}:${a.upgrade}`, label: la, detail: `전열: ${da.frontText} / 후열: ${da.backText}` },
+                { key: `pick:${b.defId}:${b.upgrade}`, label: lb, detail: `전열: ${db.frontText} / 후열: ${db.backText}` },
                 { key: "skip", label: "생략" },
               ],
             };
 
             choiceHandler = (kk: string) => {
-              if (kk.startsWith("pick:")) addCardToDeck(g, kk.slice("pick:".length));
-              else logMsg(g, "카드 보상 생략");
+              if (kk.startsWith("pick:")) {
+                const [, defId, upStr] = kk.split(":");
+                const up = Number(upStr ?? "0") || 0;
+                addCardToDeck(g, defId, { upgrade: up });
+              } else {
+                logMsg(g, "카드 보상 생략");
+              }
 
               g.choice = null;
               choiceHandler = null;
@@ -415,6 +505,8 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
             render(g, actions);
             return;
           }
+
+
 
           // (5) NONE
           g.choice = null;
@@ -486,16 +578,15 @@ export function makeUIActions(g: GameState, setGame: (next: GameState) => void) 
       g.cards[a].zone = toSide;
       if (b) g.cards[b].zone = fromSide;
 
-      const da = g.content.cardsById[g.cards[a].defId];
-      const db = b ? g.content.cardsById[g.cards[b].defId] : null;
+      const aName = cardNameWithUpgrade(g, a);
+      const bName = b ? cardNameWithUpgrade(g, b) : null;
 
       logMsg(
         g,
         b
-          ? `[${da.name}] ↔ [${db!.name}] 스왑: ${fromSide}${fromIdx + 1} ↔ ${toSide}${toIdx + 1}`
-          : `[${da.name}] 이동: ${fromSide}${fromIdx + 1} → ${toSide}${toIdx + 1}`
+          ? `[${aName}] ↔ [${bName!}] 스왑: ${fromSide}${fromIdx + 1} ↔ ${toSide}${toIdx + 1}`
+          : `[${aName}] 이동: ${fromSide}${fromIdx + 1} → ${toSide}${toIdx + 1}`
       );
-
       render(g, actions);
     },
 
@@ -560,7 +651,7 @@ export function render(g: GameState, actions: UIActions) {
   pileControls.appendChild(button("소모", () => actions.onViewPile("exhausted"), false));
   pileControls.appendChild(button("소실", () => actions.onViewPile("vanished"), false));
   pileControls.appendChild(button("손패", () => actions.onViewPile("hand"), false));
-  pileControls.appendChild(button("룰 북", actions.onViewRulebook, false));
+  pileControls.appendChild(button("룰북", actions.onViewRulebook, false));
   pileControls.appendChild(button("새 런", actions.onNewRun, false));
   left.appendChild(pileControls);
 
@@ -649,9 +740,26 @@ export function render(g: GameState, actions: UIActions) {
   top.appendChild(left);
   top.appendChild(right);
 
-  const bottom = div("panel");
-  bottom.appendChild(h2("로그"));
-  bottom.appendChild(logBox(g.log.join("\n")));
+  const bottom = div("panel logPanel" + (logCollapsed ? " collapsed" : ""));
+
+  const logHeader = div("row");
+  logHeader.style.gridTemplateColumns = "1fr auto";
+  logHeader.style.alignItems = "center";
+
+  logHeader.appendChild(h2("로그"));
+
+  const toggleLabel = logCollapsed ? "로그 펼치기" : "로그 접기";
+  const toggleBtn = button(toggleLabel, actions.onToggleLog, false);
+  toggleBtn.classList.add("primary");
+  logHeader.appendChild(toggleBtn);
+
+  bottom.appendChild(logHeader);
+
+  // 접혀있지 않을 때만 렌더(성능/UX)
+  if (!logCollapsed) {
+    bottom.appendChild(logBox(g.log.join("\n")));
+  }
+
 
   app.appendChild(top);
   app.appendChild(bottom);
@@ -665,7 +773,7 @@ export function render(g: GameState, actions: UIActions) {
 // =========================
 function renderCombat(root: HTMLElement, g: GameState, actions: UIActions, targeting: boolean) {
 
-  const controls = div("controls");
+  const controls = div("controls combatControls");
 
   controls.appendChild(
     button(
@@ -924,10 +1032,9 @@ function closestWithDatasetKeys(el: HTMLElement, keys: string[]): HTMLElement | 
 function renderDragOverlay(app: HTMLElement, g: GameState) {
   if (!drag || !drag.dragging) return;
 
-  const def = g.content.cardsById[g.cards[drag.cardUid].defId];
 
   const ghost = div("dragGhost");
-  ghost.textContent = def.name;
+  ghost.textContent = cardNameWithUpgrade(g, drag.cardUid);
   ghost.style.position = "fixed";
   ghost.style.left = `${drag.x + 12}px`;
   ghost.style.top = `${drag.y + 12}px`;
@@ -1022,6 +1129,7 @@ function statsRow(g: GameState) {
 
 function statusBadges(st: Record<string, number>) {
   const box = div("badgesRow");
+
   for (const [k, v] of Object.entries(st)) {
     if (!v) continue;
     box.appendChild(badge(`${k} ${v}`));
@@ -1030,15 +1138,14 @@ function statusBadges(st: Record<string, number>) {
 }
 
 function renderCard(g: GameState, cardUid: string, clickable: boolean, onClick?: (uid: string) => void) {
-  const defId = g.cards[cardUid].defId;
-  const def = g.content.cardsById[defId];
+  const def = getCardDefFor(g, cardUid);
 
   const d = div("card");
   if (g.selectedHandCardUid === cardUid) d.classList.add("selected");
   if (def.tags?.includes("EXHAUST")) d.classList.add("exhaust");
   if (def.tags?.includes("VANISH")) d.classList.add("vanish");
 
-  d.appendChild(divText("cardTitle", def.name));
+  d.appendChild(divText("cardTitle", cardNameWithUpgrade(g, cardUid)));
 
   const meta = div("cardMeta");
   if (def.tags?.includes("EXHAUST")) meta.appendChild(badge("소모"));
@@ -1154,23 +1261,29 @@ function renderOverlay(root: HTMLElement, g: GameState, actions: UIActions & { o
         : g.hand;
 
     const sortedUids = [...uids].sort((a, b) => {
-      const da = g.content.cardsById[g.cards[a].defId];
-      const db = g.content.cardsById[g.cards[b].defId];
+      const da = getCardDefFor(g, a);
+      const db = getCardDefFor(g, b);
       const nameCmp = da.name.localeCompare(db.name, "ko");
       if (nameCmp !== 0) return nameCmp;
+
+      const ua = g.cards[a].upgrade ?? 0;
+      const ub = g.cards[b].upgrade ?? 0;
+      if (ua !== ub) return ub - ua;
+
       return a.localeCompare(b);
     });
 
     const list = div("controls");
     for (const uid of sortedUids) {
-      const def = g.content.cardsById[g.cards[uid].defId];
+      const def = getCardDefFor(g, uid);
       const b = document.createElement("button");
       b.className = "primary";
-      b.textContent = `${def.name} — 전열: ${def.frontText} / 후열: ${def.backText}`;
-      b.onclick = () => {}; // 정보만 보여주려면 noop
+      b.textContent = `${cardNameWithUpgrade(g, uid)} — 전열: ${def.frontText} / 후열: ${def.backText}`;
+      b.onclick = () => {};
       list.appendChild(b);
     }
     root.appendChild(list);
+
   }
 
   // 닫기

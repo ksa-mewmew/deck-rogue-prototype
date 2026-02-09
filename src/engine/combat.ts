@@ -11,6 +11,8 @@ import type { EnemyEffect, GameState, Side, EnemyState } from "./types";
 import { aliveEnemies, applyStatus, clampMin, logMsg, pickOne, shuffle, applyStatusTo } from "./rules";
 import { applyDamageToPlayer, applyDamageToEnemy } from "./effects";
 import { resolvePlayerEffects } from "./resolve";
+import { getCardDefFor } from "../content/cards";
+import { cardNameWithUpgrade } from "../content/cards";
 
 function enemyStateFromId(g: GameState, enemyId: string): EnemyState {
   const def = g.content.enemiesById[enemyId];
@@ -91,6 +93,8 @@ export function startCombat(g: GameState) {
   g.backSlots = [null, null, null];
   g.backSlotDisabled = [false, false, false];
 
+  g.backUidsThisTurn = [];
+
   g.hand = [];
   g.selectedHandCardUid = null;
 
@@ -133,6 +137,7 @@ export function revealIntentsAndDisrupt(g: GameState) {
   g.intentsRevealedThisTurn = true;
 
   g.attackedEnemyIndicesThisTurn = [];
+  g.backUidsThisTurn = [];
 
   // ✅ 이번 턴 드로우 카운터 리셋 (턴 단위)
   g.drawCountThisTurn = 0;
@@ -204,6 +209,10 @@ export function revealIntentsAndDisrupt(g: GameState) {
 export function placeCard(g: GameState, cardUid: string, side: Side, idx: number) {
   if (g.phase !== "PLACE") return;
   if (!g.hand.includes(cardUid)) return;
+  if (side === "back") {
+    // 중복 방지
+    if (!g.backUidsThisTurn.includes(cardUid)) g.backUidsThisTurn.push(cardUid);
+  }
 
   const slots = side === "front" ? g.frontSlots : g.backSlots;
   if (slots[idx]) return;
@@ -215,14 +224,12 @@ export function placeCard(g: GameState, cardUid: string, side: Side, idx: number
 
   g.usedThisTurn += 1;
 
-  const def = g.content.cardsById[g.cards[cardUid].defId];
-  logMsg(g, `[${def.name}]를 ${side === "front" ? "전열" : "후열"} ${idx}번에 배치`);
+  logMsg(g, `[${cardNameWithUpgrade(g, cardUid)}]를 ${side === "front" ? "전열" : "후열"} ${idx}번에 배치`);
   if (side === "front") g.frontPlacedThisTurn += 1;
 }
 
 function isTag(g: GameState, cardUid: string, tag: "EXHAUST" | "VANISH") {
-  const defId = g.cards[cardUid].defId;
-  const def = g.content.cardsById[defId];
+  const def = getCardDefFor(g, cardUid);
   return def.tags?.includes(tag) ?? false;
 }
 
@@ -232,7 +239,7 @@ function removeFromSlots(g: GameState, cardUid: string) {
 }
 
 function moveCardAfterUse(g: GameState, cardUid: string, usedSide: "front" | "back") {
-  const def = g.content.cardsById[g.cards[cardUid].defId];
+  const def = getCardDefFor(g, cardUid);
   removeFromSlots(g, cardUid);
 
   g.hand = g.hand.filter((x) => x !== cardUid);
@@ -252,28 +259,28 @@ function moveCardAfterUse(g: GameState, cardUid: string, usedSide: "front" | "ba
   if (def.vanishWhen && vanishOk) {
     g.vanished.push(cardUid);
     g.cards[cardUid].zone = "vanished";
-    logMsg(g, `[${def.name}] 소실(영구 제거)`);
+    logMsg(g, `[${cardNameWithUpgrade(g, cardUid)}] 소실(영구 제거)`);
     return;
   }
 
   if (def.exhaustWhen && exhaustOk) {
     g.exhausted.push(cardUid);
     g.cards[cardUid].zone = "exhausted";
-    logMsg(g, `[${def.name}] 소모(이번 전투에서 제거)`);
+    logMsg(g, `[${cardNameWithUpgrade(g, cardUid)}] 소모(이번 전투에서 제거)`);
     return;
   }
 
   if (!def.vanishWhen && isTag(g, cardUid, "VANISH")) {
     g.vanished.push(cardUid);
     g.cards[cardUid].zone = "vanished";
-    logMsg(g, `[${def.name}] 소실(영구 제거)`);
+    logMsg(g, `[${cardNameWithUpgrade(g, cardUid)}] 소실(영구 제거)`);
     return;
   }
 
   if (!def.exhaustWhen && isTag(g, cardUid, "EXHAUST")) {
     g.exhausted.push(cardUid);
     g.cards[cardUid].zone = "exhausted";
-    logMsg(g, `[${def.name}] 소모(이번 전투에서 제거)`);
+    logMsg(g, `[[${cardNameWithUpgrade(g, cardUid)}]] 소모(이번 전투에서 제거)`);
     return;
   }
 
@@ -302,7 +309,7 @@ export function resolveBack(g: GameState) {
     const uid = g.backSlots[i];
     if (!uid) continue;
 
-    const def = g.content.cardsById[g.cards[uid].defId];
+    const def = getCardDefFor(g, uid);
 
     if (!g.player.immuneToDisruptThisTurn && g.backSlotDisabled[i]) {
       logMsg(g, `후열 ${i}번 [${def.name}] 교란으로 무효`);
@@ -324,7 +331,7 @@ export function resolveFront(g: GameState) {
     const uid = g.frontSlots[i];
     if (!uid) continue;
 
-    const def = g.content.cardsById[g.cards[uid].defId];
+    const def = getCardDefFor(g, uid);
 
     resolvePlayerEffects({ game: g, side: "front", cardUid: uid }, def.front);
     moveCardAfterUse(g, uid, "front");
@@ -597,7 +604,7 @@ export function checkEndConditions(g: GameState) {
   }
 
   if (aliveEnemies(g).length === 0 && g.phase !== "NODE") {
-    applyWinHooksWhileInBack(g);
+    applyWinHooksWhileInBackThisTurn(g);
     logMsg(g, "승리: 적을 모두 처치!");
     endCombatReturnAllToDeck(g);
     g.player.zeroSupplyTurns = 0;
@@ -652,13 +659,15 @@ function shuffleInPlace<T>(a: T[]) {
   }
 }
 
-function applyWinHooksWhileInBack(g: GameState) {
+function applyWinHooksWhileInBackThisTurn(g: GameState) {
   if (g.winHooksAppliedThisCombat) return;
   g.winHooksAppliedThisCombat = true;
 
-  for (const uid of g.backSlots) {
-    if (!uid) continue;
-    const def = g.content.cardsById[g.cards[uid].defId];
+  for (const uid of g.backUidsThisTurn) {
+    const card = g.cards[uid];
+    if (!card) continue;
+
+    const def = getCardDefFor(g, uid);
     const effs = def.onWinWhileInBack;
     if (!effs || effs.length === 0) continue;
 
