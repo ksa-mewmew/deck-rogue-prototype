@@ -5,22 +5,23 @@ import { addFatigue } from "../engine/effects";
 export type EventOutcome =
   | "NONE"
   | "BATTLE"
-  | "REWARD_PICK"
-  | { kind: "REMOVE_PICK"; title: string; prompt?: string; then: "NONE" | "REWARD_PICK" | "BATTLE" }
+  | "REWARD"
+  | { kind: "UPGRADE_PICK"; title?: string; prompt?: string }
+  | { kind: "REMOVE_PICK"; title: string; prompt?: string; then: "NONE" | "REWARD" | "BATTLE" }
   | { kind: "BATTLE_SPECIAL"; enemyIds: string[]; title?: string };
 
 export type EventOption = {
   key: string;
   label: string;
   detail?: string;
-  apply: (g: GameState) => EventOutcome; // ✅ 핵심
+  apply: (g: GameState) => EventOutcome;
 };
 
 export type EventDef = {
   id: string;
   name: string;
   prompt: string;
-  options: (g: GameState) => EventOption[]; // ✅ 핵심
+  options: (g: GameState) => EventOption[];
 };
 
 export function pickRandomEvent(): EventDef {
@@ -72,7 +73,7 @@ export const EVENTS: EventDef[] = [
         apply: (g) => {
           addFatigue(g, 1);
           logMsg(g, "이벤트: 몬스터로부터 숨기 → 카드 제거 후 F+1");
-            return { kind: "REMOVE_PICK", title: "짐 버리기", prompt: "제거할 카드 1장을 선택하세요.", then: "NONE" };
+            return { kind: "REMOVE_PICK", title: "숨기", prompt: "제거할 카드 1장을 선택하세요.", then: "NONE" };
           }
       },
     ],
@@ -81,21 +82,28 @@ export const EVENTS: EventDef[] = [
   {
     id: "overweight",
     name: "과중량",
-    prompt: "너무 많은 짐이 피로를 부른다.",
-    options: () => [
-      {
-        key: "accept",
-        label: "F += (덱 매수)/5 (버림)",
-        apply: (g) => {
-          const deckSize = Object.values(g.cards).filter((c) => ["deck", "hand", "discard"].includes(c.zone)).length;
-          const add = Math.floor(deckSize / 5);
-          addFatigue(g, add);
-          logMsg(g, `이벤트: 과중량 (덱 ${deckSize}장 → F +${add})`);
-          return "NONE";
+    prompt: "너무 많은 짐이 피로를 부른다!",
+    options: (g) => {
+      const deckSize = Object.values(g.cards).filter((c) =>
+        ["deck", "hand", "discard"].includes(c.zone)
+      ).length;
+
+      const add = Math.floor(deckSize / 5);
+
+      return [
+        {
+          key: "accept",
+          label: `F +${add} (버림)`,
+          apply: (g2) => {
+            addFatigue(g2, add);
+            logMsg(g2, `이벤트: 과중량 (덱 ${deckSize}장 → F +${add})`);
+            return "NONE";
+          },
         },
-      },
-    ],
+      ];
+    },
   },
+
 
   {
     id: "goblin_ambush_low_supplies",
@@ -109,7 +117,7 @@ export const EVENTS: EventDef[] = [
         label: "맞서 싸운다",
         detail: "고블린 약탈자 2마리 전투 (S=5 시작)",
         apply: (g: any) => {
-          g.run.nextBattleSuppliesBonus = -5; // ✅ 10 + (-5) = 5
+          g.run.nextBattleSuppliesBonus = -5;
           return { kind: "BATTLE_SPECIAL", title: "고블린 매복", enemyIds: ["goblin_raider", "goblin_raider"] };
         },
       },
@@ -121,7 +129,7 @@ export const EVENTS: EventDef[] = [
     name: "다른 모험가 발견",
     prompt: "거래한다.",
     options: (g: GameState) => {
-      // ✅ 보물을 가진 상태면: 즉시 “모험가 전투”로 확정
+
       if (g.run.treasureObtained) {
         return [
           {
@@ -143,7 +151,7 @@ export const EVENTS: EventDef[] = [
           label: "카드 1장 제거 후 카드 보상(2장 중 1장)",
           apply: (gg) => {
             logMsg(gg, "이벤트: 다른 모험가 발견 → 제거할 카드 선택 후 보상");
-            return { kind: "REMOVE_PICK", title: "다른 모험가 발견", prompt: "제거할 카드 1장을 선택하세요.", then: "REWARD_PICK" };
+            return { kind: "REMOVE_PICK", title: "다른 모험가 발견", prompt: "제거할 카드 1장을 선택하세요.", then: "REWARD" };
           }
         },
         {
@@ -167,9 +175,8 @@ export const EVENTS: EventDef[] = [
         key: "eat",
         label: "F -= 2, 다음 전투 시작 S +5",
         apply: (g) => {
-          // 현재는 '다음 전투 시작' 버프 시스템이 없으니 임시로 즉시 S+5
           g.player.fatigue = Math.max(0, g.player.fatigue - 2);
-          g.run.nextBattleSuppliesBonus += 5; // ✅ 다음 전투 시작 S +5
+          g.run.nextBattleSuppliesBonus += 5;
           logMsg(g, "식용 버섯: F -2, 다음 전투 시작 S +5");
           return "NONE";
         },

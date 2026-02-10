@@ -8,15 +8,23 @@ export type NodeType = "BATTLE" | "REST" | "EVENT" | "TREASURE";
 export type NodeOfferId = "A" | "B";
 
 export type NodeOffer = {
-  id: NodeOfferId;   // A/B 식별자
-  type: NodeType;    // BATTLE/REST/EVENT/TREASURE
+  id: NodeOfferId;   // A/B 식별
+  type: NodeType;
 };
 
 export type BranchOffer = {
   root: [NodeOffer, NodeOffer];      // 현재 A/B
-  nextIfA: [NodeOffer, NodeOffer];   // A를 고르면 다음
-  nextIfB: [NodeOffer, NodeOffer];   // B를 고르면 다음
+  nextIfA: [NodeOffer, NodeOffer];   // A 다음
+  nextIfB: [NodeOffer, NodeOffer];   // B 다음
 };
+
+export type PlayerDamageKind =
+  | "ENEMY_ATTACK"
+  | "BLEED"
+  | "FATIGUE"
+  | "ZERO_SUPPLY"
+  | "OTHER";
+
 
 export type ExhaustWhen = "FRONT" | "BACK" | "BOTH";
 
@@ -28,8 +36,9 @@ export type ChoiceOption = {
   cardUid?: string;
 };
 
+
 export type ChoiceState = {
-  kind: "EVENT" | "REWARD" | "PICK_CARD" | "VIEW_PILE";
+  kind: "EVENT" | "REWARD" | "PICK_CARD" | "VIEW_PILE" | "UPGRADE_PICK";
   title: string;
   prompt?: string;
   options: ChoiceOption[];
@@ -57,8 +66,8 @@ export type CardData = {
   front: PlayerEffect[];
   back: PlayerEffect[];
   design?: string;
-  exhaustWhen?: ExhaustWhen; // ✅ 어느 위치에서 발동했을 때 소모되는지
-  vanishWhen?: ExhaustWhen;  // (필요하면 소실도 동일 패턴)
+  exhaustWhen?: ExhaustWhen;
+  vanishWhen?: ExhaustWhen;
   upgrades?: Array<Partial<Pick<CardData,
   "name"|"frontText"|"backText"|"front"|"back"|"tags"|"onWinWhileInBack"|"exhaustWhen"|"vanishWhen">>>;
   onWinWhileInBack?: PlayerEffect[];
@@ -83,7 +92,7 @@ export type CardInstance = {
   uid: string;
   defId: string;
   zone: Zone;
-  upgrade: number; // 0 = 기본
+  upgrade: number;
 };
 
 export type EnemyState = {
@@ -95,15 +104,14 @@ export type EnemyState = {
   status: Record<StatusKey, number>;
 
   immuneNextTurn: boolean;
-  immuneThisTurn: boolean; // ✅ 슬라임 1패턴용
+  immuneThisTurn: boolean;
   soulCastCount?: number;
 
-  soulWarnCount?: number;         // 3번 의도 경고 누적(0..3)
-  soulArmed?: boolean;            // 경고 3번 완료 → 폭발 가능 상태
-  soulWillNukeThisTurn?: boolean; // 의도 공개 때 이번 턴 50딜로 확정됐는지
+  soulWarnCount?: number;         // 3번 의도 경고 누적
+  soulArmed?: boolean;
+  soulWillNukeThisTurn?: boolean;
 };
 
-// Effect에 적 전용 op 추가
 export type PlayerEffect =
   | { op: "block"; n: number }
   | { op: "supplies"; n: number }
@@ -117,12 +125,12 @@ export type PlayerEffect =
   | { op: "nullifyDamageThisTurn" }
   | { op: "ifDrewThisTurn"; then: PlayerEffect[] }
   | { op: "triggerFrontOfBackSlot"; index: number }
-  | { op: "damageEnemyByPlayerFatigue"; target: "random" | "select"; mult: number } // ✅ F*mult
+  | { op: "damageEnemyByPlayerFatigue"; target: "random" | "select"; mult: number }
   | { op: "statusEnemy"; target: "select" | "random" | "all"; key: StatusKey; n: number }
-  | { op: "setSupplies"; n: number }                                     // ✅ S를 n으로
-  | { op: "statusEnemiesAttackingThisTurn"; key: StatusKey; n: number }   // ✅ 이번 턴 공격한 적들
-  | { op: "maxHp"; n: number }                                           // ✅ 최대체력 증가
-  | { op: "hp"; n: number }                                             // ✅ HP 직접 증감(음수 가능);
+  | { op: "setSupplies"; n: number }
+  | { op: "statusEnemiesAttackingThisTurn"; key: StatusKey; n: number }
+  | { op: "maxHp"; n: number }
+  | { op: "hp"; n: number }
   | { op: "clearStatusSelf"; key: StatusKey }
 
 
@@ -134,8 +142,8 @@ export type PendingTarget =
 export type EnemyEffect =
   | { op: "damagePlayer"; n: number }
   | { op: "damagePlayerFormula"; kind: "goblin_raider" | "watching_statue" }
-  | { op: "supplies"; n: number } // 적이 S 깎는 용도
-  | { op: "statusPlayer"; key: StatusKey; n: number } // 적이 플레이어 상태 부여
+  | { op: "supplies"; n: number }
+  | { op: "statusPlayer"; key: StatusKey; n: number }
   | { op: "enemyHealSelf"; n: number }
   | { op: "enemyImmuneThisTurn" }
   | { op: "enemyImmuneNextTurn" }
@@ -144,10 +152,10 @@ export type EnemyEffect =
 export type PlayerState = {
   hp: number;
   maxHp: number;
-  block: number; // 방어
-  supplies: number; // S
-  fatigue: number; // F
-  zeroSupplyTurns: number; // S=0 종료 누적
+  block: number;
+  supplies: number;
+  fatigue: number;
+  zeroSupplyTurns: number;
   status: Record<StatusKey, number>;
   immuneToDisruptThisTurn: boolean;
   nullifyDamageThisTurn: boolean;
@@ -158,7 +166,7 @@ export type RunState = {
   treasureObtained: boolean;
   afterTreasureNodePicks: number;
   
-  nodeOfferQueue: NodeType[][]; // ✅ [현재, 다음, 다다음] 각 원소는 길이 2
+  nodeOfferQueue: NodeType[][];
 
   finished: boolean;
   nodePickCount: number;
@@ -168,8 +176,8 @@ export type RunState = {
   bossPool: string[];
   branchOffer: BranchOffer | null;
 
-  battleCount: number; // ✅ 지금까지 “전투 시작”한 횟수
-  enemyLastSeenBattle: Record<string, number>; // ✅ enemyId -> 마지막 등장 battleCount
+  battleCount: number;
+  enemyLastSeenBattle: Record<string, number>;
 };
 
 export type Content = {
@@ -182,7 +190,7 @@ export type GameState = {
   uidSeq: number;
 
   intentsRevealedThisTurn: boolean;
-  disruptIndexThisTurn: number | null; // ✅ 이번 턴 교란된 후열 슬롯(없으면 null)
+  disruptIndexThisTurn: number | null;
   attackedEnemyIndicesThisTurn: number[];
 
   choiceStack: ChoiceState[];
@@ -195,7 +203,7 @@ export type GameState = {
 
   content: Content;
 
-  cards: Record<string, CardInstance>; // uid -> instance
+  cards: Record<string, CardInstance>;
   deck: string[];
   hand: string[];
   discard: string[];
@@ -209,8 +217,8 @@ export type GameState = {
 
   enemies: EnemyState[];
 
-  usedThisTurn: number; // ✅ 이번 턴에 배치(사용)한 카드 수
-  frontPlacedThisTurn: number; // ✅ 이번 턴 전열에 배치한 카드 수
+  usedThisTurn: number; // 이번 턴에 배치한 카드 수
+  frontPlacedThisTurn: number; // 이번 턴 전열에 배치한 카드 수
   selectedHandCardUid: string | null;
 
   winHooksAppliedThisCombat: boolean;
@@ -221,5 +229,10 @@ export type GameState = {
   pendingTargetQueue: PendingTarget[];
 
   backUidsThisTurn: string[];
+
+  fx?: {
+    enemyShake?: number[]; // 이번 틱에 피해 받은 적 인덱스들
+    playerShake?: boolean;
+  };
 
 };

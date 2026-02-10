@@ -1,12 +1,3 @@
-// =======================================================
-// combat.ts ✅ (전체 수정본)
-// - 턴마다 intentsRevealedThisTurn 플래그 리셋 누락 수정
-// - drawCountThisTurn: "이번 턴(의도 공개~유지비 전)" 기준으로 reset
-// - drawCards: maybeReshuffle 연동 + 실제 드로우 수 반환
-// - resolveTargetSelection: damageSelect + statusSelect 둘 다 처리
-// - status select 큐까지 포함해서 "완성본"으로 맞춤
-// =======================================================
-
 import type { EnemyEffect, GameState, Side, EnemyState } from "./types";
 import { aliveEnemies, applyStatus, clampMin, logMsg, pickOne, shuffle, applyStatusTo } from "./rules";
 import { applyDamageToPlayer, applyDamageToEnemy } from "./effects";
@@ -14,6 +5,7 @@ import { resolvePlayerEffects } from "./resolve";
 import { getCardDefFor } from "../content/cards";
 import { cardNameWithUpgrade, getCardDefByIdWithUpgrade } from "../content/cards";
 import { offerRewardPair } from "../content";
+import { markEnemyShaken } from "./effects";
 
 
 function enemyStateFromId(g: GameState, enemyId: string): EnemyState {
@@ -54,20 +46,14 @@ export function spawnEncounter(
 ) {
   const forceBoss = opt?.forceBoss ?? false;
 
-  // ✅ 티어 기준: 노드 번호
-  // onChooseNode에서 nodePickCount를 +1한 뒤 spawnEncounter를 호출하는 흐름을 전제로 함
+
   const nodeNo = g.run.nodePickCount;
 
-  // ✅ 쿨다운/기록 기준: 전투 번호(이번에 실제로 전투가 시작될 때만 +1)
   const battleNo = g.run.battleCount + 1;
 
-  // -------------------------
-  // (0) 강제 패턴(이벤트 전투 등)
-  // -------------------------
   if (opt?.forcePatternIds && opt.forcePatternIds.length > 0) {
     const chosen = opt.forcePatternIds;
 
-    // 전투 시작 확정 기록
     g.run.battleCount = battleNo;
     for (const id of chosen) g.run.enemyLastSeenBattle[id] = battleNo;
 
@@ -79,19 +65,14 @@ export function spawnEncounter(
     return;
   }
 
-  // -------------------------
-  // (1) 보스 강제
-  // -------------------------
+
   if (forceBoss) {
     if (g.run.bossPool.length === 0) {
-      // 보스 풀이 비면 일반 전투로 폴백
       logMsg(g, `보스 풀이 비었습니다. 일반 전투로 진행합니다. (노드 ${nodeNo})`);
-      // 아래 일반 패턴 선택으로 계속 진행
     } else {
       const bossId = pickOne(g.run.bossPool);
       g.run.bossPool = g.run.bossPool.filter((x) => x !== bossId);
 
-      // 전투 시작 확정 기록
       g.run.battleCount = battleNo;
       g.run.enemyLastSeenBattle[bossId] = battleNo;
 
@@ -101,9 +82,7 @@ export function spawnEncounter(
     }
   }
 
-  // -------------------------
-  // (2) 노드 기준 티어 테이블
-  // -------------------------
+
   const patternsByTier: string[][][] = [
     // 1~10 노드
     [["goblin_raider"], ["watching_statue"], ["pebble_golem"], ["slime"]],
@@ -127,28 +106,18 @@ export function spawnEncounter(
     ],
   ];
 
-  // ✅ 노드 기준 tier: 1~10 => 0, 11~20 => 1, ...
   const tier = Math.min(patternsByTier.length - 1, Math.floor((nodeNo - 1) / 10));
   const patterns = patternsByTier[tier];
 
-  // -------------------------
-  // (3) 쿨다운 필터(전투 기준)
-  // -------------------------
   const cooldownBattles = 5;
   const allowed = patterns.filter((p) => patternAllowedByCooldown(g, p, battleNo, cooldownBattles));
-  const pickFrom = allowed.length > 0 ? allowed : patterns; // 전부 막히면 폴백
+  const pickFrom = allowed.length > 0 ? allowed : patterns;
 
   const chosen = pickOne(pickFrom);
 
-  // -------------------------
-  // (4) 전투 시작 확정 기록(전투 기준)
-  // -------------------------
   g.run.battleCount = battleNo;
   for (const id of chosen) g.run.enemyLastSeenBattle[id] = battleNo;
 
-  // -------------------------
-  // (5) 스폰 + 로그(노드/전투 둘 다 표기)
-  // -------------------------
   g.enemies = chosen.map((id) => enemyStateFromId(g, id));
   logMsg(
     g,
@@ -210,7 +179,7 @@ export function revealIntentsAndDisrupt(g: GameState) {
   g.attackedEnemyIndicesThisTurn = [];
   g.backUidsThisTurn = [];
 
-  // ✅ 이번 턴 드로우 카운터 리셋 (턴 단위)
+
   g.drawCountThisTurn = 0;
 
   g.phase = "REVEAL";
@@ -218,14 +187,12 @@ export function revealIntentsAndDisrupt(g: GameState) {
   g.player.immuneToDisruptThisTurn = false;
   g.player.nullifyDamageThisTurn = false;
 
-  // ✅ 교란(disrupt) 처리: 이번 턴 후열 슬롯 1칸 무효화
-  // - 결정/적용은 엔진에서만 수행(UI는 표시만)
   g.disruptIndexThisTurn = null;
   g.backSlotDisabled = [false, false, false];
 
   const disrupt = g.player.status.disrupt ?? 0;
   if (disrupt > 0) {
-    g.disruptIndexThisTurn = Math.floor(Math.random() * 3); // 0..2
+    g.disruptIndexThisTurn = Math.floor(Math.random() * 3);
     g.backSlotDisabled[g.disruptIndexThisTurn] = true;
   }
 
@@ -281,7 +248,6 @@ export function placeCard(g: GameState, cardUid: string, side: Side, idx: number
   if (g.phase !== "PLACE") return;
   if (!g.hand.includes(cardUid)) return;
   if (side === "back") {
-    // 중복 방지
     if (!g.backUidsThisTurn.includes(cardUid)) g.backUidsThisTurn.push(cardUid);
   }
 
@@ -421,7 +387,8 @@ export function resolveEnemy(g: GameState) {
 
     if (e.id === "boss_soul_stealer") {
       if (e.soulWillNukeThisTurn) {
-        applyDamageToPlayer(g, 50, e);
+        const ew = e.status.weak ?? 0;
+        applyDamageToPlayer(g, 50, "ENEMY_ATTACK", "영혼 강탈자", ew);
         logMsg(g, "영혼 강탈자: 영혼 폭발 → 50 피해!");
 
         e.soulWillNukeThisTurn = false;
@@ -454,17 +421,19 @@ export function resolveEnemy(g: GameState) {
 function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
   switch (act.op) {
     case "damagePlayer":
-      applyDamageToPlayer(g, act.n, enemy);
+      const ew = enemy.status.weak ?? 0;
+      applyDamageToPlayer(g, act.n, "ENEMY_ATTACK", enemy.name, ew);
       break;
 
     case "damagePlayerFormula":
       if (act.kind === "goblin_raider") {
         const dmg = Math.max(0, 12 - g.usedThisTurn);
-        applyDamageToPlayer(g, dmg, enemy);
-        logMsg(g, `고블린 약탈자: 12 - 사용 ${g.usedThisTurn}장 = ${dmg} 피해`);
+        const ew = enemy.status.weak ?? 0;
+        applyDamageToPlayer(g, dmg,  "ENEMY_ATTACK", enemy.name, ew);
       } else {
         const dmg = 4 + g.usedThisTurn;
-        applyDamageToPlayer(g, dmg, enemy);
+        const ew = enemy.status.weak ?? 0;
+        applyDamageToPlayer(g, dmg, "ENEMY_ATTACK", enemy.name, ew);
       }
       break;
 
@@ -519,10 +488,8 @@ export function upkeepEndTurn(g: GameState) {
     if (g.player.supplies > 0) {
       g.player.supplies -= 1;
     } else {
-      g.player.hp -= 3;
-      if (g.player.hp < 0) g.player.hp = 0;
       g.player.fatigue += 1;
-      logMsg(g, `전열 유지비 부족: HP -3, F +1 (HP ${g.player.hp}, F ${g.player.fatigue})`);
+      applyDamageToPlayer(g, 3,"ZERO_SUPPLY", `전열 유지비 부족!`);
     }
   }
 
@@ -530,23 +497,22 @@ export function upkeepEndTurn(g: GameState) {
   if (g.player.supplies === 0) {
     g.player.zeroSupplyTurns += 1;
     const p = g.player.zeroSupplyTurns;
-    g.player.hp -= p;
-    if (g.player.hp < 0) g.player.hp = 0;
-    logMsg(g, `S=0 종료 패널티: 누적 ${p}번째 → HP -${p} (HP ${g.player.hp})`);
+    applyDamageToPlayer(g, p,"ZERO_SUPPLY", `보급 없이 턴 종료! 누적 ${p}번째`);
   }
 
   const bleed = g.player.status.bleed ?? 0;
-  if (bleed > 0) {
-    g.player.hp -= bleed;
-    if (g.player.hp < 0) g.player.hp = 0;
-    logMsg(g, `출혈로 HP -${bleed} (현재 ${g.player.hp}/${g.player.maxHp})`);
-  }
+  if (bleed > 0) applyDamageToPlayer(g, bleed,  "BLEED", "출혈");
 
   for (const en of aliveEnemies(g)) {
     const b = en.status.bleed ?? 0;
     if (b > 0) {
       if (!en.immuneThisTurn) {
         en.hp = Math.max(0, en.hp - b);
+
+        const idx = g.enemies.indexOf(en);
+
+        if (idx >= 0) markEnemyShaken(g, idx);
+
         logMsg(g, `적(${en.name}) 출혈로 HP -${b} (HP ${en.hp}/${en.maxHp})`);
       } else {
         logMsg(g, `적(${en.name})은(는) 이번 턴 면역이라 출혈 피해 무시`);
@@ -578,11 +544,11 @@ function decayStatuses(g: GameState) {
 export function drawStepStartNextTurn(g: GameState) {
   if (g.phase !== "DRAW") return;
 
-  // ✅ 새 턴 시작 플래그 리셋
+
   g.intentsRevealedThisTurn = false;
   g.disruptIndexThisTurn = null;
 
-  // ✅ 먼저 종료 조건부터 확인 (전투가 끝났으면 드로우/리셔플 자체를 하지 않음)
+
   checkEndConditions(g);
   if (g.run.finished) return;
 
@@ -629,14 +595,12 @@ function maybeReshuffle(g: GameState) {
 
     const f = g.player.fatigue;
     if (f > 0) {
-      g.player.hp -= f;
-      if (g.player.hp < 0) g.player.hp = 0;
-      logMsg(g, `리셔플 피로: HP -${f} (F=${f})`);
+      applyDamageToPlayer(g, f, "FATIGUE", "피로도");
     } else {
-      logMsg(g, "리셔플: 피로 피해 없음 (F=0)");
+      logMsg(g, "피로도 피해 없음 (F=0)");
     }
     g.player.fatigue += 1;
-    logMsg(g, `피로 F +1 (현재 ${g.player.fatigue})`);
+    logMsg(g, `피로도 F +1 (현재 ${g.player.fatigue})`);
   }
 }
 
@@ -651,7 +615,7 @@ export function resolveTargetSelection(g: GameState, enemyIndex: number) {
 
   const target = g.enemies[enemyIndex];
   if (!target || target.hp <= 0) {
-    // ✅ 정책 A: 생략(소모)하지 않음. 그냥 무시.
+
     return;
   }
 
@@ -674,21 +638,21 @@ export function checkEndConditions(g: GameState) {
     return;
   }
 
-  // 승리: 적 전멸
+
   if (aliveEnemies(g).length === 0 && g.phase !== "NODE") {
     applyWinHooksWhileInBackThisTurn(g);
     logMsg(g, "승리: 적을 모두 처치!");
     endCombatReturnAllToDeck(g);
     g.player.zeroSupplyTurns = 0;
 
-    // ✅ 보물 승리 조건 체크(런 종료면 보상 없이 끝낼지, 보상 줄지 선택)
+
     if (g.run.treasureObtained && g.run.afterTreasureNodePicks >= 10) {
       g.run.finished = true;
       logMsg(g, "승리! 저주받은 보물을 얻은 후 10턴 동안 살아남았습니다.");
       return;
     }
 
-    // ✅ 전투 보상: 여기서 choice를 만든다
+
     const [a, b] = offerRewardPair();
 
     const da = getCardDefByIdWithUpgrade(g.content, a.defId, a.upgrade);
@@ -708,9 +672,6 @@ export function checkEndConditions(g: GameState) {
       ],
     };
 
-    // ✅ 지금은 보상 화면을 띄울 거라 NODE로 안 넘김
-    // g.phase를 별도로 두면 더 깔끔하지만, 최소 수정이면 그냥 유지
-    // (UI는 overlay/choice 우선 렌더링이라 괜찮음)
     return;
   }
 }

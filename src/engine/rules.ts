@@ -70,10 +70,8 @@ export function applyStatus(target: { status: Record<StatusKey, number> }, key: 
 }
 
 export function rollNodeOffers(g: GameState): NodeType[] {
-  // ✅ 다음 노드 번호 기준
   const nextIndex = g.run.nodePickCount + 1;
 
-  // ✅ 30번째마다 보스 전투만 제시(=선택지 2개를 전투로 채움)
   if (nextIndex % 30 === 0) {
     return ["BATTLE", "BATTLE"];
   }
@@ -95,7 +93,6 @@ export function rollNodeOffers(g: GameState): NodeType[] {
   const a = pickOne(pool);
   let b = pickOne(pool);
 
-  // 보물+보물만 방지 (나머지는 중복 허용)
   if (a === "TREASURE" && b === "TREASURE") {
     let guard = 0;
     do {

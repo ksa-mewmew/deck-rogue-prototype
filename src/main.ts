@@ -1,7 +1,7 @@
 import "./style.css";
 
 import { createInitialState } from "./engine/state";
-import { buildContent } from "./content"; // 프로젝트에 맞게
+import { buildContent } from "./content";
 import { render } from "./ui/ui";
 import { makeUIActions } from "./ui/ui";
 
@@ -11,7 +11,7 @@ let g = createInitialState(content);
 
 function setGame(next: typeof g) {
   g = next;
-  actions = makeUIActions(g, setGame); // ✅ 새 g로 actions도 재생성
+  actions = makeUIActions(g, setGame);
   render(g, actions);
 }
 

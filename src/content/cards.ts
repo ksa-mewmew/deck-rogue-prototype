@@ -1,10 +1,3 @@
-// =======================================================
-// cards.ts  ✅ (전체 수정본)
-// - DrewThisTurn 같은 가짜 op 제거
-// - 연속 사격: ifDrewThisTurnThen 사용
-// - 급소 사격 문법 오류(콤마/브라켓) 수정
-// =======================================================
-
 import type { CardData } from "../engine/types";
 import type { Content, GameState } from "../engine/types";
 
@@ -341,7 +334,7 @@ export const CARDS: CardData[] = [
     id: "emergency_rations",
     name: "비상식량",
     tags: ["VANISH"],
-    vanishWhen: "BACK", // ✅ 후열일 때만 소실
+    vanishWhen: "BACK",
     frontText: "S +2",
     backText: "S를 10으로 만듦. 소실",
     front: [{ op: "supplies", n: 2 }],

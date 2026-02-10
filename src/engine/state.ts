@@ -1,8 +1,3 @@
-// =======================================================
-// state.ts ✅ (전체 수정본)
-// - drawCountThisTurn 초기값 추가 (누락되어 있었음)
-// =======================================================
-
 import type { GameState, Content, CardInstance } from "./types";
 import { shuffle, uid, logMsg, rollBranchOffer } from "./rules";
 
@@ -73,7 +68,7 @@ export function createInitialState(content: Content): GameState {
     pendingTargetQueue: [],
     pendingTarget: null,
 
-    drawCountThisTurn: 0, // ✅ 추가
+    drawCountThisTurn: 0,
   };
 
   g.run.branchOffer = rollBranchOffer(g);

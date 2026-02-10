@@ -18,7 +18,6 @@ export const ENEMIES: EnemyData[] = [
     ],
   }, 
 
-  // 10회 이하에만 등장
   {
     id: "goblin_raider",
     name: "고블린 약탈자",
@@ -55,7 +54,6 @@ export const ENEMIES: EnemyData[] = [
     ],
   },
 
-  // 11회 이상부터 등장
   {
     id: "rock_golem",
     name: "바위 골렘",
@@ -72,8 +70,8 @@ export const ENEMIES: EnemyData[] = [
     intents: [
       { label: "다음 턴 동안 피해를 입지 않음", acts: [{ op: "enemyImmuneNextTurn" }] },
       {
-        label: "약화 4 부여 후 자신 HP 3 회복",
-        acts: [{ op: "statusPlayer", key: "weak", n: 4 }, { op: "enemyHealSelf", n: 3 }],
+        label: "약화 3 부여 후 자신 HP 3 회복",
+        acts: [{ op: "statusPlayer", key: "weak", n: 3 }, { op: "enemyHealSelf", n: 3 }],
       },
       { label: "6 피해", acts: [{ op: "damagePlayer", n: 6 }] },
     ],
@@ -136,8 +134,6 @@ export const ENEMIES: EnemyData[] = [
       { label: "7 피해, S -2", acts: [{ op: "damagePlayer", n: 7 }, { op: "supplies", n: -2 }] },
       { label: "7 피해, F +1", acts: [{ op: "damagePlayer", n: 7 }, { op: "fatiguePlayer", n: 1 }] },
       { label: "카운트 진행", acts: [] },
-      // ✅ 50 피해는 엔진(combat.ts)에서 카운트 조건으로 강제 발동하므로,
-      // 콘텐츠에는 굳이 op를 두지 않아도 됩니다(분리 유지하면서도 안정적).
     ],
   },
 

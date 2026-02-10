@@ -1,11 +1,3 @@
-// =======================================================
-// resolve.ts ✅ (전체 수정본)
-// - draw: op.n 버그 수정(e.n)
-// - drawCountThisTurn 누적(드로우 장수 기준)
-// - ifDrewThisTurnThen 구현(2번 대안 방식)
-// - statusEnemy target: select도 damage처럼 큐로 처리(완성)
-// =======================================================
-
 import type { GameState, Side, PlayerEffect, EnemyState } from "./types";
 import { aliveEnemies, logMsg, applyStatusTo, pickOne } from "./rules";
 import { addBlock, addFatigue, addSupplies, applyDamageToEnemy, healPlayer } from "./effects";
@@ -80,8 +72,8 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
         break;
 
       case "draw": {
-        const drawn = drawCards(g, e.n); // ✅ e.n
-        g.drawCountThisTurn += drawn;    // ✅ 이번 턴 드로우 장수 누적
+        const drawn = drawCards(g, e.n);
+        g.drawCountThisTurn += drawn;
         break;
       }
 
@@ -136,8 +128,7 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
         }
 
         if (e.target === "select") {
-          // ✅ 기존 타겟팅 요청 형식("damageSelect")으로 큐에 넣기
-          if (amount <= 0) break; // 0이면 굳이 선택 안 시킴(원하면 제거)
+          if (amount <= 0) break;
           g.pendingTargetQueue.push({ kind: "damageSelect", amount });
           g.pendingTarget = g.pendingTarget ?? g.pendingTargetQueue.shift() ?? null;
           break;
@@ -200,7 +191,7 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
           break;
         }
 
-        const def = getCardDefFor(g, uid0); // 업그레이드 반영된 정의
+        const def = getCardDefFor(g, uid0);
         logMsg(g, `재배치: [[${cardNameWithUpgrade(g, uid0)}]]의 전열 효과를 추가 발동`);
 
         resolvePlayerEffects({ game: g, side: "front", cardUid: uid0 }, def.front);

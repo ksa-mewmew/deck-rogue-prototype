@@ -17,7 +17,7 @@ export function obtainTreasure(g: GameState) {
 
 export type RewardEntry = { id: string; weight: number };
 
-// 원본 풀(절대 수정하지 않기)
+
 export const REWARD_POOL: RewardEntry[] = [
   { id: "berserk", weight: 20 },
   { id: "bandage", weight: 12 },
@@ -37,7 +37,6 @@ export const REWARD_POOL: RewardEntry[] = [
   { id: "taunt", weight: 12 },
   { id: "rapid_fire", weight: 12 },
 
-  // ...
 ];
 
 function buildWeightMap(pool: RewardEntry[]): Array<{ id: string; w: number }> {
@@ -45,7 +44,7 @@ function buildWeightMap(pool: RewardEntry[]): Array<{ id: string; w: number }> {
   for (const e of pool) {
     const w = Math.max(0, e.weight ?? 0);
     if (w <= 0) continue;
-    m.set(e.id, (m.get(e.id) ?? 0) + w); // 같은 id면 합산
+    m.set(e.id, (m.get(e.id) ?? 0) + w);
   }
   return [...m.entries()].map(([id, w]) => ({ id, w }));
 }
@@ -63,7 +62,6 @@ function pickWeightedOne(items: Array<{ id: string; w: number }>): string {
   return items[items.length - 1].id;
 }
 
-// ✅ 매번 “원본 풀에서 새로” 2장(서로 다르게) 뽑는다 = 풀은 항상 초기 상태
 export type OfferedCard = { defId: string; upgrade: number };
 
 export function rollOfferedUpgrade(): number {
@@ -117,18 +115,16 @@ export function removeCardByUid(g: GameState, uid: string) {
 
   if (inst.defId === CURSED_TREASURE_ID) {
     logMsg(g, "저주받은 보물은 덱에서 제거할 수 없습니다.");
-    return; // ✅ 제거 막기
+    return;
   }  
-  // zone 제거
+
   g.deck = g.deck.filter((x) => x !== uid);
   g.hand = g.hand.filter((x) => x !== uid);
   g.discard = g.discard.filter((x) => x !== uid);
 
-  // 전투 중일 수도 있으니 슬롯에서도 제거
   g.frontSlots = g.frontSlots.map((x) => (x === uid ? null : x));
   g.backSlots = g.backSlots.map((x) => (x === uid ? null : x));
 
-  // 영구 제거(소실처럼 취급)
   inst.zone = "vanished";
   g.vanished.push(uid);
 
@@ -139,7 +135,7 @@ export function canUpgradeUid(g: GameState, uid: string): boolean {
   const inst = g.cards[uid];
   if (!inst) return false;
   const def = g.content.cardsById[inst.defId];
-  const max = def.upgrades?.length ?? 0; // upgrades 없으면 강화 불가
+  const max = def.upgrades?.length ?? 0;
   return (inst.upgrade ?? 0) < max;
 }
 
