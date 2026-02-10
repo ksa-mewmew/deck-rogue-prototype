@@ -1575,3 +1575,392 @@ button:focus-visible {
 /* 기존에 어딘가에 이런 게 있으면(특히 문제 유발) 지우거나 choice에서만 무력화
    .choiceCard{ transform: scale(0.92); }  -> 위에서 transform:none으로 덮음
 */
+:root{ --stageDrop: 24px; }
+
+.stage{
+  margin-top: var(--stageDrop);
+}
+
+/* =========================
+   FINAL TUNING: 전장/손패 세로 압축 + 가로 여유
+   ========================= */
+:root{
+  /* 손패 도크 자체 높이 ↓ */
+  --dockH: 190px;
+
+  /* 슬롯(전장) 카드/칸 스케일 */
+  --slotW: 200px;   /* 가로는 조금 넓게 */
+  --slotH: 210px;   /* 세로는 더 짧게 (기존 252px) */
+
+  /* 손패 카드 크기 ↓ */
+  --handCardW: 120px;
+  --handCardH: 160px;
+
+  /* 전장 패널 가로 여유 */
+  --stageMaxW: 920px; /* 기존 760 근처였음 */
+}
+
+/* ===== 전장 패널 가로 폭 넓히기 ===== */
+.stageInner{
+  max-width: var(--stageMaxW);
+}
+
+/* ===== 슬롯 그리드: 가로 넓히고 세로 압축 ===== */
+.grid6{
+  grid-template-columns: repeat(3, var(--slotW));
+  gap: 8px;
+}
+
+.slot{
+  height: var(--slotH);
+  aspect-ratio: auto;   /* 고정 높이 우선 */
+  padding: 8px;
+}
+
+/* 슬롯 라벨 영역 조금 줄여서 실제 카드 공간 확보 */
+.card.inSlot{
+  inset: 22px 8px 8px 8px;  /* (기존 28px/10px) */
+  padding: 7px;
+}
+
+/* 전장 카드 텍스트는 더 짧게 보여주기(세로 절약) */
+.card.inSlot .cardText{
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.card.inSlot .cardSection{ margin-top: 5px; }
+.card.inSlot .cardSectionTitle{ font-size: 10px; }
+
+/* ===== 손패 도크: 높이/카드 크기 줄이기 ===== */
+.handDock{
+  height: var(--dockH);
+}
+
+.handDock .card{
+  width: var(--handCardW);
+  height: var(--handCardH);
+}
+
+/* 단계 버튼 줄도 약간 컴팩트하게(세로 절약) */
+.stepBtn{
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+/* ===== 메인 패널: 도크만큼 여유 공간 재계산 ===== */
+.mainPanel{
+  padding-bottom: calc(var(--dockH) + 16px);
+}
+.mainRow{
+  height: calc(100vh - var(--topHudH, 112px) - var(--dockH) - var(--uiGap, 16px));
+}
+/* 슬롯 크기/비율 유지 + 가로 간격만 더 벌리기 */
+:root{
+  --slotGapX: 22px; /* ← 가로 간격(추천 14~28px) */
+  --slotGapY: 6px;  /* ← 세로 간격(기존 유지) */
+}
+
+.grid6{
+  /* 기존 gap 대신 가로/세로 분리 */
+  row-gap: var(--slotGapY);
+  column-gap: var(--slotGapX);
+}
+/* ✅ 전장 슬롯 비율(5:7) + 크기 복구 */
+:root{
+  --slotW: 180px; /* 예전 느낌(기본 180) */
+  --slotGapX: 22px;
+  --slotGapY: 6px;
+}
+
+.grid6{
+  grid-template-columns: repeat(3, var(--slotW)); /* 폭만 기준(예전 180) */
+  column-gap: var(--slotGapX);
+  row-gap: var(--slotGapY);
+  justify-content: center;
+}
+
+.slot{
+  /* 🔥 고정 높이로 찌그러뜨리는 것 제거 */
+  height: auto !important;
+  aspect-ratio: 5 / 7 !important;
+
+  /* 폭은 그리드 컬럼을 따라가게 */
+  width: 100%;
+
+  padding: 10px;          /* 원래대로 */
+  box-sizing: border-box;
+}
+/* ===== 최종 오버라이드: 손패 조금 올리기 + 전장(회색패널) 폭 살짝 줄이기 ===== */
+
+/* 1) 손패 도크: 높이 줄여서 "조금" 위로 올리기 */
+:root{
+  --dockH: 210px;          /* 기존 240px → 200~220 사이에서 취향 */
+}
+
+/* handDock 자체도 실제로 얇아지게 */
+.handDock{
+  height: var(--dockH);
+  padding-top: 6px;        /* 위 여백 약간 줄임 */
+  padding-bottom: 10px;
+}
+
+/* mainRow 높이 계산에서 도크 높이를 쓰는 버전이라면(지금 쓰고 계심) */
+.mainRow{
+  height: calc(100vh - var(--topHudH, 112px) - var(--dockH) - var(--uiGap, 16px));
+}
+
+
+/* 2) 전장(회색 패널) 가로 폭 살짝 줄이기: 로그 스크롤 안 가리게 */
+.stageInner{
+  max-width: 700px;        /* 기존 760px → 680~720 추천 */
+}
+
+/* 3) (만약 로그패널이 absolute였던 흔적이 남아 있으면) 로그 스크롤 보호용 */
+.logPanel{
+  position: static;        /* absolute면 스크롤바/겹침 문제 자주 남 */
+  width: 340px;            /* 360 → 320~350 사이 */
+}
+/* =========================
+   FIX 1) 전장 중앙 정렬 복구 (로그 있어도 화면 정중앙)
+   FIX 2) 슬롯/손패 카드 크기 밸런스 조정
+   ========================= */
+
+:root{
+  /* 로그 폭(원하시면 320~360) */
+  --logW: 340px;
+
+  /* 전장 패널 최대 폭(이 값이 줄어도 중앙은 유지됨) */
+  --stageMaxW: 700px;
+
+  /* 슬롯 크기(카드 대비 너무 크면 여기부터 줄이세요) */
+  --slotW: 160px;      /* 기존 180 → 150~170 추천 */
+  --slotGapX: 18px;
+  --slotGapY: 8px;
+
+  /* 손패 카드 크기 */
+  --handCardW: 120px;  /* 기존 132 → 112~124 추천 */
+  --handCardH: 162px;
+}
+
+/* ✅ mainRow를 grid로: "전장"이 항상 화면 정중앙 */
+.mainRow{
+  display: grid !important;
+  grid-template-columns: 1fr minmax(0, var(--stageMaxW)) var(--logW) !important;
+  column-gap: 14px;
+  align-items: stretch;
+  position: relative;
+}
+
+/* stage/stageInner는 가운데 칼럼을 꽉 채우기만 하면 됨 */
+.stage{ width: 100%; }
+.stageInner{
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+}
+
+/* logPanel은 오른쪽 칼럼 고정 */
+.logPanel{
+  width: var(--logW) !important;
+  position: static !important;
+}
+
+/* ===== 슬롯 크기/간격 (비율 유지) ===== */
+.grid6{
+  grid-template-columns: repeat(3, var(--slotW)) !important;
+  column-gap: var(--slotGapX) !important;
+  row-gap: var(--slotGapY) !important;
+  justify-content: center;
+}
+.slot{
+  height: auto !important;
+  aspect-ratio: 5 / 7 !important;
+}
+
+/* ===== 손패 카드 크기 ===== */
+.handDock .card{
+  width: var(--handCardW) !important;
+  height: var(--handCardH) !important;
+}
+
+/* (선택) 슬롯 안 카드의 여백이 너무 커 보이면 살짝 타이트하게 */
+.card.inSlot{
+  inset: 26px 10px 10px 10px; /* 라벨 영역 조금만 */
+  padding: 7px;
+}
+.card.inSlot .cardText{
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+:root{
+  --logW: 340px;
+  --stageMaxW: 700px;
+  --rowGap: 14px;
+}
+
+/* ✅ mainRow: (전장 + 로그) 묶음을 통째로 가운데 */
+.mainRow{
+  display:flex !important;
+  justify-content:center !important;
+  align-items:stretch !important;
+  gap: var(--rowGap) !important;
+
+  /* 기존 position:relative/absolute 쓰던 흔적 무력화 */
+  position: relative !important;
+}
+
+/* ✅ 전장: 폭 제한 + 가운데 묶음의 왼쪽 구성원 */
+.stage{
+  flex: 0 1 var(--stageMaxW) !important;  /* 줄어들 수는 있지만 기본은 stageMaxW */
+  min-width: 0 !important;
+}
+.stageInner{
+  max-width: none !important;
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+/* ✅ 로그: 오른쪽 구성원(고정 폭), absolute 해제 */
+.logPanel{
+  flex: 0 0 var(--logW) !important;
+  width: var(--logW) !important;
+
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+}
+:root{
+  --logW: 360px;     /* 로그 패널 폭 */
+  --logGap: 14px;    /* 전장과 로그 사이 여백(체감) */
+  --edgePad: 14px;   /* 화면 좌우 패딩 */
+}
+
+/* ✅ 전장은 화면 기준 중앙, 로그는 오른쪽에 “떠있기” */
+.mainRow{
+  position: relative !important;
+  display: block !important;      /* stage를 가운데 두기 쉽게 */
+  padding: 4px var(--edgePad) 12px var(--edgePad) !important;
+  overflow: hidden !important;
+}
+
+/* ✅ 전장 영역은 100% 폭을 쓰고, 내부 컨테이너만 중앙 정렬 */
+.stage{
+  width: 100% !important;
+  min-width: 0 !important;
+}
+.stageInner{
+  margin: 0 auto !important;      /* ← 이게 “2번 슬롯 중앙=화면 중앙”의 핵심 */
+  width: 100% !important;
+
+  /* ✅ 로그가 있는 만큼만 ‘최대 폭’을 깎아서 겹침 방지 (중앙정렬은 유지됨) */
+  max-width: min(760px, calc(100vw - (var(--logW) + var(--logGap) + var(--edgePad)*2))) !important;
+}
+
+/* ✅ 로그는 레이아웃 흐름에서 제외(전장 정렬에 영향 X) */
+.logPanel{
+  position: absolute !important;
+  top: 12px !important;
+  right: var(--edgePad) !important;
+  bottom: 12px !important;
+
+  width: var(--logW) !important;
+  z-index: 50 !important;
+}
+
+/* 로그 내용 스크롤은 그대로 */
+.logPanel .log{
+  height: 100%;
+}
+.enemyHudCenter{
+  max-height: 140px;   /* 92 → 140 (취향대로 120~160) */
+  overflow: hidden;    /* HUD 자체는 안 밀고, 넘치면 자름 유지 */
+}
+/* ✅ HUD 아래-전장 위 간격 줄이기(최종) */
+.topHud{
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* mainRow 자체 위 여백 제거 */
+.mainRow{
+  margin-top: 0 !important;
+  padding-top: 0px !important; /* 0~6px 취향 */
+}
+
+/* 회색 전장 패널을 아래로 밀던 값 제거 */
+.mainPanel{
+  margin-top: 0 !important;   /* 기존 30px 죽이기 */
+}
+:root{
+  --hudH: 140px;  /* ✅ TopHUD 고정 높이: 여기만 조절 */
+}
+
+/* TopHUD는 절대 커지지 않게 “고정 높이” */
+.topHud{
+  height: var(--hudH) !important;
+  min-height: var(--hudH) !important;
+  max-height: var(--hudH) !important;
+
+  overflow: hidden;           /* ✅ 뱃지 늘어나도 아래로 밀지 않음 */
+  align-items: stretch;
+}
+
+/* 가운데 적 영역: HUD 안에서만 스크롤/잘림 처리 */
+.enemyHudCenter{
+  height: 100%;
+  max-height: 100% !important;
+  overflow: auto;             /* ✅ 적이 많거나 뱃지가 많아지면 여기서만 스크롤 */
+}
+
+/* 적 카드 컨테이너도 HUD 안에서만 */
+.enemyHud{
+  max-height: 100%;
+  overflow: hidden;           /* wrap을 쓰고 싶으면 아래에서 변경 */
+}
+
+/* 뱃지가 너무 길어질 때 “줄바꿈 대신 높이 폭증” 방지용(선택) */
+.enemyBadges{
+  max-height: 40px;           /* 1~2줄 정도 */
+  overflow: hidden;           /* 더 많으면 숨김(또는 auto로 바꿔도 됨) */
+}
+/* ✅ HUD-전장 간격 ‘0~2px’로 바짝 붙이기(최종) */
+.topHud{
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* mainRow가 위로 올라오게 */
+.mainRow{
+  margin-top: 0 !important;
+  padding-top: 0 !important;      /* 여기서 간격 생기면 밀림 */
+}
+
+/* 회색 패널(전장) 자체가 아래로 내려가던 값 제거 */
+.mainPanel{
+  margin-top: 0 !important;       /* 이전에 30px 줬던 거 kill */
+  padding-top: 10px !important;   /* 전장 제목 숨 막히면 8~12px */
+}
+
+/* battleTitleRow가 위에서 자체 여백 만들면 이것도 */
+.battleTitleRow{
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+.battleTitleRow h2{
+  margin-top: 0 !important;
+}
+/* ✅ Top HUD ↔ 전장(mainRow) 간격 제거 */
+.topHud{
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ mainRow 위쪽 여백 제거 */
+.mainRow{
+  margin-top: 0 !important;     /* stageDrop 같은 거 무시 */
+  padding-top: 0 !important;    /* 4px 있던 거 제거 */
+}
+
+/* ✅ 혹시 stageDrop 변수를 쓰고 있으면 확실히 0 */
+:root{ --stageDrop: 0px; }

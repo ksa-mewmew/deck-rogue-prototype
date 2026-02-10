@@ -1374,6 +1374,17 @@ function renderTopHud(g: GameState, actions: UIActions) {
       outer.appendChild(fill);
       chipBox.appendChild(outer);
 
+      // intent
+      const def = g.content.enemiesById[e.id];
+      const intent = def.intents[e.intentIndex % def.intents.length];
+      chipBox.appendChild(
+        divText("enemyIntent", g.intentsRevealedThisTurn ? `의도: ${intent.label}` : "의도: (미공개)")
+      );
+
+      chipBox.onclick = () => actions.onSelectEnemy(i);
+      enemiesWrap.appendChild(chipBox);
+
+
       // status badges
       const st = e.status;
       const badges = div("enemyBadges");
@@ -1384,15 +1395,6 @@ function renderTopHud(g: GameState, actions: UIActions) {
       if (e.immuneThisTurn) badges.appendChild(badge("면역"));
       if (badges.childNodes.length) chipBox.appendChild(badges);
 
-      // intent
-      const def = g.content.enemiesById[e.id];
-      const intent = def.intents[e.intentIndex % def.intents.length];
-      chipBox.appendChild(
-        divText("enemyIntent", g.intentsRevealedThisTurn ? `의도: ${intent.label}` : "의도: (미공개)")
-      );
-
-      chipBox.onclick = () => actions.onSelectEnemy(i);
-      enemiesWrap.appendChild(chipBox);
     }
   }
 
