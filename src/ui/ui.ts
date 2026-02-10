@@ -86,6 +86,13 @@ type DragState =
       x: number;
       y: number;
       dragging: boolean;
+
+      sourceEl?: HTMLElement | null;
+      previewEl?: HTMLElement;
+      previewW?: number;
+      previewH?: number;
+      grabDX?: number;
+      grabDY?: number;
     };
 
 type SlotDrop = { side: Side; idx: number };
@@ -1696,6 +1703,8 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
 
     }
 
+    if (drag?.sourceEl) drag.sourceEl.classList.remove("isDraggingSource");
+
     drag = null;
     hoverSlot = null;
     render(g, actions);
@@ -1804,12 +1813,21 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
 
 }
 
-function beginDrag(ev: PointerEvent, init: { kind: "hand" | "slot"; cardUid: string; fromHandIndex?: number; fromSide?: Side; fromIdx?: number }) {
+function beginDrag(
+  ev: PointerEvent,
+  init: { kind: "hand" | "slot"; cardUid: string; fromHandIndex?: number; fromSide?: Side; fromIdx?: number }
+) {
   const target = ev.currentTarget as HTMLElement;
-  try {
-    target.setPointerCapture(ev.pointerId);
-  } catch {}
+  try { target.setPointerCapture(ev.pointerId); } catch {}
 
+  const cardEl = target.closest(".card") as HTMLElement | null;
+
+  if (cardEl) cardEl.classList.add("isDraggingSource");
+
+  const r = cardEl?.getBoundingClientRect();
+
+  const grabDX = r ? (ev.clientX - r.left) : 20;
+  const grabDY = r ? (ev.clientY - r.top) : 20;
 
   drag = {
     kind: init.kind,
@@ -1823,8 +1841,31 @@ function beginDrag(ev: PointerEvent, init: { kind: "hand" | "slot"; cardUid: str
     x: ev.clientX,
     y: ev.clientY,
     dragging: false,
+
+    previewEl: undefined,
+    previewW: r?.width,
+    previewH: r?.height,
+    grabDX,
+    grabDY,
   };
+
+  if (cardEl) {
+    const clone = cardEl.cloneNode(true) as HTMLElement;
+
+    clone.classList.remove("inSlot");
+    clone.classList.remove("selected");
+    clone.classList.remove("isDraggingSource");
+
+    clone.style.position = "static";
+    clone.style.inset = "";
+    clone.style.width = "100%";
+    clone.style.height = "100%";
+    clone.style.margin = "0";
+
+    drag.previewEl = clone;
+  }
 }
+
 
 function hitTestHand(x: number, y: number): boolean {
   const el = document.elementFromPoint(x, y) as HTMLElement | null;
@@ -1870,7 +1911,7 @@ function closestWithDatasetKeys(el: HTMLElement, keys: string[]): HTMLElement | 
   return null;
 }
 
-function renderDragOverlay(app: HTMLElement, g: GameState) {
+function renderDragOverlay(_app: HTMLElement, g: GameState) {
   if (!drag || !drag.dragging) {
     document.querySelector(".dragLayer")?.remove();
     return;
@@ -1882,21 +1923,26 @@ function renderDragOverlay(app: HTMLElement, g: GameState) {
     layer.className = "dragLayer";
     layer.style.position = "fixed";
     layer.style.inset = "0";
-    layer.style.zIndex = "2000";
+    layer.style.zIndex = "5000";
     layer.style.pointerEvents = "none";
-    app.appendChild(layer);
+    document.body.appendChild(layer);
   }
-
   layer.innerHTML = "";
 
-  const ghost = div("dragGhost");
-  ghost.textContent = cardDisplayNameByUid(g, drag.cardUid);
-  ghost.style.position = "fixed";
-  ghost.style.left = `${drag.x + 12}px`;
-  ghost.style.top = `${drag.y + 12}px`;
-  ghost.style.pointerEvents = "none";
-  layer.appendChild(ghost);
+  if (!drag.previewEl) return;
+
+  const wrap = document.createElement("div");
+  wrap.className = "dragCardPreview";
+  wrap.style.position = "fixed";
+  wrap.style.left = `${drag.x - (drag.grabDX ?? 20)}px`;
+  wrap.style.top  = `${drag.y - (drag.grabDY ?? 20)}px`;
+
+  wrap.appendChild(drag.previewEl);
+  layer.appendChild(wrap);
 }
+
+
+
 
 
 // Choice / Node / Overlay

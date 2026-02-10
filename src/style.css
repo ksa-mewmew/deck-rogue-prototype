@@ -1458,3 +1458,46 @@ button:focus-visible {
 .playerHudLeft .playerStatsRow .chip{
   background: rgba(255,255,255,.06);
 }
+
+.dragCardPreview{
+  position: fixed;
+  z-index: 2200;
+  pointer-events: none;
+  transform: translate3d(0,0,0);
+  filter: drop-shadow(0 18px 50px rgba(0,0,0,.65));
+  opacity: .96;
+}
+
+.dragCardPreview .card{
+  /* 카드가 너무 크면 살짝 축소 */
+  transform: scale(1.0);
+  transform-origin: top left;
+}
+
+:root{
+  --handCardW: 132px;
+  --handCardH: 178px;
+}
+
+/* ✅ 잡고 있는 원본 카드(보드/손패 공통) */
+.card.isDraggingSource{
+  filter: brightness(.78) saturate(.90);
+  opacity: .65;
+  box-shadow: none;
+}
+
+/* ✅ 드래그 프리뷰: 손패 카드랑 동일 규격 + 살짝 “들고 있음” 느낌 */
+.dragCardPreview{
+  width: var(--handCardW);
+  height: var(--handCardH);
+  pointer-events: none;
+}
+.dragCardPreview .card{
+  width: 100%;
+  height: 100%;
+
+  /* 들고 있는 느낌(선택) */
+  filter: brightness(1.06) saturate(1.08);
+  transform: translateZ(0) scale(1.02);
+  box-shadow: 0 22px 70px rgba(0,0,0,.75);
+}
