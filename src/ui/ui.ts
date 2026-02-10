@@ -213,10 +213,9 @@ function renderNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
     rowA.onclick = () => actions.onChooseNode("A");
 
     const nowA = nodeLabel(offers[0]?.type ?? "BATTLE", isBossNode);
-    const pillNowA = document.createElement("button");
-    pillNowA.className = "primary";
+    const pillNowA = document.createElement("div");
+    pillNowA.className = "nodePill primary";
     pillNowA.textContent = nowA;
-    pillNowA.onclick = () => actions.onChooseNode("A")
     rowA.appendChild(pillNowA);
 
     rowA.appendChild(divText("", "→"));
@@ -234,10 +233,9 @@ function renderNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
     rowB.onclick = () => actions.onChooseNode("B");
 
     const nowB = nodeLabel(offers[1]?.type ?? "BATTLE", isBossNode);
-    const pillNowB = document.createElement("button");
-    pillNowB.className = "primary";
+    const pillNowB = document.createElement("div");
+    pillNowB.className = "nodePill primary";
     pillNowB.textContent = nowB;
-    pillNowB.onclick = () => actions.onChooseNode("B");
     rowB.appendChild(pillNowB);
 
     rowB.appendChild(divText("", "→"));
@@ -246,6 +244,16 @@ function renderNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
     const nextBText = divText("", nextB);
     nextBText.style.cssText = "opacity:.85;";
     rowB.appendChild(nextBText);
+
+    pillNowA.onclick = (e) => {
+      e.stopPropagation();
+      actions.onChooseNode("A");
+    };
+
+    pillNowB.onclick = (e) => {
+      e.stopPropagation();
+      actions.onChooseNode("B");
+    };
 
     preview.appendChild(rowA);
     preview.appendChild(rowB);
@@ -272,6 +280,7 @@ type ChoiceKind = "EVENT" | "REWARD" | "PICK_CARD" | "VIEW_PILE" | "UPGRADE_PICK
 
 export function makeUIActions(g0: GameState, setGame: (next: GameState) => void) {
   let choiceHandler: ((key: string) => void) | null = null;
+  let nodePickLock = false;
 
   type ChoiceFrame = {
     choice: GameState["choice"];
@@ -430,12 +439,13 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
     },
 
     onChooseNode: (id: "A" | "B") => {
-      const g = getG()
+      const g = getG();
+      if (nodePickLock) return;
+      nodePickLock = true;
+      queueMicrotask(() => (nodePickLock = false)); // 또는 setTimeout(() => nodePickLock=false, 0);
+
       if (g.run.finished) return;
-      if (g.phase !== "NODE") {
-        logMsg(g, `무시: 전투/진행 중 노드 선택 시도 (phase=${g.phase})`);
-        return;
-      }
+      if (g.phase !== "NODE") return;
 
       if (!g.run.branchOffer) g.run.branchOffer = rollBranchOffer(g);
 
@@ -610,8 +620,13 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
               const uid = k.slice("remove:".length);
               removeCardByUid(g, uid);
 
-              // 제거 후 체인 처리
-              const then = (outcome as any).then as "NONE" | "REWARD" | "BATTLE" | undefined;
+              const thenRaw = (outcome as any).then as string | undefined;
+              const then =
+                thenRaw === "REWARD" ? "REWARD_PICK" :
+                thenRaw === "REWARD_PICK" ? "REWARD_PICK" :
+                thenRaw === "BATTLE" ? "BATTLE" :
+                thenRaw === "NONE" ? "NONE" :
+                undefined;
 
               if (then === "BATTLE") {
                 closeChoiceUI(g);
@@ -622,11 +637,11 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
                 return;
               }
 
-              if (then === "REWARD") {
+
+              if (then === "REWARD_PICK") {
                 closeChoiceUI(g);
                 choiceHandler = null;
                 openRewardPick(g, actions, "카드 보상", "두 장 중 한 장을 선택하거나 생략합니다.");
-                
                 return;
               }
 
@@ -634,6 +649,8 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
               choiceHandler = null;
               g.phase = "NODE";
               render(g, actions);
+              return;
+
             };
 
 
