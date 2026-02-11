@@ -153,7 +153,7 @@ export function startCombat(g: GameState) {
   g.winHooksAppliedThisCombat = false;
 
   const bonus = g.run.nextBattleSuppliesBonus ?? 0;
-  g.player.supplies = 10 + bonus;
+  g.player.supplies = 7 + bonus;
   if (bonus !== 0) {
     logMsg(g, `다음 전투 보너스 적용: S +${bonus}`);
     g.run.nextBattleSuppliesBonus = 0;
@@ -643,7 +643,7 @@ export function upkeepEndTurn(g: GameState) {
       g.player.supplies -= 1;
     } else {
       g.player.fatigue += 1;
-      applyDamageToPlayer(g, 3, "ZERO_SUPPLY", `전열 유지비 부족!`);
+      applyDamageToPlayer(g, 2, "ZERO_SUPPLY", `전열 유지비 부족!`);
     }
   }
 
