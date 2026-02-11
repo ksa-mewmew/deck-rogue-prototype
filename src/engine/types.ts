@@ -26,7 +26,7 @@ export type PlayerDamageKind =
   | "OTHER";
 
 
-export type ExhaustWhen = "FRONT" | "BACK" | "BOTH";
+export type ExhaustWhen = "FRONT" | "BACK" | "BOTH" | "NONE";
 
 export type ChoiceOption = {
   key: string;
@@ -78,6 +78,7 @@ export type CardData = {
 export type EnemyData = {
   id: string;
   name: string;
+  omen?: string;
   maxHp: number;
   intents: EnemyIntentData[];
   rule?: string;
@@ -103,6 +104,8 @@ export type EnemyState = {
   intentIndex: number;
   status: Record<StatusKey, number>;
 
+  lastIntentIndex?: number;          // 이전 의도 저장
+
   immuneNextTurn: boolean;
   immuneThisTurn: boolean;
   soulCastCount?: number;
@@ -110,6 +113,11 @@ export type EnemyState = {
   soulWarnCount?: number;         // 3번 의도 경고 누적
   soulArmed?: boolean;
   soulWillNukeThisTurn?: boolean;
+
+  intentLabelOverride?: string;
+
+  lastIntentKey?: string | null;
+  lastIntentStreak?: number;
 };
 
 export type PlayerEffect =
@@ -133,10 +141,37 @@ export type PlayerEffect =
   | { op: "hp"; n: number }
   | { op: "clearStatusSelf"; key: StatusKey }
 
+export type TargetMeta = {
+
+  reason?: "FRONT" | "BACK" | "ENEMY" | "EVENT" | "RELIC" | "OTHER";
+
+  sourceCardUid?: string;
+
+  sourceLabel?: string;
+
+  sourceOp?: string;
+
+  chainIndex?: number;
+  chainTotal?: number;
+};
 
 export type PendingTarget =
-  | { kind: "damageSelect"; amount: number }
-  | { kind: "statusSelect"; key: StatusKey; n: number };
+  | {
+      kind: "damageSelect";
+      amount: number;
+      sourceCardUid?: string;
+      sourceLabel?: string;
+      reason?: "FRONT" | "BACK" | "EVENT" | "RELIC";
+    }
+  | {
+      kind: "statusSelect";
+      key: StatusKey;
+      n: number;
+      sourceCardUid?: string;
+      sourceLabel?: string;
+      reason?: "FRONT" | "BACK" | "EVENT" | "RELIC";
+    };
+
 
 
 export type EnemyEffect =
@@ -147,7 +182,8 @@ export type EnemyEffect =
   | { op: "enemyHealSelf"; n: number }
   | { op: "enemyImmuneThisTurn" }
   | { op: "enemyImmuneNextTurn" }
-  | { op: "fatiguePlayer"; n: number };
+  | { op: "fatiguePlayer"; n: number }
+  | { op: "damagePlayerByDeckSize"; base: number; per: number; div: number; cap?: number };
 
 export type PlayerState = {
   hp: number;
@@ -178,6 +214,14 @@ export type RunState = {
 
   battleCount: number;
   enemyLastSeenBattle: Record<string, number>;
+
+  nextBossId?: string | null;
+
+  nextBossTime: number;
+  forcedNext: "BOSS" | null;
+  bossOmenText: string | null;
+  deckSizeAtTreasure: number
+
 };
 
 export type Content = {
@@ -229,6 +273,10 @@ export type GameState = {
   pendingTargetQueue: PendingTarget[];
 
   backUidsThisTurn: string[];
+
+  victoryResolvedThisCombat?: boolean;
+
+  time: number
 
   fx?: {
     enemyShake?: number[]; // 이번 틱에 피해 받은 적 인덱스들

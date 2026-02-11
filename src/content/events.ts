@@ -1,5 +1,5 @@
 import type { GameState } from "../engine/types";
-import { logMsg } from "../engine/rules";
+import { logMsg, pickOne } from "../engine/rules";
 import { addFatigue } from "../engine/effects";
 
 export type EventOutcome =
@@ -28,6 +28,13 @@ export function pickRandomEvent(): EventDef {
   return EVENTS[Math.floor(Math.random() * EVENTS.length)];
 }
 
+export const BOSS_OMEN_HINT: Record<string, string> = {
+  boss_cursed_wall: "움직이지 않는다. 당신이 닳아간다.",
+  boss_giant_orc: "거대한 무언가가 기다린다.",
+  boss_soul_stealer: "행동하지 않으면 종말이 온다.",
+  boss_gravity_master: "몸이 점점 무겁다. 몸을 가볍게 하라.",
+};
+
 export const EVENTS: EventDef[] = [
   {
     id: "drop_bag",
@@ -36,7 +43,7 @@ export const EVENTS: EventDef[] = [
     options: () => [
       {
         key: "drop",
-        label: "카드 1장 제거, F -= 1",
+        label: "카드 1장 제거, F -1",
         apply: (g) => {
           addFatigue(g, -1);
           logMsg(g, "이벤트: 짐 버리기 → 제거할 카드를 선택하세요.");
@@ -69,7 +76,7 @@ export const EVENTS: EventDef[] = [
       },
       {
         key: "remove_and_fatigue",
-        label: "카드 1장 제거 후 F += 1",
+        label: "카드 1장 제거 후 F +1",
         apply: (g) => {
           addFatigue(g, 1);
           logMsg(g, "이벤트: 몬스터로부터 숨기 → 카드 제거 후 F+1");
@@ -93,7 +100,7 @@ export const EVENTS: EventDef[] = [
       return [
         {
           key: "accept",
-          label: `F +${add} (버림)`,
+          label: `F +${add}`,
           apply: (g2) => {
             addFatigue(g2, add);
             logMsg(g2, `이벤트: 과중량 (덱 ${deckSize}장 → F +${add})`);
@@ -173,7 +180,7 @@ export const EVENTS: EventDef[] = [
     options: () => [
       {
         key: "eat",
-        label: "F -= 2, 다음 전투 시작 S +5",
+        label: "F -2, 다음 전투 시작 S +5",
         apply: (g) => {
           g.player.fatigue = Math.max(0, g.player.fatigue - 2);
           g.run.nextBattleSuppliesBonus += 5;
@@ -183,4 +190,57 @@ export const EVENTS: EventDef[] = [
       },
     ],
   },
-];
+
+  {
+    id: "ominous_prophecy",
+    name: "불길한 예언",
+    prompt: "불길한 속삭임이 귓가를 맴돈다. 대가를 치르고 미래를 엿볼까?",
+    options: (g: GameState) => [
+      {
+        key: "omen:listen",
+        label: "예언을 듣는다",
+        detail: "F +1. 다음 보스를 확정하고 공개합니다.",
+        apply: (g2) => {
+          addFatigue(g2, 1);
+          logMsg(g2, "불길한 예언: 피로 F +1");
+
+          if (!g2.run.nextBossId) {
+            if (g2.run.bossPool.length > 0) {
+              g2.run.nextBossId = pickOne(g2.run.bossPool);
+            } else {
+              g2.run.nextBossId = null;
+            }
+          }
+
+          if (!g2.run.nextBossId) {
+            logMsg(g2, "예언: 미래가 흐릿하다. (보스가 남아있지 않음)");
+            return "NONE";
+          }
+
+          const bossDef = g2.content.enemiesById[g2.run.nextBossId];
+          const hint = BOSS_OMEN_HINT[g2.run.nextBossId] ?? "정체불명의 위협이 다가온다.";
+          g2.run.bossOmenText = `${hint}`;
+          logMsg(g2, `예언: ${hint}`);
+
+          return "NONE";
+        },
+      },
+      {
+        key: "omen:ignore",
+        label: "무시한다",
+        detail: "아무 일도 일어나지 않습니다.",
+        apply: (g2) => {
+          logMsg(g2, "불길한 예언(무시)");
+          return "NONE";
+        },
+      },
+    ],
+  },
+
+
+
+] as const;
+
+export function getEventById(id: string) {
+  return EVENTS.find((e) => e.id === id) ?? null;
+}

@@ -18,7 +18,8 @@ export function createInitialState(content: Content): GameState {
       afterTreasureNodePicks: 0,
       finished: false,
       nextBattleSuppliesBonus: 0,
-      bossPool: ["boss_cursed_wall", "boss_giant_orc", "boss_soul_stealer"],
+      nextBossId: null,
+      bossPool: ["boss_gravity_master","boss_cursed_wall", "boss_giant_orc", "boss_soul_stealer"],
       nodePickCount: 0,
       branchOffer: null,
 
@@ -29,6 +30,13 @@ export function createInitialState(content: Content): GameState {
 
       battleCount: 0,
       enemyLastSeenBattle: {},
+
+      nextBossTime: 30,
+      forcedNext: null,
+      bossOmenText: null,
+
+      deckSizeAtTreasure: 0,
+
     },
 
     player: {
@@ -69,6 +77,9 @@ export function createInitialState(content: Content): GameState {
     pendingTarget: null,
 
     drawCountThisTurn: 0,
+
+    time: 0,
+
   };
 
   g.run.branchOffer = rollBranchOffer(g);

@@ -12,26 +12,37 @@
   --shadow: 0 18px 60px rgba(0,0,0,.65);
   --radius:18px;
 
-  --hudH: 112px;   /* 상단 HUD 높이(대략) */
-  --dockH: 240px;  /* 손패 영역 높이 */
+  --hudH: 112px;
+  --dockH: 210px;
+  --uiGap: 16px;
+
+  --logW: 360px;
+  --logGap: 14px;
+  --edgePad: 14px;
+
+  --handCardW: 132px;
+  --handCardH: 178px;
+
+  --slotW: 180px;
+  --slotGapX: 22px;
+  --slotGapY: 6px;
 }
 
-/* ===== base ===== */
 html,body{ height:100%; }
 body{
   margin:0;
   background: radial-gradient(1200px 700px at 50% -20%, #1b1f27 0%, var(--bg0) 55%) fixed;
   color:var(--text);
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", "Apple SD Gothic Neo", Arial;
-  overflow:hidden; /* 전체 스크롤 금지(패널 내부만 스크롤) */
+  overflow:hidden;
 }
 #app{
   height:100vh;
+  min-height:100vh;
   display:flex;
   flex-direction:column;
 }
 
-/* ===== common panel ===== */
 .panel{
   background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
   border:1px solid var(--line);
@@ -39,39 +50,31 @@ body{
   box-shadow: var(--shadow);
   backdrop-filter: blur(10px);
 }
-h2,h3{
-  margin:0 0 10px 0;
-  letter-spacing:.2px;
-}
+h2,h3{ margin:0 0 10px 0; letter-spacing:.2px; }
 h2{ font-size:18px; }
 h3{ font-size:14px; color:var(--muted); }
 
-/* ===== TOP HUD ===== */
 .topHud{
   display: grid;
-  grid-template-columns: 280px 1fr 280px; /* 좌/중/우 동일 폭 확보 */
+  grid-template-columns: 280px 1fr 280px;
   gap: 12px;
   align-items: start;
-
-  /* TOP HUD 전체를 살짝 안쪽으로 + 여백 압축 */
-  padding: 6px 14px 2px 14px;
+  padding: 6px 14px 0 14px;
   box-sizing: border-box;
   margin: 0;
-  margin-bottom: 4px;
-}
-.enemyHudCenter{
-  justify-self: center;
-  width: min(760px, 100%);
-  max-height: 92px;   /* 80~110px 사이에서 취향 */
-  overflow: hidden;   /* 더 많아도 HUD가 전장을 밀지 않게 */
 }
 
-/* 왼쪽 플레이어 */
 .playerHud{
   display:flex;
   align-items:flex-start;
-  gap: 14px;
+  gap:14px;
   min-width: 360px;
+}
+.playerHudLeft{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  min-width:260px;
 }
 .playerHudTitle{
   font-weight:700;
@@ -79,18 +82,34 @@ h3{ font-size:14px; color:var(--muted); }
   color:var(--muted);
   margin-bottom:6px;
 }
+.playerTitleRow{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
 .playerBars{
   display:flex;
   flex-direction:column;
-  gap: 8px;
+  gap:8px;
+}
+.playerStatsRow{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:10px;
+  align-items:center;
+}
+.playerHudLeft .playerStatsRow .chip{
+  background: rgba(255,255,255,.06);
 }
 
-/* ✅ 플레이어 HP 바 크게 */
 .statBar{
   display:flex;
   flex-direction:column;
   gap:6px;
-  min-width: 320px;
+  min-width:320px;
 }
 .statBarTop{
   display:flex;
@@ -99,9 +118,9 @@ h3{ font-size:14px; color:var(--muted); }
   color:var(--muted);
 }
 .barOuter{
-  width: 340px;          /* 더 길게 */
-  height: 8px;          /* 더 두껍게 */
-  border-radius: 999px;
+  width:340px;
+  height:8px;
+  border-radius:999px;
   border:1px solid var(--line2);
   background: rgba(255,255,255,.06);
   overflow:hidden;
@@ -114,38 +133,40 @@ h3{ font-size:14px; color:var(--muted); }
 .barFill.hp{ background: linear-gradient(90deg, #ff5a5a, #ff2f2f); }
 .barFill.block{ background: linear-gradient(90deg, #64b5ff, #2a7cff); }
 
-/* 중앙 적들 */
+.enemyHudCenter{
+  justify-self: center;
+  width: min(760px, 100%);
+  max-height: 140px;
+  overflow: hidden;
+}
 .enemyHud{
   flex:1;
   display:flex;
   align-items:flex-start;
   justify-content:center;
   overflow:hidden;
-
-  gap: 14px; /* 카드 사이 간격 */
+  gap:14px;
 }
 .enemyChip{
-  width: 240px;
-
+  width: 320px;
+  max-width: 360px;
   min-width: 200px;
   padding: 14px 14px;
   border-radius: 16px;
-
   border:1px solid var(--line);
   background: rgba(255,255,255,.04);
 }
 .enemyChipTop{
   display:flex;
   justify-content:space-between;
-  font-size: 12px;
+  font-size:13px;
   color:var(--muted);
-  gap: 10px;
-
-  margin-bottom: 4px;
+  gap:10px;
+  margin-bottom:4px;
 }
 .enemyHPOuter{
   width:100%;
-  height: 7px;
+  height:8px;
   border-radius:999px;
   border:1px solid var(--line2);
   background: rgba(255,255,255,.06);
@@ -157,35 +178,32 @@ h3{ font-size:14px; color:var(--muted); }
   background: linear-gradient(90deg, #ff5a5a, #ff2f2f);
 }
 .enemyBadges{
-  margin-top: 4px;
+  margin-top:4px;
   display:flex;
   flex-wrap:wrap;
-  gap: 4px;
+  gap:6px;
+  align-items:center;
+  min-height: calc(18px * 2 + 6px);
 }
 .enemyBadges .badge{
-  font-size: 12px;
-  padding: 3px 8px;
+  font-size:12px;
+  padding:3px 8px;
 }
-
-/* ✅ 의도 글씨(최종값 유지: 크기↑ + 한 줄 줄임표 유지) */
 .enemyIntent{
   color: var(--muted);
   line-height: 1.2;
-
   margin-top: 8px;
   font-size: 13px;
-
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* 오른쪽 자원(칩들) */
 .resourceRow{
   display:flex;
   align-items:center;
-  gap: 8px;
-  min-width: 260px;
+  gap:8px;
+  min-width:260px;
   justify-content:flex-end;
 }
 .resourceRow.inline{
@@ -193,83 +211,75 @@ h3{ font-size:14px; color:var(--muted); }
   gap:8px;
   flex-wrap:wrap;
   justify-content:flex-end;
-  margin-bottom: 0;
+  margin-bottom:0;
 }
 .chip{
   display:inline-flex;
   align-items:center;
   gap:6px;
-  padding: 7px 10px;
-  border-radius: 999px;
+  padding:7px 10px;
+  border-radius:999px;
   border:1px solid var(--line);
   background: var(--chip);
   font-size:12px;
   color: var(--text);
 }
-
-/* ===== middle layout: stage + log ===== */
-.mainRow{
-  flex:1;
-  min-height:0; /* 중요: 내부 스크롤 가능 */
-  display:flex;
-  gap: 14px;
-  position: relative;
-
-  /* 최종 패딩(유효한 값) */
-  padding: 4px 14px 12px 14px;
-
-  /* mainRow는 스크롤 안 하고, 패널 내부만 스크롤 */
-  overflow: hidden;
+.chip.warn{
+  border-color: rgba(255,80,80,.55);
+  background: rgba(255,80,80,.10);
+  box-shadow: 0 0 0 2px rgba(255,80,80,.10) inset, 0 0 18px rgba(255,80,80,.10);
+  color: #ffd6d6;
 }
 
-/* 전장 영역(왼쪽) */
+.mainRow{
+  position: relative !important;
+  display: block !important;
+  flex: 1;
+  min-height:0;
+  overflow: hidden !important;
+  padding: 0 var(--edgePad) 12px var(--edgePad) !important;
+  height: calc(100vh - var(--topHudH, var(--hudH)) - var(--dockH) - var(--uiGap));
+  box-sizing: border-box;
+}
+
 .stage{
-  flex: 1 1 auto;
-  min-width:0;
+  width: 100% !important;
+  min-width: 0 !important;
   display:flex;
   align-items:stretch;
-
-  /* 마지막에 리셋된 값 */
-  width: 100%;
-  transform: none;
-  margin-top: 0;
 }
 .stageInner{
-  width: 100%;
-  margin: 0 auto; /* 진짜 중앙 */
+  margin: 0 auto !important;
+  width: 100% !important;
   display:flex;
   align-items:stretch;
-
-  /* 마지막 유효 max-width 유지 */
-  max-width: 760px;
-
-  /* 마지막에 리셋된 값 */
-  margin-top: 0;
+  max-width: min(760px, calc(100vw - (var(--logW) + var(--logGap) + var(--edgePad)*2))) !important;
+  box-sizing: border-box;
 }
+
 .mainPanel{
   width:100%;
   padding: 16px 16px 12px 16px;
+  box-sizing: border-box;
   min-height:0;
-
-  /* 전장 패널만 스크롤 허용 + 손패 도크만큼 하단 여백 */
+  height: 100%;
   overflow: auto;
-  max-height: calc(100vh - var(--hudH) - 24px); /* HUD 제외 */
-  padding-bottom: calc(var(--dockH) + 18px);   /* ✅ 도크에 가리지 않게 */
+  margin-top: 0 !important;
+  padding-top: 10px !important;
+  padding-bottom: calc(var(--dockH) + 16px);
 }
 
-/* 로그 패널(오른쪽) */
 .logPanel{
+  position: absolute !important;
+  top: 12px !important;
+  right: var(--edgePad) !important;
+  bottom: 12px !important;
+  width: var(--logW) !important;
+  z-index: 50 !important;
   padding: 14px;
   min-height:0;
   display:flex;
   flex-direction:column;
-
-  /* 로그를 우측에 고정(전장 중앙 정렬에 영향 안 줌) */
-  position: absolute;
-  top: 12px;
-  right: 14px;
-  bottom: 12px;
-  width: 360px;
 }
 .logPanel .log{
   flex:1;
@@ -282,15 +292,15 @@ h3{ font-size:14px; color:var(--muted); }
   color: #cfd5e2;
   font-size: 12px;
   line-height: 1.45;
-  overflow:auto; /* ✅ 로그만 스크롤 */
+  overflow:auto;
   white-space: pre-wrap;
+  height: 100%;
 }
 
-/* ===== board ===== */
 .combatRoot{
   display:flex;
   flex-direction:column;
-  gap: 6px; /* 전열/후열 사이 간격 좁힘 */
+  gap: 6px;
 }
 .boardArea{
   display:flex;
@@ -298,84 +308,98 @@ h3{ font-size:14px; color:var(--muted); }
   gap: 6px;
   margin-top: 6px;
 }
-/* 전열/후열 두 그리드 사이 간격(보드 내부)을 더 줄이기 */
 .boardArea > .grid6 + .grid6{
   margin-top: 6px;
 }
 
-/* 슬롯 그리드 */
 .grid6{
   display:grid;
-  gap: 6px; /* 최종 값 */
-  grid-template-columns: repeat(3, 180px); /* 슬롯 폭 고정 */
+  grid-template-columns: repeat(3, var(--slotW));
   justify-content: center;
+  column-gap: var(--slotGapX);
+  row-gap: var(--slotGapY);
 }
-
-/* 슬롯 */
 .slot{
   position: relative;
   border-radius: 16px;
   border: 1px dashed rgba(255,255,255,0.12);
   background: rgba(0,0,0,0.18);
   overflow: hidden;
-
-  aspect-ratio: 5 / 7;
-  height: 252px;
+  aspect-ratio: 5 / 7 !important;
+  height: auto !important;
+  width: 100%;
   padding: 10px;
   box-sizing: border-box;
 }
-.slot.disabled{
-  opacity:.45;
-  filter: grayscale(1);
-}
+.slot.disabled{ opacity:.45; filter: grayscale(1); }
 .slot.dropHover{
   border-color: rgba(255,255,255,.38);
   box-shadow: 0 0 0 2px rgba(255,255,255,.10) inset;
 }
-.slot small{
-  color: var(--muted);
-  font-size: 11px;
-}
-/* 슬롯 라벨(전열1/후열1)은 카드 위로 떠 있어야 하니 z-index */
+.slot small{ color: var(--muted); font-size: 11px; }
 .slot > small{
   position: relative;
   z-index: 2;
   opacity: 0.75;
 }
-
-/* S 경고: 슬롯이 붉게 */
 .slot.sWarn{
   border-color: rgba(255,80,80,.55) !important;
   box-shadow: 0 0 0 2px rgba(255,80,80,.18) inset, 0 0 22px rgba(255,80,80,.12);
 }
-/* 슬롯 안 카드도 살짝 붉게(선택) */
 .slot.sWarn .card.inSlot{
   box-shadow: 0 0 0 1px rgba(255,80,80,.22) inset, 0 16px 40px rgba(0,0,0,.55);
 }
 
-/* ===== controls ===== */
 .controls{
   display:flex;
   flex-wrap:wrap;
-  gap: 8px;
+  gap: 12px;
 }
-.controls.topClose{
-  justify-content:flex-end;
-}
+.controls.topClose{ justify-content:flex-end; }
+
 button{
+  position: relative;
+  overflow: hidden;
   appearance:none;
-  border:1px solid var(--line);
+  border: 1px solid rgba(255,255,255,.12);
   background: rgba(255,255,255,.06);
-  color: var(--text);
-  padding: 8px 10px;
-  border-radius: 12px;
-  cursor:pointer;
-  font-size: 12px;
+  color: rgba(255,255,255,.92);
+  border-radius: 14px;
+  padding: 10px 14px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform .08s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease, opacity .15s ease;
+  box-shadow: 0 6px 18px rgba(0,0,0,.35);
 }
-button:hover{ background: rgba(255,255,255,.09); }
+button::before{
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(120% 80% at 20% 10%, rgba(255,255,255,.10), transparent 55%);
+  opacity: .9;
+}
+button:hover{
+  background: rgba(255,255,255,.10);
+  border-color: rgba(255,255,255,.20);
+  transform: translateY(-1px);
+}
+button:active{
+  transform: translateY(0px);
+  background: rgba(255,255,255,.08);
+}
 button:disabled{
-  opacity:.45;
-  cursor:not-allowed;
+  opacity: .38;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+button:focus{ outline: none; }
+button:focus-visible{
+  outline: 2px solid rgba(255,255,255,.22);
+  outline-offset: 2px;
 }
 button.primary{
   border-color: rgba(255,255,255,.16);
@@ -385,31 +409,51 @@ button.stepOn{
   box-shadow: 0 0 0 2px rgba(255,255,255,.10) inset;
 }
 
-/* ===== hand dock (bottom) ===== */
+.stepBtn{
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.10);
+  font-size: 13px;
+}
+
+.pileButtons{
+  margin-top: 10px;
+  margin-left:auto;
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  white-space: nowrap;
+}
+.pileButtons button{
+  padding: 8px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  background: rgba(255,255,255,.045);
+}
+.pileButtons button:hover{ background: rgba(255,255,255,.085); }
+
 .handDock{
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
   height: var(--dockH);
-  padding: 10px 14px 14px 18px; /* 좌측 여백 조금 확보 */
+  padding: 6px 14px 10px 18px;
   background: linear-gradient(180deg, rgba(0,0,0,.00), rgba(0,0,0,.65));
-  pointer-events: none; /* ✅ 도크 자체는 통과 */
+  pointer-events: none;
 }
-.handDock > *{ pointer-events: auto; } /* ✅ 내부 버튼/카드는 클릭 가능 */
+.handDock > *{ pointer-events: auto; }
 
 .controlsDock{
   display:flex;
   gap: 8px;
-
-  /* 하단 단계 버튼을 왼쪽으로 + 줄바꿈 */
   justify-content: flex-start;
   flex-wrap: wrap;
   padding-left: 6px;
-
   margin-bottom: 10px;
 }
-
 .hand{
   overflow-x: auto;
   overflow-y: hidden;
@@ -420,10 +464,9 @@ button.stepOn{
   justify-content: flex-start;
   align-items: flex-end;
   gap: 10px;
-  min-width: max-content; /* 카드가 많으면 가로로 계속 늘어나게 */
+  min-width: max-content;
 }
 
-/* ===== card ===== */
 .card{
   flex: 0 0 auto;
   width: 168px;
@@ -433,7 +476,6 @@ button.stepOn{
   padding: 10px 10px 8px 10px;
   box-shadow: 0 16px 40px rgba(0,0,0,.55);
   user-select:none;
-
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -446,10 +488,9 @@ button.stepOn{
   font-weight: 800;
   font-size: 13px;
   margin-bottom: 6px;
-
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap; /* 제목은 한 줄로 */
+  white-space: nowrap;
 }
 .cardMeta{
   display:flex;
@@ -465,9 +506,12 @@ button.stepOn{
   color: var(--muted);
   border:1px solid var(--line);
   background: rgba(255,255,255,.05);
+  height:18px;
+  line-height:18px;
+  white-space:nowrap;
 }
+.badge.placeholder{ visibility: hidden; }
 
-/* 카드 텍스트 섹션 */
 .cardSection{ margin-top: 8px; }
 .cardSectionTitle{
   font-size: 11px;
@@ -475,110 +519,43 @@ button.stepOn{
   color: var(--muted);
   margin-bottom: 4px;
 }
-
-/* 전역 카드 텍스트(최종 clamp 6) */
 .cardText{
   font-size: 12px;
   line-height: 1.25;
   color: #e9ecf3;
-
   white-space: normal;
   overflow: hidden;
   display: -webkit-box;
-  line-clamp: 6;
-  -webkit-line-clamp: 6;
   -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  line-clamp: 6;
   word-break: break-word;
-
   flex: 1;
 }
 
-/* 손패 비었을 때 */
-.handEmptyHint{
-  color: var(--muted);
-  font-size: 12px;
-  padding: 10px;
-}
-
-/* 드래그 고스트 */
-.dragGhost{
-  padding: 8px 10px;
-  border-radius: 12px;
-  border:1px solid var(--line2);
-  background: rgba(10,12,15,.85);
-  color: var(--text);
-  box-shadow: var(--shadow);
-}
-.dragLayer{ pointer-events:none; }
-
-/* rulebook/overlay */
-.rulebook{
-  margin:0;
-  padding: 12px;
-  border-radius: 12px;
-  border:1px solid var(--line);
-  background: rgba(0,0,0,.25);
-  white-space: pre-wrap;
-  overflow:auto;
-  max-height: 52vh;
-}
-
-/* 오버레이 상단 헤더(제목+닫기) */
-.overlayHeader{
-  position: sticky;
-  top: 0;
-  z-index: 5;
-
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap: 12px;
-
-  padding: 10px 12px;
-  margin-bottom: 10px;
-
-  border-radius: 14px;
-  border:1px solid var(--line);
-  background: rgba(0,0,0,.25);
-  backdrop-filter: blur(10px);
-}
-.overlayTitle{ margin:0; }
-.overlayClose{ margin-left:auto; }
-
-/* ===== 카드 위치별 규격 ===== */
-/* 손패 카드(최종 크기) */
 .handDock .card{
-  width: 132px;
-  height: 178px;
+  width: var(--handCardW);
+  height: var(--handCardH);
 }
-
-/* 전장(슬롯) 카드: 슬롯에 맞춰 유연 */
 .slot .card{
   width: 100%;
   height: 100%;
 }
-
-/* ✅ 슬롯에 들어간 카드는 슬롯 내부를 꽉 채움 */
 .card.inSlot{
   position: absolute;
-  inset: 28px 10px 10px 10px; /* 라벨 공간 */
+  inset: 26px 10px 10px 10px;
   width: auto;
   height: auto;
   margin: 0;
-
   box-sizing: border-box;
   border-radius: 14px;
   overflow: hidden;
-
-  /* 클릭/드래그 잘 먹게 */
   pointer-events: auto;
   z-index: 1;
-
-  /* 슬롯 카드 내부 레이아웃 안정화 */
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 8px;
+  padding: 7px;
 }
 .card.inSlot .cardTitle{
   font-size: 13px;
@@ -596,12 +573,10 @@ button.stepOn{
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
   line-clamp: 3;
-
   white-space: normal;
   word-break: break-word;
   line-height: 1.2;
@@ -614,7 +589,74 @@ button.stepOn{
   margin-bottom: 2px;
 }
 
-/* ===== misc UI ===== */
+.handEmptyHint{
+  color: var(--muted);
+  font-size: 12px;
+  padding: 10px;
+}
+
+.dragLayer{ pointer-events:none; }
+.dragGhost{
+  padding: 8px 10px;
+  border-radius: 12px;
+  border:1px solid var(--line2);
+  background: rgba(10,12,15,.85);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+.dragCardPreview{
+  position: fixed;
+  z-index: 2200;
+  pointer-events: none;
+  transform: translate3d(0,0,0);
+  filter: drop-shadow(0 18px 50px rgba(0,0,0,.65));
+  opacity: .96;
+  width: var(--handCardW);
+  height: var(--handCardH);
+}
+.dragCardPreview .card{
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  filter: brightness(1.06) saturate(1.08);
+  transform: translateZ(0) scale(1.02);
+  box-shadow: 0 22px 70px rgba(0,0,0,.75);
+}
+.card.isDraggingSource{
+  filter: brightness(.78) saturate(.90);
+  opacity: .65;
+  box-shadow: none;
+}
+
+.rulebook{
+  margin:0;
+  padding: 12px;
+  border-radius: 12px;
+  border:1px solid var(--line);
+  background: rgba(0,0,0,.25);
+  white-space: pre-wrap;
+  overflow:auto;
+  max-height: 52vh;
+}
+
+.overlayHeader{
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border-radius: 14px;
+  border:1px solid var(--line);
+  background: rgba(0,0,0,.25);
+  backdrop-filter: blur(10px);
+}
+.overlayTitle{ margin:0; }
+.overlayClose{ margin-left:auto; }
+
 .panelHeader{
   display:flex;
   align-items:center;
@@ -622,43 +664,23 @@ button.stepOn{
   gap:12px;
   margin-bottom:10px;
 }
-
 .battleTitleRow{
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 12px;
-
-  margin-bottom: 6px;
-  padding-bottom: 0;
-  padding-top: 6px;
+  margin: 0 0 6px 0;
+  padding: 0;
 }
-/* 전장 제목(h2)이 위에서 잘리는 현상 방지 */
 .battleTitleRow h2{
   line-height: 1.2;
   padding-top: 2px;
   margin: 0;
 }
-
 .topRightControls{
   display: flex;
   gap: 8px;
   justify-content: flex-end;
-}
-
-.hpBar{ height: 12px; border-radius: 999px; overflow: hidden; }
-.hpFill{ height: 100%; }
-
-.slotBox{
-  aspect-ratio: 5 / 7;
-  width: 100%;
-  max-width: 320px;
-}
-.battleSlotsGrid{
-  display: grid;
-  grid-template-columns: repeat(3, minmax(180px, 1fr));
-  gap: 12px;
-  justify-items: center;
 }
 
 .targetHint{
@@ -670,16 +692,11 @@ button.stepOn{
   font-size: 12px;
   margin-bottom: 10px;
 }
-
-/* 타겟팅 중 살아있는 적 강조 */
 .enemyChip.targetable{
   border-color: rgba(255, 80, 80, 0.55);
-  box-shadow:
-    0 0 0 1px rgba(255, 80, 80, 0.18) inset,
-    0 10px 26px rgba(0,0,0,0.55);
+  box-shadow: 0 0 0 1px rgba(255, 80, 80, 0.18) inset, 0 10px 26px rgba(0,0,0,0.55);
   cursor: pointer;
 }
-/* 마우스 올리면 더 강하게 */
 .enemyChip.targetable:hover{
   border-color: rgba(255, 80, 80, 0.85);
   box-shadow:
@@ -687,7 +704,6 @@ button.stepOn{
     0 0 18px rgba(255, 60, 60, 0.22),
     0 14px 32px rgba(0,0,0,0.6);
 }
-/* 선택된 적까지 더 강조(선택 기능 쓸 때만) */
 .enemyChip.targetSelected{
   border-color: rgba(255, 80, 80, 0.95);
   box-shadow:
@@ -696,370 +712,16 @@ button.stepOn{
     0 18px 40px rgba(0,0,0,0.65);
 }
 
-/* 칩 경고 */
-.chip.warn{
-  border-color: rgba(255,80,80,.55);
-  background: rgba(255,80,80,.10);
-  box-shadow: 0 0 0 2px rgba(255,80,80,.10) inset, 0 0 18px rgba(255,80,80,.10);
-  color: #ffd6d6;
+.enemyChip.shake { animation: enemyHitShake 140ms linear; }
+@keyframes enemyHitShake{
+  0%{ transform: translateX(0); }
+  20%{ transform: translateX(-4px); }
+  40%{ transform: translateX(4px); }
+  60%{ transform: translateX(-2px); }
+  80%{ transform: translateX(2px); }
+  100%{ transform: translateX(0); }
 }
 
-/* 덱/더미 버튼 */
-.pileButtons{
-  margin-top: 10px;
-  display:flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-}
-.pileButtons button{
-  padding: 6px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-}
-
-.choiceCard{
-  transform: scale(0.92);
-  transform-origin: top left;
-}
-
-/* ===== next preview ===== */
-.nextPreviewBox{
-  margin-top: 10px;
-  padding: 10px 12px;
-  border: 1px solid rgba(255,255,255,.10);
-  border-radius: 14px;
-  background: rgba(255,255,255,.03);
-}
-.nextPreviewTitle{
-  font-size: 12px;
-  opacity: .8;
-  margin-bottom: 8px;
-}
-.nextPreviewLine{
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin: 6px 0;
-}
-.nextPreviewSide{
-  min-width: 40px;
-  font-size: 12px;
-  opacity: .75;
-}
-.nextPathRow{
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.nextPathArrow,
-.nextPathSlash{
-  opacity: .6;
-  font-weight: 700;
-}
-.nextPathChoices{
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.nodePill{
-  padding: 8px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.12);
-  background: rgba(0,0,0,.18);
-  font-size: 13px;
-  white-space: nowrap;
-}
-.nodePill.picked{
-  border-color: rgba(255,255,255,.20);
-  background: rgba(255,255,255,.06);
-  font-weight: 700;
-}
-
-.enemyChip.shake {
-  animation: enemyHitShake 140ms linear;
-}
-
-@keyframes enemyHitShake {
-  0%   { transform: translateX(0); }
-  20%  { transform: translateX(-4px); }
-  40%  { transform: translateX(4px); }
-  60%  { transform: translateX(-2px); }
-  80%  { transform: translateX(2px); }
-  100% { transform: translateX(0); }
-}
-
-.topHud{
-  display:flex;
-  gap:16px;
-  align-items:stretch; /* 기본은 stretch로 두고 */
-}
-
-/* ✅ 왼쪽 플레이어 박스만 ‘세로 중앙’으로 */
-.playerHudLeft{
-  display:flex;
-  flex-direction:column;
-  align-self:center;   /* 이게 포인트: topHud 높이 안에서 중간 */
-  gap:10px;
-  min-width: 260px;    /* 취향 */
-}
-
-/* 타이틀 옆에 버튼 */
-.playerTitleRow{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-}
-
-/* 버튼들 줄 정렬 */
-.pileButtons{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;      /* 공간 부족하면 다음줄 */
-  justify-content:flex-end;
-}
-
-/* 버튼이 너무 커서 덩어리로 보이면 */
-.pileButtons button{
-  padding:6px 10px;
-  font-size:12px;
-}
-
-/* ✅ 플레이어 HUD: 화면 기준 좌측 중앙 고정 */
-.playerHudLeft{
-  position: fixed;
-  left: 16px;
-  top: 50vh;
-  transform: translateY(-50%);
-  z-index: 1200;
-
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-
-  width: 280px;          /* 취향 */
-  max-width: 34vw;
-}
-
-/* ✅ 타이틀 옆에 덱/버림/손패... */
-.playerTitleRow{
-  display:flex;
-  align-items:center;
-  gap:12px;
-}
-.pileButtons{
-  margin-left:auto;
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  justify-content:flex-end;
-}
-.pileButtons button{
-  padding:6px 10px;
-  font-size:12px;
-}
-/* topHud를 3칸 그리드로 고정: 왼쪽(플레이어 자리) / 가운데(적) / 오른쪽(버튼) */
-.topHud{
-  display: grid;
-  grid-template-columns: var(--playerHudW, 370px) 1fr auto;
-  align-items: start;
-  gap: 16px;
-}
-
-/* ✅ 레이아웃용 스페이서(내용 없음) */
-.topHudLeftSpacer{
-  width: var(--playerHudW, 300px);
-  height: 1px;
-}
-
-:root{
-  --playerHudW: 130px; /* ✅ 여기만 조절하면 topHud도 같이 맞습니다 */
-}
-
-/* 플레이어 HUD 자체 */
-.playerHudLeft{
-  position: fixed;
-  left: 16px;
-  top: 50vh;
-  transform: translateY(-50%);
-  z-index: 1200;
-
-  width: var(--playerHudW);
-  max-width: 36vw;
-
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-
-/* 타이틀 + 버튼: 줄바꿈 금지 */
-.playerTitleRow{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  flex-wrap: nowrap;
-  white-space: nowrap;
-}
-
-/* 버튼들도 줄바꿈 금지 + 넘치면 가로 스크롤(선택) */
-.pileButtons{
-  margin-left:auto;
-  display:flex;
-  gap:8px;
-  flex-wrap: nowrap;
-  white-space: nowrap;
-  overflow-x: auto;      /* ✅ 버튼이 많아져도 줄바꿈 대신 스크롤 */
-}
-.pileButtons::-webkit-scrollbar{ height: 6px; } /* 선택 */
-:root{
-  --playerHudW: 360px;          /* 플레이어 바 폭 */
-  --topHudPadT: 10px;           /* 상단 여백 */
-  --stageDrop: 14px;            /* 전장을 조금 내리는 값 */
-  --enemyHudMaxW: min(900px, 56vw); /* 적 HUD 최대 폭(상황 따라 조절) */
-}
-
-/* 상단 전체 */
-.topHud{
-  display: grid;
-  grid-template-columns: var(--playerHudW) 1fr auto;
-  align-items: start;
-  column-gap: 18px;
-  padding-top: var(--topHudPadT);
-}
-
-/* 왼쪽은 자리만 차지 */
-.topHudLeftSpacer{
-  width: var(--playerHudW);
-  height: 1px;
-}
-
-/* ✅ 적 HUD를 “전체 화면의 정중앙”에 고정 */
-.enemyHudCenter{
-  justify-self: center;
-  width: min(100%, var(--enemyHudMaxW));
-}
-
-/* 적 카드들이 많아질 때 균형 */
-.enemyHud{
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-/* 오른쪽 버튼은 우측 정렬 유지 */
-.topHudRight{
-  justify-self: end;
-}
-
-/* ✅ 전장(가운데 큰 패널) 조금만 아래로 */
-.mainRow{
-  margin-top: var(--stageDrop);
-}
-.enemyChip{
-  width: 320px;           /* 적 한 칩 기본 폭 */
-  max-width: 360px;
-}
-@media (max-width: 1400px){
-  .enemyChip{ width: 300px; }
-}
-@media (max-width: 1200px){
-  .enemyChip{ width: 280px; }
-}
-.playerHudLeft{
-  position: fixed;
-  left: 16px;
-  top: 52vh;                 /* 살짝 아래로(원하시면 50~55 조절) */
-  transform: translateY(-50%);
-  z-index: 1200;
-  width: var(--playerHudW);
-  max-width: 36vw;
-
-  display:flex;
-  flex-direction:column;
-  gap: 10px;
-}
-
-/* 타이틀 + 버튼 한 줄 */
-.playerTitleRow{
-  display:flex;
-  align-items:center;
-  gap: 10px;
-  flex-wrap: nowrap;
-  white-space: nowrap;
-}
-
-.playerHudTitle{
-  font-size: 14px;           /* ✅ 타이틀 줄이기 */
-  opacity: .9;
-}
-
-/* 버튼 줄: 줄바꿈 금지 + 공간 부족 시 버튼이 겹치지 않게 */
-.pileButtons{
-  margin-left: auto;
-  display:flex;
-  gap: 6px;
-  flex-wrap: nowrap;
-  white-space: nowrap;
-}
-
-/* 버튼 자체를 조금 컴팩트하게 */
-.pileButtons button{
-  padding: 6px 10px;
-  font-size: 12px;
-}
-
-/* HP 박스 키우기 */
-.playerHudBox{
-  padding: 9px;
-  border-radius: 16px;
-}
-
-/* HP/블록 바 두껍게 */
-.enemyHPOuter{
-  height: 8px;              /* ✅ 기존보다 두껍게 */
-}
-.enemyChipTop{
-  font-size: 13px;
-}
-:root{ --topCenterNudgeX: 0px; }
-
-.enemyHudCenter{
-  justify-self: center;
-  transform: translateX(var(--topCenterNudgeX));
-}
-
-.topHud{
-  display: grid;
-  grid-template-columns: 1fr auto 1fr; /* 좌/우를 같은 비중으로 잡아 중앙이 진짜 중앙 */
-  align-items: start;
-  column-gap: 16px;
-  padding: 16px 24px; /* 좌우 패딩 동일하게 */
-}
-
-/* 왼쪽은 왼쪽 끝 */
-.playerHudLeft{
-  justify-self: start;
-}
-
-/* 가운데는 진짜 중앙 */
-.enemyHudCenter{
-  justify-self: center;
-}
-
-/* 오른쪽은 오른쪽 끝 */
-.topHudRight{
-  justify-self: end;
-}
-
-/* “전투 없음” 문구 정렬은 원하시는대로 */
-.enemyNone{
-  text-align: center; /* 또는 left */
-}
-
-/* 미리보기 박스 */
 .previewPickBox{
   border: 1px solid rgba(255,255,255,.10);
   border-radius: 14px;
@@ -1067,13 +729,7 @@ button.stepOn{
   background: rgba(255,255,255,.03);
   margin-top: 12px;
 }
-
-.previewTitle{
-  opacity: .85;
-  margin-bottom: 10px;
-}
-
-/* 한 줄(전자/후자) */
+.previewTitle{ opacity: .85; margin-bottom: 10px; }
 .previewRow{
   display: flex;
   align-items: center;
@@ -1083,82 +739,24 @@ button.stepOn{
   cursor: pointer;
   user-select: none;
 }
-
 .previewRow:hover{
   background: rgba(255,255,255,.04);
   border: 1px solid rgba(255,255,255,.06);
 }
-
 .previewRow:focus{
   outline: 2px solid rgba(255,255,255,.18);
   outline-offset: 2px;
 }
-
 .previewRowLabel{
-  width: 56px;          /* 전자/후자 라벨 고정폭 */
+  width: 56px;
   opacity: .85;
 }
-
-/* 칩들 */
 .previewPills{
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
 }
-
-/* ✅ 글자 길이와 무관하게 항상 같은 폭 */
-.nodePill{
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 72px;          /* 여기 숫자만 취향대로 */
-  height: 34px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.14);
-  background: rgba(0,0,0,.18);
-  font-weight: 600;
-}
-
-.previewArrow, .previewSlash{
-  opacity: .5;
-  padding: 0 2px;
-}
-
-.nodePickBtn{
-  display:flex;
-  flex-direction:column;
-  align-items:flex-start;
-  gap:8px;
-  padding:14px 14px;
-  min-width: 260px; /* 버튼 폭 통일 */
-}
-
-.nodePickTop{
-  display:flex;
-  gap:8px;
-  align-items:center;
-}
-
-.nodePickMid{
-  opacity:.55;
-  margin-left: 6px;
-}
-
-.nodePickBottom{
-  display:flex;
-  gap:8px;
-  align-items:center;
-}
-
-.nodePickSep{ opacity:.35; }
-
-.nodePickDim{
-  opacity:.45;
-  font-size: 12px;
-}
-
-/* ✅ 글자 길이 들쑥날쑥 해결 핵심 */
 .nodePill{
   display:inline-flex;
   align-items:center;
@@ -1167,800 +765,755 @@ button.stepOn{
   border-radius:999px;
   border:1px solid rgba(255,255,255,.14);
   background:rgba(255,255,255,.06);
-
-  min-width: 64px;  /* ← 이 값으로 “전투/이벤트/휴식” 길이 차이를 흡수 */
+  min-width: 64px;
   text-align:center;
   white-space:nowrap;
   font-size: 12px;
+  font-weight: 600;
 }
-/* ===== Button base ===== */
-button {
-  appearance: none;
-  border: 1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.06);
-  color: rgba(255,255,255,.92);
-  border-radius: 14px;
-  padding: 10px 14px;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  transition: transform .08s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease, opacity .15s ease;
-  box-shadow: 0 6px 18px rgba(0,0,0,.35);
-}
-
-button:hover {
-  background: rgba(255,255,255,.10);
+.nodePill.picked{
   border-color: rgba(255,255,255,.20);
-  transform: translateY(-1px);
+  background: rgba(255,255,255,.06);
+  font-weight: 700;
+}
+.previewArrow, .previewSlash{
+  opacity: .5;
+  padding: 0 2px;
 }
 
-button:active {
-  transform: translateY(0px);
-  background: rgba(255,255,255,.08);
+:root{
+  --edgePad: 14px;
+  --logW: 360px;
+  --logGap: 14px;
+
+  --playerW: 320px;     /* 플레이어 UI 박스 폭 */
+  --hudH: 140px;        /* 상단 HUD 영역 높이 */
+  --dockH: 210px;       /* 손패 도크 높이 */
+
+  --stageMaxW: 760px;   /* 전장 최대 폭(중앙) */
 }
 
-button:disabled {
-  opacity: .38;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-/* ===== Primary button ===== */
-/* ===== Step buttons (정찰/후열/전열...) ===== */
-.stepBtn {
-  padding: 10px 12px;
-  border-radius: 999px;           /* pill */
-  background: rgba(255,255,255,.05);
-  border: 1px solid rgba(255,255,255,.10);
-}
-
-
-/* 작은 칩 버튼(덱/버림/손패/소모/소실)에 딱 맞는 미니 버튼 */
-.pileButtons button {
-  padding: 8px 10px;
-  border-radius: 999px;
-  font-size: 13px;
-  background: rgba(255,255,255,.045);
-}
-.pileButtons button:hover { background: rgba(255,255,255,.085); }
-
-/* ===== Choice overlay buttons ===== */
-.choice-item button.primary {
-  width: fit-content;
-  min-width: 120px;
-}
-/* 노드 선택 버튼 두 개(A/B) */
-.controls button.primary {
-  min-width: 120px;     /* 글자 길이 차이 흡수 */
-  justify-content: center;
-  text-align: center;
-}
-
-/* 노드 라벨이 길어져도 버튼 폭이 튀지 않게 */
-.controls {
-  display: flex;
+/* ===== Top HUD: 적 중앙 상부 + 우상단 버튼 ===== */
+.topHud{
+  height: var(--hudH);
+  display: grid;
+  grid-template-columns: 1fr minmax(0, var(--stageMaxW)) 1fr; /* 가운데가 진짜 중앙 */
+  align-items: start;
   gap: 12px;
-  flex-wrap: wrap;
-}
-button::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: radial-gradient(120% 80% at 20% 10%, rgba(255,255,255,.10), transparent 55%);
-  opacity: .9;
+  padding: 8px var(--edgePad) 0 var(--edgePad);
+  margin: 0;
+  box-sizing: border-box;
+  overflow: hidden; /* 배지 때문에 HUD가 아래로 늘어나지 않게 */
 }
 
-button {
-  position: relative;
-  overflow: hidden;
-}
-button:focus { outline: none; }
-button:focus-visible {
-  outline: 2px solid rgba(255,255,255,.22);
-  outline-offset: 2px;
-}
-/* 회색 패널(전장 + 로그/선택창 들어있는 큰 판) 자체를 아래로 */
-.mainPanel {
-  margin-top: 30px;   /* 6~16px에서 조절 */
+/* 적 UI는 중앙 상부 */
+.enemyHudCenter{
+  grid-column: 2;
+  justify-self: center;
+  width: 100%;
+  max-height: 100%;
+  overflow: auto; /* 적 많아지면 여기만 스크롤 */
 }
 
-/* 화면 전체를 세로로: 상단 HUD + 중간(회색패널/로그) + 하단(손패 도크는 fixed라면 padding으로 공간 확보) */
-#app {
-  min-height: 100vh;
+/* 우상단 버튼(새 런/룰북 등) */
+.topHudRight{
+  grid-column: 3;
+  justify-self: end;
+  align-self: start;
+  display: flex;
+  gap: 8px;
+}
+
+/* (좌측 칸은 비워둬도 됨. 플레이어는 fixed로 갈 거라) */
+.topHudLeftSpacer{
+  grid-column: 1;
+}
+
+/* ===== 플레이어 UI: 좌측 중간 고정 ===== */
+.playerHudLeft{
+  position: fixed;
+  left: var(--edgePad);
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--playerW);
+  z-index: 1200;
+}
+
+/* ===== 로그: 우측 고정 ===== */
+.logPanel{
+  position: fixed;
+  top: calc(var(--hudH) + 8px);
+  right: var(--edgePad);
+  bottom: calc(var(--dockH) + 8px);
+  width: var(--logW);
+  z-index: 900;
   display: flex;
   flex-direction: column;
 }
 
-/* 중간 영역(전장/로그) */
-.mainRow {
-  flex: 1;
-  display: flex;
-  gap: 12px;              /* 원래 쓰던 값 */
-  min-height: 0;          /* 중요: 내부 스크롤 허용 */
-}
-
-/* 왼쪽(전장) */
-.stage {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-}
-
-/* 회색 패널(전장 내용이 들어있는 판) */
-.mainPanel {
-  flex: 1;
-  min-height: 0;
-
-  /* ✅ 핵심: 도크가 fixed라면 그만큼 아래 공간을 확보해서 “전투 때처럼” 아래까지 내려오게 */
-  padding-bottom: 220px;  /* handDock 높이에 맞춰 조절 (예: 180~260px) */
-}
-:root{
-  --topHudH: 120px;   /* 대충값. 아래 2)에서 JS로 자동 측정하면 더 정확 */
-  --dockH: 260px;     /* 손패 도크 높이(대충값) */
-  --uiGap: 24px;      /* 위아래 여백 */
-}
-
+/* ===== 전장: 화면 정중앙 (우측 로그/좌측 플레이어는 '겹치지 않게' padding으로 비워줌) ===== */
 .mainRow{
-  /* 화면 높이에서 topHud + handDock + 여백 뺀 만큼을 “고정 높이”로 */
-  height: calc(100vh - var(--topHudH) - var(--dockH) - var(--uiGap));
-  align-items: stretch; /* ✅ 자식 패널 높이 강제로 맞춤 */
-}
-
-.stage, .stageInner{
-  height: 100%;
-}
-
-.panel.mainPanel{
-  height: 100%;
-  overflow: auto;     /* ✅ 전투/비전투 모두 내부만 스크롤 */
-}
-
-.panel.logPanel{
-  height: 100%;
-  overflow: auto;     /* 로그도 같은 높이로 */
-}
-
-:root{
-  --hudH: 112px;
-  --dockH: 240px;
-}
-
-/* ===== TOP HUD ===== */
-.topHud{
-  display: grid;
-  grid-template-columns: 280px 1fr 280px; /* 좌/중/우 동일 폭 */
-  gap: 12px;
-  align-items: start;
-
-  padding: 6px 14px 2px 14px;
-  box-sizing: border-box;
-  margin: 0 0 4px 0;
-}
-
-/* 왼쪽 플레이어: fixed 금지(그리드에 자연스럽게) */
-.playerHudLeft{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-  min-width: 260px;
-}
-
-.enemyHudCenter{
-  justify-self: center;
-  width: min(760px, 100%);
-  max-height: 92px;
-  overflow: hidden;
-}
-
-.topHudRight{
-  justify-self: end;
-}
-
-.topRightControls{
-  display:flex;
-  gap:8px;
-  justify-content:flex-end;
-}
-
-/* ===== middle layout: stage + log ===== */
-.mainRow{
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  gap: 14px;
-
-  padding: 4px 14px 12px 14px;
-  padding-bottom: calc(var(--dockH) + 12px); /* ✅ 도크 공간 확보 */
-  box-sizing: border-box;
-
-  overflow: hidden;
-}
-
-.stage{
-  flex: 1 1 auto;
-  min-width: 0;
-  display:flex;
-  align-items:stretch;
-}
-
-.stageInner{
-  width: 100%;
-  margin: 0 auto;
-  display:flex;
-  align-items:stretch;
-  max-width: 760px;
-}
-
-.mainPanel{
-  width:100%;
-  min-height:0;
-  overflow: auto;
-
-  padding: 16px 16px 12px 16px;
-  box-sizing: border-box;
-
-  /* ✅ 전투/비전투 모두 같은 높이로 “끝까지” 내려오게 */
-  height: 100%;
-  max-height: none;
-}
-
-/* 로그패널: absolute 금지 (전장 중앙 흔들림 원인) */
-.logPanel{
-  width: 360px;
-  padding: 14px;
-  min-height:0;
-  display:flex;
-  flex-direction:column;
-}
-
-.logPanel .log{
-  flex:1;
-  min-height:0;
-  overflow:auto;
-}
-:root{
-  --dockH: 240px;     /* handDock 높이 */
-  --uiGap: 16px;      /* 위/아래 여백 취향 */
-}
-
-/* topHud 실제 높이가 변할 수 있으니, 일단 대충값 */
-:root{ --topHudH: 112px; }
-
-/* ✅ 중간 영역 높이를 확정 */
-.mainRow{
-  height: calc(100vh - var(--topHudH) - var(--dockH) - var(--uiGap));
-  min-height: 0;
-  overflow: hidden;
-
-  /* padding-bottom으로 도크 공간 확보하던 건 여기선 빼도 됩니다 */
-  padding-bottom: 12px;
-}
-.stage, .stageInner, .mainPanel, .logPanel{ height: 100%; }
-.mainPanel{
-  overflow: auto;
-  padding-bottom: calc(var(--dockH) + 16px); /* ✅ 도크만큼 여유 */
-  box-sizing: border-box;
-}
-
-
-
-.playerStatsRow{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  margin-top: 10px;
-  align-items:center;
-}
-
-.playerHudLeft .playerStatsRow .chip{
-  background: rgba(255,255,255,.06);
-}
-
-.dragCardPreview{
-  position: fixed;
-  z-index: 2200;
-  pointer-events: none;
-  transform: translate3d(0,0,0);
-  filter: drop-shadow(0 18px 50px rgba(0,0,0,.65));
-  opacity: .96;
-}
-
-.dragCardPreview .card{
-  /* 카드가 너무 크면 살짝 축소 */
-  transform: scale(1.0);
-  transform-origin: top left;
-}
-
-:root{
-  --handCardW: 132px;
-  --handCardH: 178px;
-}
-
-/* ✅ 잡고 있는 원본 카드(보드/손패 공통) */
-.card.isDraggingSource{
-  filter: brightness(.78) saturate(.90);
-  opacity: .65;
-  box-shadow: none;
-}
-
-/* ✅ 드래그 프리뷰: 손패 카드랑 동일 규격 + 살짝 “들고 있음” 느낌 */
-.dragCardPreview{
-  width: var(--handCardW);
-  height: var(--handCardH);
-  pointer-events: none;
-}
-.dragCardPreview .card{
-  width: 100%;
-  height: 100%;
-
-  /* 들고 있는 느낌(선택) */
-  filter: brightness(1.06) saturate(1.08);
-  transform: translateZ(0) scale(1.02);
-  box-shadow: 0 22px 70px rgba(0,0,0,.75);
-}
-
-/* =========================
-   FINAL OVERRIDE: mainPanel 아래로 내리기
-   ========================= */
-:root{
-  --mainPanelDrop: 24px;  /* ← 이 값만 조절 (0~60px 추천) */
-}
-
-.stageInner{
-  padding-top: var(--mainPanelDrop);
-  box-sizing: border-box;
-}
-
-/* (선택) 위에서 내리면 높이가 부족해질 수 있으니, 스크롤 영역 유지 */
-.mainPanel{
-  height: calc(100% - var(--mainPanelDrop));
-}
-:root{
-  --handCardW: 132px;
-  --handCardAspect: calc(132 / 178); /* ✅ 손패 카드 비율 */
-}
-/* ✅ 드래그 프리뷰: 손패 카드와 “같은 비율” 유지 */
-.dragCardPreview{
-  width: var(--handCardW);
-  aspect-ratio: var(--handCardAspect);
-  height: auto;              /* ✅ 비율로 자동 계산 */
-  pointer-events: none;
-}
-
-/* 내부 카드가 wrapper를 꽉 채우게 */
-.dragCardPreview .card{
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-/* =========================
-   Choice(강화/제거/보상) 카드 크기 고정
-   - 손패 카드 비율(132x178) 그대로 사용
-   ========================= */
-:root{
-  --handCardW: 132px;
-  --handCardH: 178px;
-}
-
-/* choice 화면의 왼쪽 카드 영역은 늘어나지 않게 */
-.choice-left{
-  flex: 0 0 auto;
-  align-self: flex-start;
-}
-
-/* ✅ choice 프리뷰 카드는 항상 동일 크기 */
-.choice-left .card.choiceCard{
-  width: var(--handCardW);
-  height: var(--handCardH);
-  flex: 0 0 auto;
-  align-self: flex-start;
-
-  /* 비율 유지 확실히 */
-  aspect-ratio: 132 / 178;
-
-  /* (선택) 스케일 쓰고 있으면 제거/통일 */
-  transform: none; /* 기존 .choiceCard transform:scale(...) 있으면 이걸로 막기 */
-}
-
-/* 카드 내부 레이아웃이 높이에 끌려 늘어나지 않게 */
-.choice-left .card.choiceCard .cardText{
-  flex: 0 0 auto;          /* ✅ choice에서는 남는 높이 채우지 않게 */
-  -webkit-line-clamp: 6;   /* 필요하면 손패랑 동일하게 */
-  line-clamp: 6;
-}
-
-/* 기존에 어딘가에 이런 게 있으면(특히 문제 유발) 지우거나 choice에서만 무력화
-   .choiceCard{ transform: scale(0.92); }  -> 위에서 transform:none으로 덮음
-*/
-:root{ --stageDrop: 24px; }
-
-.stage{
-  margin-top: var(--stageDrop);
-}
-
-/* =========================
-   FINAL TUNING: 전장/손패 세로 압축 + 가로 여유
-   ========================= */
-:root{
-  /* 손패 도크 자체 높이 ↓ */
-  --dockH: 190px;
-
-  /* 슬롯(전장) 카드/칸 스케일 */
-  --slotW: 200px;   /* 가로는 조금 넓게 */
-  --slotH: 210px;   /* 세로는 더 짧게 (기존 252px) */
-
-  /* 손패 카드 크기 ↓ */
-  --handCardW: 120px;
-  --handCardH: 160px;
-
-  /* 전장 패널 가로 여유 */
-  --stageMaxW: 920px; /* 기존 760 근처였음 */
-}
-
-/* ===== 전장 패널 가로 폭 넓히기 ===== */
-.stageInner{
-  max-width: var(--stageMaxW);
-}
-
-/* ===== 슬롯 그리드: 가로 넓히고 세로 압축 ===== */
-.grid6{
-  grid-template-columns: repeat(3, var(--slotW));
-  gap: 8px;
-}
-
-.slot{
-  height: var(--slotH);
-  aspect-ratio: auto;   /* 고정 높이 우선 */
-  padding: 8px;
-}
-
-/* 슬롯 라벨 영역 조금 줄여서 실제 카드 공간 확보 */
-.card.inSlot{
-  inset: 22px 8px 8px 8px;  /* (기존 28px/10px) */
-  padding: 7px;
-}
-
-/* 전장 카드 텍스트는 더 짧게 보여주기(세로 절약) */
-.card.inSlot .cardText{
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-}
-.card.inSlot .cardSection{ margin-top: 5px; }
-.card.inSlot .cardSectionTitle{ font-size: 10px; }
-
-/* ===== 손패 도크: 높이/카드 크기 줄이기 ===== */
-.handDock{
-  height: var(--dockH);
-}
-
-.handDock .card{
-  width: var(--handCardW);
-  height: var(--handCardH);
-}
-
-/* 단계 버튼 줄도 약간 컴팩트하게(세로 절약) */
-.stepBtn{
-  padding: 8px 10px;
-  font-size: 13px;
-}
-
-/* ===== 메인 패널: 도크만큼 여유 공간 재계산 ===== */
-.mainPanel{
-  padding-bottom: calc(var(--dockH) + 16px);
-}
-.mainRow{
-  height: calc(100vh - var(--topHudH, 112px) - var(--dockH) - var(--uiGap, 16px));
-}
-/* 슬롯 크기/비율 유지 + 가로 간격만 더 벌리기 */
-:root{
-  --slotGapX: 22px; /* ← 가로 간격(추천 14~28px) */
-  --slotGapY: 6px;  /* ← 세로 간격(기존 유지) */
-}
-
-.grid6{
-  /* 기존 gap 대신 가로/세로 분리 */
-  row-gap: var(--slotGapY);
-  column-gap: var(--slotGapX);
-}
-/* ✅ 전장 슬롯 비율(5:7) + 크기 복구 */
-:root{
-  --slotW: 180px; /* 예전 느낌(기본 180) */
-  --slotGapX: 22px;
-  --slotGapY: 6px;
-}
-
-.grid6{
-  grid-template-columns: repeat(3, var(--slotW)); /* 폭만 기준(예전 180) */
-  column-gap: var(--slotGapX);
-  row-gap: var(--slotGapY);
-  justify-content: center;
-}
-
-.slot{
-  /* 🔥 고정 높이로 찌그러뜨리는 것 제거 */
-  height: auto !important;
-  aspect-ratio: 5 / 7 !important;
-
-  /* 폭은 그리드 컬럼을 따라가게 */
-  width: 100%;
-
-  padding: 10px;          /* 원래대로 */
-  box-sizing: border-box;
-}
-/* ===== 최종 오버라이드: 손패 조금 올리기 + 전장(회색패널) 폭 살짝 줄이기 ===== */
-
-/* 1) 손패 도크: 높이 줄여서 "조금" 위로 올리기 */
-:root{
-  --dockH: 210px;          /* 기존 240px → 200~220 사이에서 취향 */
-}
-
-/* handDock 자체도 실제로 얇아지게 */
-.handDock{
-  height: var(--dockH);
-  padding-top: 6px;        /* 위 여백 약간 줄임 */
-  padding-bottom: 10px;
-}
-
-/* mainRow 높이 계산에서 도크 높이를 쓰는 버전이라면(지금 쓰고 계심) */
-.mainRow{
-  height: calc(100vh - var(--topHudH, 112px) - var(--dockH) - var(--uiGap, 16px));
-}
-
-
-/* 2) 전장(회색 패널) 가로 폭 살짝 줄이기: 로그 스크롤 안 가리게 */
-.stageInner{
-  max-width: 700px;        /* 기존 760px → 680~720 추천 */
-}
-
-/* 3) (만약 로그패널이 absolute였던 흔적이 남아 있으면) 로그 스크롤 보호용 */
-.logPanel{
-  position: static;        /* absolute면 스크롤바/겹침 문제 자주 남 */
-  width: 340px;            /* 360 → 320~350 사이 */
-}
-/* =========================
-   FIX 1) 전장 중앙 정렬 복구 (로그 있어도 화면 정중앙)
-   FIX 2) 슬롯/손패 카드 크기 밸런스 조정
-   ========================= */
-
-:root{
-  /* 로그 폭(원하시면 320~360) */
-  --logW: 340px;
-
-  /* 전장 패널 최대 폭(이 값이 줄어도 중앙은 유지됨) */
-  --stageMaxW: 700px;
-
-  /* 슬롯 크기(카드 대비 너무 크면 여기부터 줄이세요) */
-  --slotW: 160px;      /* 기존 180 → 150~170 추천 */
-  --slotGapX: 18px;
-  --slotGapY: 8px;
-
-  /* 손패 카드 크기 */
-  --handCardW: 120px;  /* 기존 132 → 112~124 추천 */
-  --handCardH: 162px;
-}
-
-/* ✅ mainRow를 grid로: "전장"이 항상 화면 정중앙 */
-.mainRow{
-  display: grid !important;
-  grid-template-columns: 1fr minmax(0, var(--stageMaxW)) var(--logW) !important;
-  column-gap: 14px;
-  align-items: stretch;
   position: relative;
+  height: calc(100vh - var(--hudH) - var(--dockH));
+  padding:
+    8px
+    calc(var(--logW) + var(--logGap) + var(--edgePad))
+    12px
+    calc(var(--playerW) + var(--logGap) + var(--edgePad));
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
-/* stage/stageInner는 가운데 칼럼을 꽉 채우기만 하면 됨 */
-.stage{ width: 100%; }
+/* stage는 중앙 컨테이너만 가운데 정렬 */
+.stage{
+  height: 100%;
+  display: flex;
+  justify-content: center; /* ✅ 전장 정중앙 */
+  align-items: stretch;
+}
 .stageInner{
-  width: 100% !important;
-  max-width: none !important;
-  margin: 0 !important;
+  width: min(var(--stageMaxW), 100%);
+  height: 100%;
+  margin: 0;
+  display: flex;
 }
 
-/* logPanel은 오른쪽 칼럼 고정 */
-.logPanel{
-  width: var(--logW) !important;
-  position: static !important;
+/* 전장 패널은 내부 스크롤 */
+.mainPanel{
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  margin: 0;
+  padding-bottom: 16px; /* 도크는 fixed라 mainRow가 이미 공간을 뺌 */
 }
 
-/* ===== 슬롯 크기/간격 (비율 유지) ===== */
-.grid6{
-  grid-template-columns: repeat(3, var(--slotW)) !important;
-  column-gap: var(--slotGapX) !important;
-  row-gap: var(--slotGapY) !important;
-  justify-content: center;
+/* 손패 도크는 그대로 fixed 유지 */
+.handDock{
+  height: var(--dockH);
 }
-.slot{
+
+/* =========================
+   MOBILE LAYOUT ONLY
+   - desktop은 원본 유지
+   ========================= */
+@media (max-width: 900px){
+  :root{
+    --edgePad: 10px;
+    --logW: auto;
+    --dockH: 180px; /* 모바일에서 손패 조금 얇게 */
+  }
+
+  /* 전체는 스크롤 금지 유지, 내부만 스크롤 */
+  body{ overflow: hidden; }
+
+  /* ===== 상단 HUD: 1열로 ===== */
+  .topHud{
+    height: auto;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 10px var(--edgePad) 6px var(--edgePad);
+    overflow: visible;
+  }
+
+  /* 적 UI는 전체폭 */
+  .enemyHudCenter{
+    grid-column: auto;
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+  }
+
+  /* 우상단 버튼(새로운 런/룰북)은 HUD 안 오른쪽 정렬 */
+  .topHudRight{
+    grid-column: auto;
+    justify-self: end;
+    position: sticky;
+    top: 8px;
+    z-index: 50;
+  }
+
+  /* ===== 플레이어 UI: fixed 해제, 전장 위에 배치 ===== */
+  .playerHudLeft{
+    position: static !important;
+    transform: none !important;
+    width: 100% !important;
+    z-index: auto !important;
+    margin: 6px var(--edgePad) 0 var(--edgePad);
+  }
+
+  /* HP바 등 가로 꽉 */
+  .statBar{ min-width: 0; width: 100%; }
+  .barOuter{ width: 100%; }
+
+  /* ===== 메인 영역: 좌우 패딩 제거하고 1열 ===== */
+  .mainRow{
+    height: calc(100vh - var(--dockH) - 12px);
+    padding: 0 var(--edgePad) 0 var(--edgePad) !important;
+  }
+
+  .stage{
+    justify-content: stretch;
+  }
+
+  .stageInner{
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+  }
+
+  /* 전장 패널은 내부 스크롤 허용(여기가 메인 스크롤) */
+  .mainPanel{
+    overflow: auto !important;
+    height: 100% !important;
+    padding-bottom: calc(var(--dockH) + 16px) !important; /* 손패 도크에 안 가리게 */
+  }
+
+  /* ===== 로그: fixed 해제해서 전장 아래로 ===== */
+  .logPanel{
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    margin-top: 10px;
+  }
+  .logPanel .log{
+    max-height: 28vh; /* 너무 길면 여기만 스크롤 */
+  }
+
+  /* ===== 슬롯: 모바일에서는 2열(너무 좁으면 1열) ===== */
+  .grid6{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 10px;
+    row-gap: 10px;
+  }
+}
+
+@media (max-width: 520px){
+  /* 더 작은 폰에서는 1열 */
+  .grid6{
+    grid-template-columns: 1fr;
+  }
+}
+:root{
+  --handCardW: 132px;
+  --handCardH: 178px;
+  --handCardAR: calc(132 / 178);
+}
+
+/* 보상/선택 오버레이에서 '왼쪽 프리뷰 카드'를 손패 카드와 동일 규격으로 */
+.choice-left .card,
+.reward-left .card,
+.preview-left .card,
+.choiceCard{
+  width: var(--handCardW) !important;
+  aspect-ratio: var(--handCardAR) !important;
   height: auto !important;
-  aspect-ratio: 5 / 7 !important;
+  transform: none !important; /* 예전 scale 남아있으면 제거 */
 }
 
-/* ===== 손패 카드 크기 ===== */
-.handDock .card{
+/* 내부 레이아웃이 늘어나며 찌그러지지 않게 */
+.choice-left .card,
+.reward-left .card,
+.preview-left .card,
+.choiceCard{
+  display: flex;
+  flex-direction: column;
+}
+/* 오버레이 영역 글꼴/자간/렌더링을 카드 느낌으로 */
+.overlay,
+.choiceOverlay,
+.rewardOverlay,
+.modal{
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", Arial;
+  letter-spacing: -0.2px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+/* 오버레이 제목/설명 약간 세련되게 */
+.overlay h2,
+.choiceOverlay h2,
+.rewardOverlay h2,
+.modal h2{
+  font-weight: 800;
+  letter-spacing: -0.4px;
+}
+
+.overlay p,
+.choiceOverlay p,
+.rewardOverlay p,
+.modal p{
+  color: rgba(231,233,238,.88);
+}
+/* ✅ 손패 영역 고정(한 줄) */
+.hand {
+  height: calc(var(--handCardH) + 12px); /* 카드 높이 + 여백 */
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 6px;
+}
+.handCardsRow {
+  display: flex;
+  flex-wrap: nowrap;    /* ✅ 한 줄 고정 */
+  gap: 10px;
+  align-items: flex-end;
+  min-width: max-content;
+}
+.handDock { z-index: 700; overflow: hidden; }
+.logPanel { z-index: 900; }
+.dragCardPreview { z-index: 1200; }
+.handCardsRow { flex-wrap: nowrap; }
+.hand { height: calc(var(--handCardH) + 12px); }
+
+/* ✅ 로그를 중앙쯤에서 끝내기 */
+.logPanel{
+  position: fixed;
+  top: calc(var(--hudH) + 8px);
+  right: var(--edgePad);
+
+  bottom: auto !important;                 /* ✅ 기존 bottom 무력화 */
+  height: min(46vh, 420px);                /* ✅ 원하는 크기: vh+픽셀 중 작은 값 */
+  width: var(--logW);
+
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 900px){
+  /* 플레이어/적 카드 세로 압축 */
+  .enemyChip{
+    padding: 10px 10px;
+    border-radius: 14px;
+  }
+  .enemyChipTop{ margin-bottom: 2px; }
+  .enemyBadges{
+    min-height: 0;
+    gap: 4px;
+  }
+  .enemyIntent{
+    margin-top: 6px;
+    font-size: 12px;
+  }
+
+  /* 플레이어 HUD도 압축 */
+  .playerHudLeft{
+    margin: 6px var(--edgePad) 0 var(--edgePad);
+  }
+  .statBarTop{ font-size: 11px; }
+  .barOuter{ height: 7px; }
+  .playerStatsRow{ gap: 6px; margin-top: 6px; }
+  .chip{ padding: 6px 9px; font-size: 11px; }
+}
+
+@media (max-width: 900px){
+  :root{
+    --slotW: 108px;     /* ✅ 모바일 슬롯 폭 */
+    --slotGapX: 10px;
+    --slotGapY: 8px;
+  }
+
+  /* ✅ 전열/후열은 3칸 유지 */
+  .grid6{
+    grid-template-columns: repeat(3, var(--slotW)) !important;
+    justify-content: center;
+  }
+
+  .slot{
+    padding: 8px;
+    border-radius: 14px;
+  }
+
+  /* 슬롯 내부 카드 텍스트 더 줄이기 */
+  .card.inSlot{
+    inset: 22px 8px 8px 8px;
+    padding: 6px;
+  }
+  .card.inSlot .cardText{
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 900px){
+  .hudCollapsed .playerBars,
+  .hudCollapsed .enemyBadges{
+    display: none;
+  }
+  .hudCollapsed .enemyChip{
+    padding: 8px 10px;
+  }
+  .hudCollapsed .enemyIntent{
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (max-width: 900px){
+  .mainPanel{
+    padding-bottom: calc(var(--dockH) + 24px) !important;
+  }
+}
+/* ✅ 모바일 적 스트립: 가로 스크롤 */
+.enemyStrip{
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 2px;
+  scroll-snap-type: x mandatory;
+}
+.enemyStrip .enemyChip{
+  flex: 0 0 auto;
+  width: 220px;           /* ✅ 모바일 폭 */
+  scroll-snap-align: start;
+}
+@media (max-width: 900px){
+  .enemyStrip .enemyChip{
+    width: 200px;
+    padding: 10px;
+  }
+  .enemyIntent{
+    font-size: 12px;
+  }
+  .enemyBadges{
+    min-height: 0;
+  }
+}
+@media (max-width: 900px){
+  .playerHudBox{
+    padding: 10px !important;
+  }
+}
+@media (max-width: 900px){
+  .mobilePlayerHeader{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:10px 12px;
+    border-radius:16px;
+  }
+
+  .mobileHpText{
+    font-weight:800;
+    font-size:14px;
+    white-space:nowrap;
+  }
+
+  .mobileTopBtns{
+    display:flex;
+    gap:8px;
+    flex-wrap:nowrap;
+  }
+
+  .mobileTopBtns button{
+    padding:8px 10px;
+    border-radius:999px;
+    font-size:13px;
+  }
+}
+@media (max-width: 900px){
+  .topHudRight{ display:none !important; }   /* ✅ 우상단 버튼 제거 */
+}
+@media (max-width: 900px){
+  :root{
+    --handCardW: 148px;   /* ✅ 더 크게 */
+    --handCardH: 210px;
+    --dockH: 250px;       /* ✅ 도크 높이 늘리기 */
+  }
+
+  .handDock .card{ width: var(--handCardW) !important; height: var(--handCardH) !important; }
+  .handCardsRow{ gap: 12px; }
+
+  .handDock .card .cardText{
+    font-size: 13px;
+    line-height: 1.35;
+    -webkit-line-clamp: 8;
+    line-clamp: 8;
+  }
+
+  .card.inSlot .cardText{
+    font-size: 12.5px;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+  }
+}
+@media (max-width: 900px){
+  #app{ display:flex; flex-direction:column; height:100vh; }
+
+  .topHud{ flex: 0 0 auto; }
+  .mainRow{ flex: 1 1 auto; height:auto !important; }  /* ✅ calc 제거 */
+  .handDock{ flex: 0 0 auto; }
+}
+@media (max-width: 900px){
+  .topRightControls { display:none !important; } /* battleTitleRow 쪽 컨트롤이라면 */
+}
+@media (max-width: 900px){
+  .mobileChipsRow{
+    display:flex;
+    gap:8px;
+    overflow-x:auto;
+    padding: 8px 2px 2px 2px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .mobileChipsRow::-webkit-scrollbar{ display:none; }
+  .mobileChipsRow .chip{ flex:0 0 auto; }
+}
+@media (max-width: 900px){
+  .card{
+    background: rgba(15,18,22,.92) !important;
+    border-color: rgba(255,255,255,.14) !important;
+  }
+  .cardText{
+    opacity: 1 !important;
+    -webkit-line-clamp: 8;
+    line-clamp: 8;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+}
+@media (max-width: 900px){
+  :root{ --dockH: 150px; } /* 180 -> 150 같은 식 */
+  .handDock{ padding-bottom: 6px; }
+}
+@media (max-width: 900px){
+  /* ✅ 모바일 손패 카드: 카드 크기/패딩/글자 전용 */
+  :root{
+    --handCardW: 118px;   /* 필요하면 110~130 사이로 */
+    --handCardH: 156px;
+  }
+
+  .handDock .card{
+    width: var(--handCardW) !important;
+    height: var(--handCardH) !important;
+    padding: 8px 8px 6px 8px !important;
+    border-radius: 14px;
+  }
+
+  .handDock .cardTitle{
+    font-size: 12px !important;
+    margin-bottom: 4px !important;
+  }
+
+  .handDock .badge{
+    font-size: 10px !important;
+    padding: 2px 6px !important;
+    height: 16px !important;
+    line-height: 16px !important;
+  }
+
+  .handDock .cardSectionTitle{
+    font-size: 10px !important;
+    margin-bottom: 2px !important;
+    opacity: .8;
+  }
+
+  .handDock .cardText{
+    font-size: 11px !important;
+    line-height: 1.15 !important;
+    -webkit-line-clamp: 7 !important; /* ✅ 텍스트 더 보여주기 */
+    line-clamp: 7 !important;
+  }
+
+  /* ✅ 슬롯(전열/후열) 카드도 같이 축소 */
+  .slot .card.inSlot{
+    padding: 6px !important;
+  }
+  .slot .card.inSlot .cardTitle{
+    font-size: 12px !important;
+    margin-bottom: 3px !important;
+  }
+  .slot .card.inSlot .cardText{
+    font-size: 11px !important;
+    line-height: 1.12 !important;
+    -webkit-line-clamp: 4 !important;
+    line-clamp: 4 !important;
+  }
+}
+@media (max-width: 900px){
+  .topHud{ overflow: visible !important; }
+  .enemyHudCenter{ overflow: visible !important; }
+}
+/* 전체 높이: 100vh 말고 100dvh */
+#app, body {
+  height: 100dvh;
+}
+
+/* 하단 도크가 홈 인디케이터에 안 먹히게 */
+.handDock {
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+}
+.mobileTopLine{
+  display:flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.mobileStatusLine{
+  display:flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  opacity: .85;      /* “살짝” 느낌 */
+  transform: scale(.96);
+  transform-origin: left top;
+}
+@media (max-width: 520px){
+  .chip{
+    font-size: 12px;     /* 폰트는 1~2px만 */
+    padding: 4px 8px;    /* ✅ 이게 핵심 */
+    border-radius: 999px;
+    line-height: 1.1;    /* ✅ 높이 줄이기 */
+  }
+}
+.mobileStatusLine{
+  display:flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity:.85;
+  margin-top: 4px;
+}
+.mobileStatusLine .badge{
+  font-size: 11px;
+  padding: 3px 7px;
+  line-height: 1.1;
+}
+@media (max-width: 520px){
+  .enemyChip{
+    padding: 10px;          /* 기존보다 줄이기 */
+    border-radius: 16px;
+  }
+  .enemyIntent{ font-size: 12px; }
+  .enemyBadges .badge{ font-size: 11px; padding: 3px 7px; }
+}
+@media (max-width: 520px){
+  .enemyStrip{
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 10px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+  .enemyStrip::-webkit-scrollbar{ display:none; }
+
+  .enemyStrip .enemyChip{
+    flex: 0 0 auto;
+    min-width: 320px; /* ✅ 길게 */
+  }
+
+  .enemyIntent{
+    white-space: nowrap;   /* ✅ 의도 한 줄 */
+    overflow: visible;     /* ✅ 잘리지 않게 */
+    text-overflow: clip;
+  }
+}
+
+@media (max-width: 520px){
+  .enemyStrip .enemyChip{ overflow: visible; }
+}
+.zoomedCard{
+  transform: scale(1.05);
+  transform-origin: center;
+}
+@media (max-width: 520px){
+  .handDock{
+    bottom: calc(env(safe-area-inset-bottom) + 64px); /* ✅ 이 값으로 “올리는 정도” 조절 */
+  }
+}
+html, body, #app{
+  height: 100dvh;
+}
+.handDock{
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+}
+@media (max-width: 520px){
+  .handDock{
+    height: auto;
+    max-height: none;           /* ✅ 도크 자체 제한 해제 */
+    overflow: visible;          /* ✅ 바깥은 자르지 않기 */
+  }
+
+  .hand{
+    max-height: none;           /* ✅ hand 영역 제한 해제 */
+    overflow: visible;
+  }
+
+  /* 카드 줄(가로 스크롤 줄)은 스크롤만 담당 */
+  .handCardsRow{
+    overflow-x: auto;
+    overflow-y: visible;        /* ✅ 세로로 자르지 않기 */
+    -webkit-overflow-scrolling: touch;
+  }
+}
+@media (max-width: 520px){
+  .handDock{ max-height:none; height:auto; overflow:visible; }
+  .hand{ max-height:none; overflow:visible; }
+  .handCardsRow{ overflow-x:auto; overflow-y:visible; }
+}
+:root{
+  --dock-lift: 0px; /* ✅ 기본 0, 필요하면 12px/18px 정도로만 */
+}
+
+@media (max-width: 520px){
+  .handDock{
+    bottom: calc(env(safe-area-inset-bottom) + var(--dock-lift));
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+@media (max-width: 520px){
+  .hand{
+    overflow: hidden;          /* ✅ 바깥은 잘라주고 */
+  }
+
+  .handCardsRow{
+    display: flex;
+    flex-wrap: nowrap;         /* ✅ 줄바꿈 금지 */
+    gap: 10px;
+    overflow-x: auto;          /* ✅ 가로 스크롤 */
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 12px 8px 12px;
+    touch-action: pan-x;       /* ✅ iOS에서 스와이프 스크롤 잘 되게 */
+  }
+
+  .handCardsRow > .card{
+    flex: 0 0 auto;            /* ✅ 카드가 줄어들지 않게(스크롤 유도) */
+  }
+}
+
+/* 손패 가로 스크롤 강제 (모바일 포함) */
+.hand{
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+}
+
+.handCardsRow{
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  gap: 10px;
+  align-items: flex-end;
+  min-width: max-content !important;
+}
+
+.handCardsRow > .card{
+  flex: 0 0 auto !important;
+}
+.hand{
+  overscroll-behavior-x: contain;
+}
+.cardPeekOverlay{ touch-action: manipulation; }
+.cardPeekPanel .card{ width: 100% !important; }
+.cardPeekPanel .card{
   width: var(--handCardW) !important;
   height: var(--handCardH) !important;
 }
-
-/* (선택) 슬롯 안 카드의 여백이 너무 커 보이면 살짝 타이트하게 */
-.card.inSlot{
-  inset: 26px 10px 10px 10px; /* 라벨 영역 조금만 */
-  padding: 7px;
-}
-.card.inSlot .cardText{
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-}
-:root{
-  --logW: 340px;
-  --stageMaxW: 700px;
-  --rowGap: 14px;
-}
-
-/* ✅ mainRow: (전장 + 로그) 묶음을 통째로 가운데 */
-.mainRow{
-  display:flex !important;
-  justify-content:center !important;
-  align-items:stretch !important;
-  gap: var(--rowGap) !important;
-
-  /* 기존 position:relative/absolute 쓰던 흔적 무력화 */
-  position: relative !important;
-}
-
-/* ✅ 전장: 폭 제한 + 가운데 묶음의 왼쪽 구성원 */
-.stage{
-  flex: 0 1 var(--stageMaxW) !important;  /* 줄어들 수는 있지만 기본은 stageMaxW */
-  min-width: 0 !important;
-}
-.stageInner{
-  max-width: none !important;
-  width: 100% !important;
-  margin: 0 !important;
-}
-
-/* ✅ 로그: 오른쪽 구성원(고정 폭), absolute 해제 */
-.logPanel{
-  flex: 0 0 var(--logW) !important;
-  width: var(--logW) !important;
-
-  position: static !important;
-  top: auto !important;
-  right: auto !important;
-  bottom: auto !important;
-}
-:root{
-  --logW: 360px;     /* 로그 패널 폭 */
-  --logGap: 14px;    /* 전장과 로그 사이 여백(체감) */
-  --edgePad: 14px;   /* 화면 좌우 패딩 */
-}
-
-/* ✅ 전장은 화면 기준 중앙, 로그는 오른쪽에 “떠있기” */
-.mainRow{
-  position: relative !important;
-  display: block !important;      /* stage를 가운데 두기 쉽게 */
-  padding: 4px var(--edgePad) 12px var(--edgePad) !important;
-  overflow: hidden !important;
-}
-
-/* ✅ 전장 영역은 100% 폭을 쓰고, 내부 컨테이너만 중앙 정렬 */
-.stage{
-  width: 100% !important;
-  min-width: 0 !important;
-}
-.stageInner{
-  margin: 0 auto !important;      /* ← 이게 “2번 슬롯 중앙=화면 중앙”의 핵심 */
-  width: 100% !important;
-
-  /* ✅ 로그가 있는 만큼만 ‘최대 폭’을 깎아서 겹침 방지 (중앙정렬은 유지됨) */
-  max-width: min(760px, calc(100vw - (var(--logW) + var(--logGap) + var(--edgePad)*2))) !important;
-}
-
-/* ✅ 로그는 레이아웃 흐름에서 제외(전장 정렬에 영향 X) */
-.logPanel{
-  position: absolute !important;
-  top: 12px !important;
-  right: var(--edgePad) !important;
-  bottom: 12px !important;
-
-  width: var(--logW) !important;
-  z-index: 50 !important;
-}
-
-/* 로그 내용 스크롤은 그대로 */
-.logPanel .log{
-  height: 100%;
-}
-.enemyHudCenter{
-  max-height: 140px;   /* 92 → 140 (취향대로 120~160) */
-  overflow: hidden;    /* HUD 자체는 안 밀고, 넘치면 자름 유지 */
-}
-/* ✅ HUD 아래-전장 위 간격 줄이기(최종) */
-.topHud{
-  padding-bottom: 0 !important;
-  margin-bottom: 0 !important;
-}
-
-/* mainRow 자체 위 여백 제거 */
-.mainRow{
-  margin-top: 0 !important;
-  padding-top: 0px !important; /* 0~6px 취향 */
-}
-
-/* 회색 전장 패널을 아래로 밀던 값 제거 */
-.mainPanel{
-  margin-top: 0 !important;   /* 기존 30px 죽이기 */
-}
-:root{
-  --hudH: 140px;  /* ✅ TopHUD 고정 높이: 여기만 조절 */
-}
-
-/* TopHUD는 절대 커지지 않게 “고정 높이” */
-.topHud{
-  height: var(--hudH) !important;
-  min-height: var(--hudH) !important;
-  max-height: var(--hudH) !important;
-
-  overflow: hidden;           /* ✅ 뱃지 늘어나도 아래로 밀지 않음 */
-  align-items: stretch;
-}
-
-/* 가운데 적 영역: HUD 안에서만 스크롤/잘림 처리 */
-.enemyHudCenter{
-  height: 100%;
-  max-height: 100% !important;
-  overflow: auto;             /* ✅ 적이 많거나 뱃지가 많아지면 여기서만 스크롤 */
-}
-
-/* 적 카드 컨테이너도 HUD 안에서만 */
-.enemyHud{
-  max-height: 100%;
-  overflow: hidden;           /* wrap을 쓰고 싶으면 아래에서 변경 */
-}
-
-/* 뱃지가 너무 길어질 때 “줄바꿈 대신 높이 폭증” 방지용(선택) */
-.enemyBadges{
-  max-height: 40px;           /* 1~2줄 정도 */
-  overflow: hidden;           /* 더 많으면 숨김(또는 auto로 바꿔도 됨) */
-}
-/* ✅ HUD-전장 간격 ‘0~2px’로 바짝 붙이기(최종) */
-.topHud{
-  padding-bottom: 0 !important;
-  margin-bottom: 0 !important;
-}
-
-/* mainRow가 위로 올라오게 */
-.mainRow{
-  margin-top: 0 !important;
-  padding-top: 0 !important;      /* 여기서 간격 생기면 밀림 */
-}
-
-/* 회색 패널(전장) 자체가 아래로 내려가던 값 제거 */
-.mainPanel{
-  margin-top: 0 !important;       /* 이전에 30px 줬던 거 kill */
-  padding-top: 10px !important;   /* 전장 제목 숨 막히면 8~12px */
-}
-
-/* battleTitleRow가 위에서 자체 여백 만들면 이것도 */
-.battleTitleRow{
-  margin-top: 0 !important;
-  padding-top: 0 !important;
-}
-.battleTitleRow h2{
-  margin-top: 0 !important;
-}
-/* ✅ Top HUD ↔ 전장(mainRow) 간격 제거 */
-.topHud{
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
-/* ✅ mainRow 위쪽 여백 제거 */
-.mainRow{
-  margin-top: 0 !important;     /* stageDrop 같은 거 무시 */
-  padding-top: 0 !important;    /* 4px 있던 거 제거 */
-}
-
-/* ✅ 혹시 stageDrop 변수를 쓰고 있으면 확실히 0 */
-:root{ --stageDrop: 0px; }

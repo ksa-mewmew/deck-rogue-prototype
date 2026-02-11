@@ -1,11 +1,14 @@
 import type { GameState } from "../engine/types";
 import { shuffle, logMsg, pickOne } from "../engine/rules";
 import { getCardDefFor } from "./cards";
+import { currentTotalDeckLikeSize } from "../engine/combat";
 
 export function obtainTreasure(g: GameState) {
   if (g.run.treasureObtained) return;
 
   g.run.treasureObtained = true;
+  g.run.afterTreasureNodePicks = 0;
+  g.run.deckSizeAtTreasure = currentTotalDeckLikeSize(g);
 
   const id = newUid(g);
   g.cards[id] = { uid: id, defId: "goal_treasure", zone: "deck", upgrade: 0 };

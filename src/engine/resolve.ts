@@ -1,4 +1,4 @@
-import type { GameState, Side, PlayerEffect, EnemyState } from "./types";
+import type { GameState, Side, PlayerEffect, EnemyState, } from "./types";
 import { aliveEnemies, logMsg, applyStatusTo, pickOne } from "./rules";
 import { addBlock, addFatigue, addSupplies, applyDamageToEnemy, healPlayer } from "./effects";
 import { drawCards } from "./combat";
@@ -10,22 +10,38 @@ export type ResolveCtx = {
   cardUid: string;
 };
 
-function enqueueTargetSelectDamage(g: GameState, amount: number) {
-  const req = { kind: "damageSelect" as const, amount };
+function enqueueTargetSelectDamage(ctx: ResolveCtx, amount: number) {
+  const g = ctx.game;
+  const req = {
+    kind: "damageSelect" as const,
+    amount,
+    sourceCardUid: ctx.cardUid,
+    reason: ctx.side === "front" ? "FRONT" : "BACK",
+  } as const;
+
   if (g.pendingTarget == null) g.pendingTarget = req;
   else g.pendingTargetQueue.push(req);
 
   const remaining = (g.pendingTarget ? 1 : 0) + g.pendingTargetQueue.length;
-  logMsg(g, `대상 선택 필요: 적을 클릭하세요. (남은 선택 ${remaining})`);
+  logMsg(g, `대상 선택 필요: 적을 클릭하세요.`);
 }
 
-function enqueueTargetSelectStatus(g: GameState, key: "vuln" | "weak" | "bleed" | "disrupt", n: number) {
-  const req = { kind: "statusSelect" as const, key, n };
+
+function enqueueTargetSelectStatus(ctx: ResolveCtx, key: "vuln" | "weak" | "bleed" | "disrupt", n: number) {
+  const g = ctx.game;
+  const req = {
+    kind: "statusSelect" as const,
+    key,
+    n,
+    sourceCardUid: ctx.cardUid,
+    reason: ctx.side === "front" ? "FRONT" : "BACK",
+  } as const;
+
   if (g.pendingTarget == null) g.pendingTarget = req;
   else g.pendingTargetQueue.push(req);
 
   const remaining = (g.pendingTarget ? 1 : 0) + g.pendingTargetQueue.length;
-  logMsg(g, `대상 선택 필요: 적을 클릭하세요. (남은 선택 ${remaining})`);
+  logMsg(g, `대상 선택 필요: 적을 클릭하세요.`);
 }
 
 function enemyWillAttackThisTurn(g: GameState, en: EnemyState): boolean {
@@ -92,7 +108,7 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
         } else if (e.target === "all") {
           for (const en of aliveEnemies(g)) applyDamageToEnemy(g, en, e.n);
         } else {
-          enqueueTargetSelectDamage(g, e.n);
+          enqueueTargetSelectDamage(ctx, e.n);
         }
         break;
 
@@ -129,8 +145,7 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
 
         if (e.target === "select") {
           if (amount <= 0) break;
-          g.pendingTargetQueue.push({ kind: "damageSelect", amount });
-          g.pendingTarget = g.pendingTarget ?? g.pendingTargetQueue.shift() ?? null;
+          enqueueTargetSelectDamage(ctx, amount);
           break;
         }
 
@@ -157,7 +172,7 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
           for (const en of alive) applyStatusTo(en, e.key, e.n);
           logMsg(g, `모든 적 상태: ${e.key} ${e.n >= 0 ? "+" : ""}${e.n}`);
         } else {
-          enqueueTargetSelectStatus(g, e.key, e.n);
+          enqueueTargetSelectStatus(ctx, e.key, e.n);
         }
         break;
 

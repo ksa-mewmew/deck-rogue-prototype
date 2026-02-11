@@ -49,7 +49,6 @@ export const CARDS: CardData[] = [
   {
     id: "maintenance",
     name: "정비 도구",
-    tags: ["EXHAUST"],
     exhaustWhen: "BACK",
     frontText: "방어 +3",
     backText: "F -1, 소모",
@@ -149,7 +148,6 @@ export const CARDS: CardData[] = [
   {
     id: "goal_treasure",
     name: "저주받은 보물",
-    tags: ["EXHAUST"],
     exhaustWhen: "BOTH",
     frontText: "F +1, 소모",
     backText: "S -1, F +1, 소모",
@@ -179,16 +177,17 @@ export const CARDS: CardData[] = [
   {
     id: "bandage",
     name: "붕대",
-    frontText: "HP +4",
-    backText: "HP +4, S -1",
+    exhaustWhen: "BOTH",
+    frontText: "HP +4, 소모",
+    backText: "HP +4, S -1, 소모",
     front: [{ op: "heal", n: 4 }],
     back: [{ op: "supplies", n: -1 }, { op: "heal", n: 4 }],
 
     upgrades: [
       {
-        frontText: "HP +4, 출혈 제거",
+        frontText: "HP +4, 출혈 제거, 소모",
         front: [{ op: "heal", n: 4 }, { op: "clearStatusSelf", key: "bleed" }],
-        backText: "HP +4, 출혈 제거, S -1",
+        backText: "HP +4, 출혈 제거, S -1, 소모",
         back: [{ op: "supplies", n: -1 }, { op: "heal", n: 4 }, { op: "clearStatusSelf", key: "bleed" }],
       },
     ]
@@ -197,7 +196,6 @@ export const CARDS: CardData[] = [
   {
     id: "arrow_rain",
     name: "화살의 비",
-    tags: ["EXHAUST"],
     exhaustWhen: "BOTH",
     frontText: "모든 적에게 10 피해, S -1, F +1, 소모",
     backText: "드로우 2, 손패 크기 +2, S +2, F +1, 소모",
@@ -225,7 +223,6 @@ export const CARDS: CardData[] = [
   {
     id: "smoke",
     name: "연막",
-    tags: ["EXHAUST"],
     exhaustWhen: "FRONT",
     frontText: "이번 턴 피해 무효, 소모",
     backText: "자신은 교란 당하지 않음",
@@ -263,7 +260,6 @@ export const CARDS: CardData[] = [
   {
     id: "secret_strike",
     name: "비장의 일격",
-    tags: ["EXHAUST"],
     exhaustWhen: "BOTH",
     frontText: "무작위 적에게 자신의 F의 3배 피해, 소모",
     backText: "모든 적에게 취약 +4 및 약화 +4, 소모",
@@ -275,7 +271,6 @@ export const CARDS: CardData[] = [
 
     upgrades: [
       {
-        tags: ["EXHAUST"],
         exhaustWhen: "FRONT",
         frontText: "선택한 적에게 자신의 F의 3배 피해, 소모",
         front: [{ op: "damageEnemyByPlayerFatigue", target: "select", mult: 3 }],
@@ -292,7 +287,6 @@ export const CARDS: CardData[] = [
   {
     id: "fire_scroll",
     name: "화염 두루마리",
-    tags: ["EXHAUST"],
     exhaustWhen: "BOTH",
     frontText: "방어 +7, 소모",
     backText: "모든 적에게 12 피해, 소모",
@@ -333,7 +327,6 @@ export const CARDS: CardData[] = [
   {
     id: "emergency_rations",
     name: "비상식량",
-    tags: ["VANISH"],
     vanishWhen: "BACK",
     frontText: "S +2",
     backText: "S를 10으로 만듦. 소실",
@@ -356,7 +349,6 @@ export const CARDS: CardData[] = [
   {
     id: "painkiller",
     name: "진통제",
-    tags: ["EXHAUST"],
     exhaustWhen: "BOTH",
     frontText: "HP -8, F -2, 소모",
     backText: "HP +10, F +2, 소모",
@@ -378,7 +370,6 @@ export const CARDS: CardData[] = [
   {
     id: "field_experience",
     name: "실전 경험",
-    tags: ["EXHAUST"],
     exhaustWhen: "BACK",
     frontText: "모든 적에게 3 피해",
     backText: "이 카드가 후열에 있는 턴에 승리하면 최대 체력 +2, 소모",

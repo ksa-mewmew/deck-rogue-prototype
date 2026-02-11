@@ -35,13 +35,27 @@ const RULEBOOK_TEXT = `# Deck Rogue Prototype — 룰북 (플레이어용)
 - 교란: 당신을 방해합니다. 무엇일까요?
 
 [5] 조작
+
+(컴퓨터)
 - 4: 선택 해제
 - Tab: 손패 선택 이동
-- 1~3: 전열 배치 / Shift+1~3: 후열 배치
+- 1~3: 전열 배치 / q,w,e: 후열 배치
 - 드래그: 손패→슬롯 배치, 슬롯↔슬롯 스왑, 슬롯→손패 회수
+- Space: 다음 턴
+- F: 새로운 런
+
+(모바일)
+- 손패: 클릭 시 선택, 길게 누를 시 확대
+- 카드 선택 상태에서 슬롯을 눌러 배치
+- 슬롯: 클릭 시 확대, 길게 누를 시 회수
+- 슬롯에 넣은 카드는 이름만 보입니다.
+
+[6] 당신을 위한 조언
+
+덱은 당신의 비품입니다. 비품이 적으면, 늘 새로 꾸리느라 힘들 겁니다. 비품이 많으면, 들고 다니기 힘들겠지요. 균형을 찾으세요.
 `;
 
-import type { GameState, PileKind, NodeOffer, Side } from "../engine/types";
+import type { GameState, PileKind, NodeOffer, Side, PendingTarget  } from "../engine/types";
 import {
   spawnEncounter,
   startCombat,
@@ -53,20 +67,314 @@ import {
   resolveEnemy,
   upkeepEndTurn,
   drawStepStartNextTurn,
+  isTargeting,
+  currentTotalDeckLikeSize,
+  escapeRequiredNodePicks,
 } from "../engine/combat";
 import { logMsg, rollBranchOffer, advanceBranchOffer } from "../engine/rules";
 import { createInitialState } from "../engine/state";
 
 import type { EventOutcome } from "../content/events";
-import { pickRandomEvent } from "../content/events";
-import { removeCardByUid, addCardToDeck, offerRewardPair, canUpgradeUid, upgradeCardByUid } from "../content/rewards";
+import { pickRandomEvent, getEventById } from "../content/events";
+import { removeCardByUid, addCardToDeck, offerRewardPair, canUpgradeUid, upgradeCardByUid, obtainTreasure } from "../content/rewards";
 import { getCardDefByIdWithUpgrade } from "../content/cards";
+
+import { saveGame, hasSave, loadGame, clearSave } from "../persist";
+
+let saveTimer: number | null = null;
+
+function scheduleSave(g: GameState) {
+  if (saveTimer != null) window.clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(() => {
+    saveTimer = null;
+    saveGame(g);
+  }, 250);
+}
+
+type ForcedNext = null | "BOSS";
+
+function ensureBossSchedule(g: GameState) {
+  const runAny = g.run as any;
+  if (runAny.nextBossTime == null) runAny.nextBossTime = 30; // 첫 보스 시간
+  if (runAny.forcedNext == null) runAny.forcedNext = null as ForcedNext;
+}
+
+function totalTime(g: GameState) {
+  return (g.run.nodePickCount ?? 0) + (g.time ?? 0);
+}
+
+function rollExtraTime01FromDeck(deckN: number) {
+  const BASE = 20;
+  const DIV = 3;
+  const CAP = 85;
+  const x = Math.max(0, deckN - BASE);
+  const pPct = Math.min(CAP, Math.floor((x * x) / DIV));
+  const extra = Math.random() * 100 < pPct ? 1 : 0;
+  return { extra, pPct };
+}
+
+function hydrateLoadedState(loaded: any, content: any) {
+  const g = loaded as any;
+
+  g.content = content;
+
+  g.time ??= 0;
+
+  g.run ??= {};
+  g.run.nextBossTime ??= 30;
+  g.run.forcedNext ??= null;
+  g.run.bossOmenText ??= null;
+  g.run.enemyLastSeenBattle ??= {};
+  g.run.nodePickByType ??= { BATTLE: 0, REST: 0, EVENT: 0, TREASURE: 0 };
+  g.run.bossPool ??= ["boss_gravity_master","boss_cursed_wall", "boss_giant_orc", "boss_soul_stealer"];
+  g.run.nextBossId ??= null;
+
+  g.run.afterTreasureNodePicks ??= 0;
+  (g.run as any).deckSizeAtTreasure ??= null;
+
+  if (g.run.treasureObtained && g.run.deckSizeAtTreasure == null) {
+    g.run.deckSizeAtTreasure = currentTotalDeckLikeSize(g);
+  }
+
+  g.choiceStack ??= [];
+  g.pendingTargetQueue ??= [];
+  g.exhausted ??= [];
+  g.vanished ??= [];
+
+  return g;
+}
+
+export function createOrLoadGame(content: any) {
+  if (!hasSave()) return createInitialState(content);
+
+  const loaded = loadGame();
+  if (!loaded) return createInitialState(content);
+
+  return hydrateLoadedState(loaded.state, content);
+}
+
+
+
+
+
 
 let lastMainPanelScrollTop = 0;
 let lastMainPanelScrollLeft = 0;
 let currentG: GameState | null = null;
 
+// 모바일 카드 확대
+
+let pressTimer: number | null = null;
+let pressStartX = 0;
+let pressStartY = 0;
+let pressedUid: string | null = null;
+let cardZoomOpen = false;
+
+function openCardZoom(g: GameState, uid: string) {
+  closeCardZoom();
+
+  const layer = div("cardZoomLayer");
+  layer.style.cssText = `
+    position:fixed; inset:0; z-index:7000;
+    background: rgba(0,0,0,.55);
+    backdrop-filter: blur(6px);
+    display:flex; align-items:center; justify-content:center;
+    padding: 14px;
+  `;
+
+  const panel = div("cardZoomPanel");
+  panel.style.cssText = `
+    width: min(420px, 92vw);
+    max-height: 82vh;
+    overflow: auto;
+  `;
+
+  const big = renderCardPreviewByUid(g, uid);
+  big.classList.add("zoomedCard");
+  panel.appendChild(big);
+
+  layer.onclick = () => closeCardZoom();
+  panel.onclick = (e) => e.stopPropagation();
+
+  layer.appendChild(panel);
+  document.body.appendChild(layer);
+  cardZoomOpen = true;
+}
+
+function closeCardZoom() {
+  document.querySelector(".cardZoomLayer")?.remove();
+  cardZoomOpen = false;
+}
+
+function renderCardInSlotCompact(g: GameState, uid: string) {
+  const c = g.cards[uid];
+  const def = getCardDefByIdWithUpgrade(g.content, c.defId, c.upgrade ?? 0);
+
+  const d = div("card");
+  d.classList.add("inSlot");
+  d.appendChild(divText("cardTitle", displayNameForUid(g, uid)));
+
+  const meta = div("cardMeta");
+  if (def.tags?.includes("EXHAUST")) meta.appendChild(badge("소모"));
+  if (def.tags?.includes("VANISH")) meta.appendChild(badge("소실"));
+  d.appendChild(meta);
+
+  return d;
+}
+
+let longPressTimer: number | null = null;
+let longPressFired = false;
+let longPressStartX = 0;
+let longPressStartY = 0;
+
+function clearLongPress() {
+  if (longPressTimer != null) {
+    window.clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+  longPressFired = false;
+}
+
+function openCardPeek(g: GameState, cardUid: string) {
+  document.querySelector(".cardPeekOverlay")?.remove();
+
+  const layer = div("cardPeekOverlay");
+  layer.style.cssText =
+    "position:fixed; inset:0; z-index:7000; background:rgba(0,0,0,.60);" +
+    "backdrop-filter: blur(6px); display:flex; align-items:center; justify-content:center;" +
+    "padding:18px; box-sizing:border-box;";
+
+  const panel = div("panel");
+  panel.classList.add("cardPeekPanel");
+  panel.style.cssText =
+    "width: fit-content; max-width: 92vw; max-height: 92vh;" +
+    "overflow: visible; padding: 12px; border-radius: 16px;";
+
+  const card = renderCardPreviewByUid(g, cardUid);
+
+  (card as HTMLElement).style.width = "var(--handCardW)";
+  (card as HTMLElement).style.height = "var(--handCardH)";
+  (card as HTMLElement).style.boxSizing = "border-box";
+
+  panel.appendChild(card);
+  layer.appendChild(panel);
+
+  layer.onclick = () => layer.remove();
+  panel.onclick = (e) => e.stopPropagation();
+
+  document.body.appendChild(layer);
+}
+
+function renderMobileQuickMenu(g: GameState, actions: UIActions) {
+  document.querySelector(".mobileQuickMenuBtn")?.remove();
+  document.querySelector(".mobileQuickMenuSheet")?.remove();
+
+  const mobile = isMobileUI();
+  if (!mobile) return;
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "mobileQuickMenuBtn";
+  btn.textContent = "≡";
+  btn.style.cssText = `
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 10px);
+    right: calc(env(safe-area-inset-right, 0px) + 10px);
+    z-index: 9999;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.18);
+    background: rgba(15,18,22,.88);
+    color: #fff;
+    font-weight: 900;
+    backdrop-filter: blur(6px);
+  `;
+
+  btn.onclick = () => openSheet();
+  document.body.appendChild(btn);
+
+  const openSheet = () => {
+    document.querySelector(".mobileQuickMenuSheet")?.remove();
+
+    const layer = document.createElement("div");
+    layer.className = "mobileQuickMenuSheet";
+    layer.style.cssText = `
+      position: fixed; inset: 0;
+      z-index: 9998;
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 12px;
+      box-sizing: border-box;
+    `;
+
+    const sheet = document.createElement("div");
+    sheet.style.cssText = `
+      width: min(520px, 100%);
+      border-radius: 18px;
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(15,18,22,.92);
+      box-shadow: 0 18px 60px rgba(0,0,0,.45);
+    `;
+
+    const row1 = document.createElement("div");
+    row1.style.cssText = "display:flex; gap:10px; flex-wrap:wrap;";
+
+    const mk = (label: string, fn: () => void) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = label;
+      b.style.cssText = `
+        padding: 10px 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(255,255,255,.14);
+        background: rgba(255,255,255,.06);
+        color: #fff;
+        font-weight: 700;
+      `;
+      b.onclick = () => {
+        layer.remove();
+        fn();
+      };
+      return b;
+    };
+
+    row1.appendChild(mk("새로운 런", () => actions.onNewRun()));
+    row1.appendChild(mk("룰북", () => actions.onViewRulebook()));
+    row1.appendChild(mk("로그", () => actions.onToggleLogOverlay()));
+
+    const hr = document.createElement("div");
+    hr.style.cssText = "height:1px; margin:12px 0; background: rgba(255,255,255,.10);";
+
+    const row2 = document.createElement("div");
+    row2.style.cssText = "display:flex; gap:10px; flex-wrap:wrap;";
+
+    row2.appendChild(mk("덱", () => actions.onViewPile("deck")));
+    row2.appendChild(mk("버림", () => actions.onViewPile("discard")));
+    row2.appendChild(mk("손패", () => actions.onViewPile("hand")));
+    row2.appendChild(mk("소모", () => actions.onViewPile("exhausted")));
+    row2.appendChild(mk("소실", () => actions.onViewPile("vanished")));
+
+    sheet.appendChild(row1);
+    sheet.appendChild(hr);
+    sheet.appendChild(row2);
+
+    layer.onclick = () => layer.remove();
+    sheet.onclick = (e) => e.stopPropagation();
+
+    layer.appendChild(sheet);
+    document.body.appendChild(layer);
+  };
+}
+
+
+
 // UI Actions
+
 
 export type UIActions = ReturnType<typeof makeUIActions>;
 
@@ -105,7 +413,7 @@ let overlay: Overlay | null = null;
 let uiMounted = false;
 let drag: DragState = null;
 let hoverSlot: SlotDrop | null = null;
-
+let showLogOverlay = false;
 
 // 카드 렌더
 
@@ -173,10 +481,10 @@ function renderCardPreviewByDef(g: GameState, defId: string, upgrade: number) {
 
 
 function nodeLabel(t: "BATTLE" | "REST" | "EVENT" | "TREASURE", isBoss: boolean) {
-  if (t === "BATTLE") return isBoss ? "☠️" : "⚔️";
-  if (t === "REST") return "⛺";
-  if (t === "EVENT") return "❔";
-  return "🌑";
+  if (t === "BATTLE") return isBoss ? "💀(보스)" : "⚔️(전투)";
+  if (t === "REST") return "⛺(휴식)";
+  if (t === "EVENT") return "❔(미지)";
+  return "🌑(보물)";
 }
 function labelList(
   offers: Array<{ type: "BATTLE" | "REST" | "EVENT" | "TREASURE" }>,
@@ -187,17 +495,43 @@ function labelList(
 }
 
 
-
 function renderNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
-  const parts: string[] = [`[선택 ${g.run.nodePickCount}회]`];
-  if (g.run.treasureObtained) parts.push(`[보물 후 ${g.run.afterTreasureNodePicks}/10]`);
+  const parts: string[] = [`[탐험 ${g.run.nodePickCount}회]`];
+
+  if (g.run.treasureObtained) {
+    const req = escapeRequiredNodePicks(g.run.deckSizeAtTreasure);
+    parts.push(`[탈출까지 ${g.run.afterTreasureNodePicks}/${req}]`);
+  }
+
   root.appendChild(p(parts.join(" ")));
 
-  const nextIndex = g.run.nodePickCount + 1;
-  const isBossNode = nextIndex % 30 === 0;
-  const isBossNextAfterPick = (g.run.nodePickCount + 2) % 30 === 0;
+  ensureBossSchedule(g);
 
-  const offers = actions.getNodeOffers();   // A/B
+  
+  if (!g.run.bossOmenText || String(g.run.bossOmenText).trim() === "") {
+    g.run.bossOmenText = "아직 징조가 없다."; // 기본 문구
+  }
+  const runAny = g.run as any;
+  const T = totalTime(g);
+  const remain = Math.max(0, runAny.nextBossTime - T);
+
+  const omenTxt = ` . . . ${g.run.bossOmenText}`;
+  const omen = divText("bossOmenBanner", `다음 보스까지 남은 시간: ${remain}${omenTxt}`);
+
+
+
+  omen.style.cssText =
+    "margin-top:8px; padding:10px 12px; border-radius:14px;" +
+    "border:1px solid rgba(255, 255, 255, 0);" +
+    "background:rgba(0, 0, 0, 0.18);" +
+    "font-weight:600;" +
+    "font-size:13px;" +
+    "line-height:1.2;"; 
+  root.appendChild(omen);
+
+  omen.style.color = "white";
+
+  const offers = actions.getNodeOffers();
   const br = g.run.branchOffer;
 
   if (br) {
@@ -205,64 +539,44 @@ function renderNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
     preview.style.cssText =
       "margin-top:10px; padding:12px; border:1px solid rgba(255,255,255,.10); border-radius:16px; background:rgba(0,0,0,.18);";
 
-    const rowA = div("nodePreviewRow");
-    rowA.style.cssText =
-      "display:flex; gap:10px; align-items:center; padding:10px; border-radius:14px; cursor:pointer;";
-    rowA.onmouseenter = () => (rowA.style.background = "rgba(255,255,255,.06)");
-    rowA.onmouseleave = () => (rowA.style.background = "transparent");
-    rowA.onclick = () => actions.onChooseNode("A");
+    const forcedBoss = runAny.forcedNext === "BOSS";
 
-    const nowA = nodeLabel(offers[0]?.type ?? "BATTLE", isBossNode);
-    const pillNowA = document.createElement("div");
-    pillNowA.className = "nodePill primary";
-    pillNowA.textContent = nowA;
-    rowA.appendChild(pillNowA);
+    const makeRow = (side: "A" | "B") => {
+      const row = div("nodePreviewRow");
+      row.style.cssText =
+        "display:flex; gap:10px; align-items:center; padding:10px; border-radius:14px; cursor:pointer;";
+      row.onmouseenter = () => (row.style.background = "rgba(255,255,255,.06)");
+      row.onmouseleave = () => (row.style.background = "transparent");
+      row.onclick = () => actions.onChooseNode(side);
 
-    rowA.appendChild(divText("", "→"));
+      const idx = side === "A" ? 0 : 1;
+      const nowLabel = forcedBoss ? "💀(보스)" : nodeLabel(offers[idx]?.type ?? "BATTLE", false);
 
-    const nextA = labelList(br.nextIfA, isBossNextAfterPick);
-    const nextAText = divText("", nextA);
-    nextAText.style.cssText = "opacity:.85;";
-    rowA.appendChild(nextAText);
+      const pill = document.createElement("div");
+      pill.className = "nodePill primary";
+      pill.textContent = nowLabel;
+      pill.onclick = (e) => {
+        e.stopPropagation();
+        actions.onChooseNode(side);
+      };
+      row.appendChild(pill);
 
-    const rowB = div("nodePreviewRow");
-    rowB.style.cssText =
-      "display:flex; gap:10px; align-items:center; padding:10px; border-radius:14px; cursor:pointer;";
-    rowB.onmouseenter = () => (rowB.style.background = "rgba(255,255,255,.06)");
-    rowB.onmouseleave = () => (rowB.style.background = "transparent");
-    rowB.onclick = () => actions.onChooseNode("B");
+      row.appendChild(divText("", "→"));
 
-    const nowB = nodeLabel(offers[1]?.type ?? "BATTLE", isBossNode);
-    const pillNowB = document.createElement("div");
-    pillNowB.className = "nodePill primary";
-    pillNowB.textContent = nowB;
-    rowB.appendChild(pillNowB);
+      const nextList = side === "A" ? br.nextIfA : br.nextIfB;
+      const nextText = divText("", labelList(nextList, false));
+      nextText.style.cssText = "opacity:.85;";
+      row.appendChild(nextText);
 
-    rowB.appendChild(divText("", "→"));
-
-    const nextB = labelList(br.nextIfB, isBossNextAfterPick);
-    const nextBText = divText("", nextB);
-    nextBText.style.cssText = "opacity:.85;";
-    rowB.appendChild(nextBText);
-
-    pillNowA.onclick = (e) => {
-      e.stopPropagation();
-      actions.onChooseNode("A");
+      return row;
     };
 
-    pillNowB.onclick = (e) => {
-      e.stopPropagation();
-      actions.onChooseNode("B");
-    };
-
-    preview.appendChild(rowA);
-    preview.appendChild(rowB);
+    preview.appendChild(makeRow("A"));
+    preview.appendChild(makeRow("B"));
 
     root.appendChild(preview);
     root.appendChild(hr());
   }
-
-
 }
 
 
@@ -278,9 +592,51 @@ function hr() {
 
 type ChoiceKind = "EVENT" | "REWARD" | "PICK_CARD" | "VIEW_PILE" | "UPGRADE_PICK";
 
+function autoAdvanceToNextTurn(g: GameState, actions: UIActions) {
+  // 이미 종료/선택중/타겟중이면 안 함
+  if (g.run.finished) return;
+  if (g.choice) return;
+  if (isTargeting(g)) return;
+
+  let sawDraw = false;
+  let guard = 0;
+
+  const tick = () => {
+    guard++;
+    if (guard > 50) return; // 안전장치 (무한루프 방지)
+
+    if (g.run.finished) return;
+    if (g.choice || overlay) return;
+    if (isTargeting(g)) return;
+
+    // “다음 한 단계” 계산
+    const step = computeNextStep(g, actions, /*targeting*/ false);
+    if (!step.fn || step.disabled) return;
+
+    // 실행 전/후로 턴 경계 감지
+    if (g.phase === "DRAW") sawDraw = true;
+
+    step.fn();
+
+    render(g, actions);
+
+    if (sawDraw && g.phase === "PLACE") return;
+
+    requestAnimationFrame(tick);
+  };
+
+  requestAnimationFrame(tick);
+}
+
+
+
+
 export function makeUIActions(g0: GameState, setGame: (next: GameState) => void) {
   let choiceHandler: ((key: string) => void) | null = null;
   let nodePickLock = false;
+
+
+  let targetPickLock = false;
 
   type ChoiceFrame = {
     choice: GameState["choice"];
@@ -358,6 +714,11 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
 
     rerender: () => { const g = getG(); render(g, actions); },
 
+    onToggleLogOverlay: () => {
+      showLogOverlay = !showLogOverlay;
+      render(getG(), actions);
+    },
+
     onCloseOverlay: () => {
       const g = getG();
       overlay = null;        
@@ -371,6 +732,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       drag = null;
       choiceHandler = null;
       closeChoiceUI(g);              
+      clearSave();
       setGame(createInitialState(g.content));
     },
 
@@ -414,6 +776,22 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       render(g, actions);
     },
 
+    onSelectEnemy: (enemyIndex: number) => {
+      const g = getG();
+
+      if (targetPickLock) return;
+      targetPickLock = true;
+      requestAnimationFrame(() => { targetPickLock = false; });
+
+      const finishedTargeting = resolveTargetSelection(g, enemyIndex);
+
+      render(g, actions);
+
+      if (finishedTargeting && !g.choice && !g.run.finished) {
+        actions.onAutoAdvance();
+      }
+    },
+
     onSelectHandCard: (uid: string) => {
       const g = getG()
       if (isTargeting(g)) return;
@@ -423,68 +801,131 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
 
     // Node 선택
     getNodeOffers: (): NodeOffer[] => {
-      const g = getG()
+      const g = getG();
+      ensureBossSchedule(g);
+
       if (!g.run.branchOffer) g.run.branchOffer = rollBranchOffer(g);
 
-      const nextIndex = g.run.nodePickCount + 1;
-      const isBossNode = nextIndex % 30 === 0;
+      const runAny = g.run as any;
+      const T = totalTime(g);
 
-      if (isBossNode) {
+      if (runAny.forcedNext === "BOSS") {
+        runAny.nodeExtra01 = 0;
         return [
           { id: "A", type: "BATTLE" },
           { id: "B", type: "BATTLE" },
         ];
       }
+
+      if (runAny.nodeExtra01 == null) {
+        runAny.nodeExtra01 = rollExtraTime01FromDeck(g.deck.length).extra;
+      }
+
+      const afterT = T + 1 + runAny.nodeExtra01;
+      const willHitBoss = afterT >= runAny.nextBossTime;
+
+      if (willHitBoss) {
+        return [
+          { id: "A", type: "REST" },
+          { id: "B", type: "REST" },
+        ];
+      }
+
       return g.run.branchOffer.root;
     },
+
+
+    
 
     onChooseNode: (id: "A" | "B") => {
       const g = getG();
       if (nodePickLock) return;
       nodePickLock = true;
-      queueMicrotask(() => (nodePickLock = false)); // 또는 setTimeout(() => nodePickLock=false, 0);
+      queueMicrotask(() => (nodePickLock = false));
 
       if (g.run.finished) return;
       if (g.phase !== "NODE") return;
 
+      ensureBossSchedule(g);
       if (!g.run.branchOffer) g.run.branchOffer = rollBranchOffer(g);
 
+      const runAny = g.run as any;
+
+      const offers = actions.getNodeOffers();
+      const basePicked = (id === "A" ? offers[0].type : offers[1].type);
+
+      const beforeT = totalTime(g);
+
+      const forcedBossNow = runAny.forcedNext === "BOSS";
+
+      let extra = 0;
+      if (!forcedBossNow) {
+        if (runAny.nodeExtra01 == null) runAny.nodeExtra01 = rollExtraTime01FromDeck(g.deck.length).extra;
+        extra = runAny.nodeExtra01;
+      }
+
+      const afterT = beforeT + 1 + extra;
+
       const nextIndex = g.run.nodePickCount + 1;
-      const forceBossNow = nextIndex % 30 === 0;
-
-      const pickedType = forceBossNow
-        ? "BATTLE"
-        : id === "A"
-        ? g.run.branchOffer.root[0].type
-        : g.run.branchOffer.root[1].type;
-
-      const actual = pickedType;
-
       g.run.nodePickCount = nextIndex;
-      g.run.nodePickByType[actual] = (g.run.nodePickByType[actual] ?? 0) + 1;
+      g.time = (g.time ?? 0) + extra;
+
+      runAny.nodeExtra01 = null;
+
+      const willHitBoss = !forcedBossNow && afterT >= runAny.nextBossTime;
+
+      const actual =
+        forcedBossNow
+          ? ("BATTLE" as const)
+          : willHitBoss
+          ? ("REST" as const)
+          : (basePicked as typeof basePicked);
 
       advanceBranchOffer(g, id);
 
-      // 승리 조건
+      g.run.nodePickByType[actual] = (g.run.nodePickByType[actual] ?? 0) + 1;
+
       if (g.run.treasureObtained && actual !== "TREASURE") {
         g.run.afterTreasureNodePicks += 1;
-        if (g.run.afterTreasureNodePicks >= 10) {
+
+        const snap = g.run.deckSizeAtTreasure;
+        const req = escapeRequiredNodePicks(snap);
+  
+        if (g.run.afterTreasureNodePicks >= req) {
           g.run.finished = true;
-          logMsg(g, "승리! 저주받은 보물을 얻은 후 10번의 탐험을 버텼습니다.");
+          logMsg(g, `승리! 보물 획득 후 ${req}번의 탐험을 버티고 탈출했습니다.`);
           render(g, actions);
           return;
         }
       }
 
+      if (forcedBossNow) {
+        runAny.forcedNext = null;
+        runAny.nextBossTime += 30;
+
+        g.run.bossOmenText = null;
+
+        logMsg(g, `=== 시간 ${afterT}: 보스 전투 ===`);
+        spawnEncounter(g, { forceBoss: true });
+        startCombat(g);
+        render(g, actions);
+        return;
+      }
+
+      if (willHitBoss) {
+        runAny.forcedNext = "BOSS";
+        logMsg(g, `시간이 흘러 보스가 다가옵니다!`);
+      }
+
       if (actual === "BATTLE") {
-        if (forceBossNow) logMsg(g, `=== ${nextIndex}번째 노드: 보스 전투 ===`);
-        spawnEncounter(g, { forceBoss: forceBossNow });
+        spawnEncounter(g, { forceBoss: false });
         startCombat(g);
         render(g, actions);
         return;
       }
 
       if (actual === "REST") {
+
         const openRestMenu = () => {
           g.choice = {
             kind: "EVENT",
@@ -548,18 +989,28 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       }
 
 
-
-
       if (actual === "TREASURE") {
-        g.run.treasureObtained = true;
-        g.run.afterTreasureNodePicks = 0;
-        logMsg(g, "저주받은 보물을 얻었습니다! 이제부터 10번의 탐험을 버티면 승리합니다.");
+        obtainTreasure(g);
+
+        const snap = (g.run as any).deckSizeAtTreasure;
+        const req = escapeRequiredNodePicks(snap);
+        logMsg(g, `저주받은 보물을 얻었습니다! 이제부터 ${req}번의 탐험을 버티면 탈출합니다.`);
+
         render(g, actions);
         return;
       }
 
       if (actual === "EVENT") {
-        const ev = pickRandomEvent();
+
+        const runAny = g.run as any;
+        runAny.firstEventSeen ??= false;
+
+        const ev = !runAny.firstEventSeen
+          ? (getEventById("ominous_prophecy") ?? pickRandomEvent())
+          : pickRandomEvent();
+
+        runAny.firstEventSeen = true;
+
         const opts = ev.options(g);
 
         g.choice = {
@@ -700,6 +1151,10 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
 
       if (choiceHandler) {
         choiceHandler(key);
+        const g2 = getG();
+        const justEnteredCombat = g2.enemies.length > 0 && g2.phase === "PLACE";
+        if (!justEnteredCombat) actions.onAutoAdvance();
+
         return;
       }
 
@@ -730,18 +1185,71 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       logMsg(g, `선택 처리 불가: handler 없음 (kind=${kind}, key=${key})`);
     },
 
+    onAutoAdvance: () => {
+      const g = getG();
+      if (g.run.finished) return;
+      if (g.choice) return;
+      if (isTargeting(g)) return;
+      if (g.phase === "NODE") return;
+
+      let drew = false;
+
+      // 안전장치 (무한루프 방지)
+      for (let guard = 0; guard < 50; guard++) {
+        if (g.run.finished) break;
+        if (g.choice) break;
+        if (isTargeting(g)) break;
+
+
+        if (g.phase === "DRAW") {
+          drawStepStartNextTurn(g);
+          drew = true;
+         break;
+        }
+
+        if (g.phase === "PLACE") {
+          if (g.enemies.length > 0 && !g.intentsRevealedThisTurn) {
+            revealIntentsAndDisrupt(g);
+            continue;
+          }
+          resolveBack(g);
+          continue;
+        }
+
+        if (g.phase === "BACK") {
+          resolveBack(g);
+          continue;
+        }
+
+        if (g.phase === "FRONT") {
+          resolveFront(g);
+          continue;
+        }
+
+        if (g.phase === "ENEMY") {
+          resolveEnemy(g);
+          continue;
+        }
+
+        if (g.phase === "UPKEEP") {
+          upkeepEndTurn(g);
+          continue;
+        }
+
+        // 예상 밖 phase면 탈출
+        break;
+      }
+
+      render(g, actions);
+    },
+
+
 
     onRevealIntents: () => {
       const g = getG()
       if (g.run.finished) return;
       if (g.enemies.length === 0) return;
       revealIntentsAndDisrupt(g);
-      render(g, actions);
-    },
-
-    onSelectEnemy: (enemyIndex: number) => {
-      const g = getG()
-      resolveTargetSelection(g, enemyIndex);
       render(g, actions);
     },
 
@@ -1048,6 +1556,89 @@ export function render(g: GameState, actions: UIActions) {
     g.fx.enemyShake = [];
     g.fx.playerShake = false;
   }
+  renderLogOverlay(g, actions);
+  renderFloatingNewRun(actions);
+  renderMobileQuickMenu(g, actions);
+
+  scheduleSave(g);
+}
+
+function renderFloatingNewRun(actions: UIActions) {
+  document.querySelector(".floatingNewRun")?.remove();
+  if (isMobileUI()) return;
+
+  const btn = mkButton("새로운 런", () => actions.onNewRun(), "floatingNewRun");
+
+  btn.style.cssText = `
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 10px);
+    left: calc(env(safe-area-inset-left, 0px) + 10px);
+    z-index: 10000;
+    pointer-events: auto;
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.16);
+    background: rgba(0,0,0,.55);
+    color: #fff;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    cursor: pointer;
+  `;
+
+  document.body.appendChild(btn);
+}
+
+
+function renderLogOverlay(g: GameState, actions: UIActions) {
+
+  
+  document.querySelector(".logOverlay")?.remove();
+
+  if (!showLogOverlay) return;
+
+  const overlay = div("logOverlay");
+  overlay.style.cssText = `
+    position: fixed; inset: 0;
+    z-index: 6000;
+    background: rgba(0,0,0,.55);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  `;
+
+  const sheet = div("panel");
+  sheet.style.cssText = `
+    width: min(720px, 100%);
+    max-height: 70vh;
+    border-radius: 18px 18px 0 0;
+    padding: 12px;
+    margin: 0;
+  `;
+
+  const header = div("panelHeader");
+  const title = document.createElement("h2");
+  title.textContent = "로그";
+  header.appendChild(title);
+
+  const closeBtn = mkButton("닫기", () => actions.onToggleLogOverlay());
+  header.appendChild(closeBtn);
+
+  sheet.appendChild(header);
+
+  const pre = document.createElement("pre");
+  pre.className = "log";
+  pre.textContent = g.log.join("\n");
+  pre.style.maxHeight = "60vh";
+  pre.style.overflow = "auto";
+
+  sheet.appendChild(pre);
+
+  overlay.onclick = () => actions.onToggleLogOverlay();
+  sheet.onclick = (e) => e.stopPropagation();
+
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
 }
 
 function renderOverlayLayer(
@@ -1259,93 +1850,136 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
 }
 
 // Top HUD (Player left + Enemies center + Top-right controls)
+function isMobileUI() {
+  return window.matchMedia && window.matchMedia("(max-width: 900px)").matches;
+}
 
 function renderTopHud(g: GameState, actions: UIActions) {
+  document.querySelectorAll(".topHud").forEach((el) => el.remove());
 
-  
+
+  const Time = g.time
   const top = div("topHud");
 
-  top.appendChild(div("topHudLeftSpacer"));
+  const mobile = isMobileUI();
 
-  // (1) LEFT: player
+  if (!mobile) top.appendChild(div("topHudLeftSpacer"));
+
+
+  // (A) LEFT: player (compact on mobile)
 
   const left = div("playerHudLeft");
 
-  const titleRow = div("playerTitleRow");
-  titleRow.appendChild(divText("playerHudTitle", "플레이어"));
+  
 
-  const piles = div("pileButtons");
-  piles.appendChild(mkButton("덱", () => actions.onViewPile("deck")));
-  piles.appendChild(mkButton("버림", () => actions.onViewPile("discard")));
-  piles.appendChild(mkButton("손패", () => actions.onViewPile("hand")));
-  piles.appendChild(mkButton("소모", () => actions.onViewPile("exhausted")));
-  piles.appendChild(mkButton("소실", () => actions.onViewPile("vanished")));
+  if (mobile) {
+    // 상단 한 줄: HP / 블록 / S F / 탐험 / 덱
+    const topLine = div("mobileTopLine"); // 새 클래스
+    topLine.appendChild(chipEl(`HP ${g.player.hp}/${g.player.maxHp}`));
+    topLine.appendChild(chipEl(`블록 ${g.player.block}`));
 
-  titleRow.appendChild(piles);
-  left.appendChild(titleRow);
+    topLine.appendChild(chipEl(`S ${g.player.supplies}`, g.player.supplies === 0 ? "warn" : ""));
+    topLine.appendChild(chipEl(`F ${g.player.fatigue}`));
 
-  const pbox = div("enemyChip"); // 재사용
-  pbox.classList.add("playerHudBox");
-  if (g.fx?.playerShake) pbox.classList.add("shake");
+    topLine.appendChild(chipEl(`시간 ${Math.max(1, g.run.nodePickCount+Time)}`));
+    topLine.appendChild(chipEl(`덱 ${g.deck.length}`));
 
-  const hpTop = div("enemyChipTop");
-  hpTop.appendChild(divText("", "HP"));
-  hpTop.appendChild(divText("", `${g.player.hp}/${g.player.maxHp}`));
-  pbox.appendChild(hpTop);
+    left.appendChild(topLine);
 
-  const hpOuter = div("enemyHPOuter");
-  const hpFill = div("enemyHPFill");
-  hpFill.style.width = `${Math.max(0, Math.min(100, (g.player.hp / Math.max(1, g.player.maxHp)) * 100))}%`;
-  hpOuter.appendChild(hpFill);
-  pbox.appendChild(hpOuter);
+    const stLine = div("mobileStatusLine");
 
-  const blTop = div("enemyChipTop");
-  blTop.appendChild(divText("", "블록"));
-  blTop.appendChild(divText("", `${g.player.block}`));
-  pbox.appendChild(blTop);
+    const pst = g.player.status;
+    const list: string[] = [];
+    if ((pst.vuln ?? 0) > 0) list.push(`취약 ${pst.vuln}`);
+    if ((pst.weak ?? 0) > 0) list.push(`약화 ${pst.weak}`);
+    if ((pst.bleed ?? 0) > 0) list.push(`출혈 ${pst.bleed}`);
+    if ((pst.disrupt ?? 0) > 0) list.push(`교란 ${pst.disrupt}`);
 
-  const blOuter = div("enemyHPOuter");
-  const blFill = div("enemyHPFill");
-  blFill.style.background = "linear-gradient(90deg, #64b5ff, #2a7cff)";
-  blFill.style.width = `${Math.max(0, Math.min(100, (g.player.block / Math.max(1, g.player.maxHp)) * 100))}%`;
-  blOuter.appendChild(blFill);
-  pbox.appendChild(blOuter);
+    const shown = list.slice(0, 4);
+    for (const t of shown) stLine.appendChild(badge(t));
+    if (list.length > shown.length) stLine.appendChild(badge(`+${list.length - shown.length}`));
 
-  const pst = g.player.status;
-  const pBadges = div("enemyBadges");
-  if ((pst.vuln ?? 0) > 0) pBadges.appendChild(badge(`취약 ${pst.vuln}`));
-  if ((pst.weak ?? 0) > 0) pBadges.appendChild(badge(`약화 ${pst.weak}`));
-  if ((pst.bleed ?? 0) > 0) pBadges.appendChild(badge(`출혈 ${pst.bleed}`));
-  if ((pst.disrupt ?? 0) > 0) pBadges.appendChild(badge(`교란 ${pst.disrupt}`));
-  if (pBadges.childNodes.length) pbox.appendChild(pBadges);
+    left.appendChild(stLine);
 
-  left.appendChild(pbox);
-  const res = div("resourceRow inline");
-
-  const inCombat = g.enemies.length > 0 && g.phase !== "NODE";
-  const bonusS = g.run.nextBattleSuppliesBonus ?? 0;
-
-  if (inCombat) {
-    res.appendChild(chipEl(`S ${g.player.supplies}`, g.player.supplies === 0 ? "warn" : ""));
   } else {
-    if (bonusS > 0) {
-      res.appendChild(chipEl(`보너스 S +${bonusS}`, "bonus"));
+    // 데스크톱: 기존 바 유지
+    const titleRow = div("playerTitleRow");
+    titleRow.appendChild(divText("playerHudTitle", "플레이어"));
+
+    const piles = div("pileButtons");
+    piles.appendChild(mkButton("덱", () => actions.onViewPile("deck")));
+    piles.appendChild(mkButton("버림", () => actions.onViewPile("discard")));
+    piles.appendChild(mkButton("손패", () => actions.onViewPile("hand")));
+    piles.appendChild(mkButton("소모", () => actions.onViewPile("exhausted")));
+    piles.appendChild(mkButton("소실", () => actions.onViewPile("vanished")));
+    titleRow.appendChild(piles);
+
+    left.appendChild(titleRow);
+
+    const pbox = div("enemyChip");
+    pbox.classList.add("playerHudBox");
+    if (g.fx?.playerShake) pbox.classList.add("shake");
+
+    const hpTop = div("enemyChipTop");
+    hpTop.appendChild(divText("", "HP"));
+    hpTop.appendChild(divText("", `${g.player.hp}/${g.player.maxHp}`));
+    pbox.appendChild(hpTop);
+
+    const hpOuter = div("enemyHPOuter");
+    const hpFill = div("enemyHPFill");
+    hpFill.style.width = `${Math.max(0, Math.min(100, (g.player.hp / Math.max(1, g.player.maxHp)) * 100))}%`;
+    hpOuter.appendChild(hpFill);
+    pbox.appendChild(hpOuter);
+
+    const blTop = div("enemyChipTop");
+    blTop.appendChild(divText("", "블록"));
+    blTop.appendChild(divText("", `${g.player.block}`));
+    pbox.appendChild(blTop);
+
+    const blOuter = div("enemyHPOuter");
+    const blFill = div("enemyHPFill");
+    blFill.style.background = "linear-gradient(90deg, #64b5ff, #2a7cff)";
+    blFill.style.width = `${Math.max(0, Math.min(100, (g.player.block / Math.max(1, g.player.maxHp)) * 100))}%`;
+    blOuter.appendChild(blFill);
+    pbox.appendChild(blOuter);
+
+    const pst = g.player.status;
+    const pBadges = div("enemyBadges");
+    pbox.appendChild(pBadges);
+
+    const pBadgeList: string[] = [];
+    if ((pst.vuln ?? 0) > 0) pBadgeList.push(`취약 ${pst.vuln}`);
+    if ((pst.weak ?? 0) > 0) pBadgeList.push(`약화 ${pst.weak}`);
+    if ((pst.bleed ?? 0) > 0) pBadgeList.push(`출혈 ${pst.bleed}`);
+    if ((pst.disrupt ?? 0) > 0) pBadgeList.push(`교란 ${pst.disrupt}`);
+
+    const shown = mobile ? pBadgeList.slice(0, 3) : pBadgeList;
+    for (const t of shown) pBadges.appendChild(badge(t));
+    if (mobile && pBadgeList.length > shown.length) pBadges.appendChild(badge(`+${pBadgeList.length - shown.length}`)); // ✅ 모바일 요약
+
+    left.appendChild(pbox);
+
+    const res = div("resourceRow inline");
+    const inCombat = g.enemies.length > 0 && g.phase !== "NODE";
+    const bonusS = g.run.nextBattleSuppliesBonus ?? 0;
+
+    if (inCombat) {
+      res.appendChild(chipEl(`S ${g.player.supplies}`, g.player.supplies === 0 ? "warn" : ""));
+    } else {
+      if (bonusS > 0) res.appendChild(chipEl(`보너스 S +${bonusS}`, "bonus"));
     }
+    res.appendChild(chipEl(`F ${g.player.fatigue}`));
+    res.appendChild(chipEl(`시간 ${Math.max(1, g.run.nodePickCount+Time)}`));
+    res.appendChild(chipEl(`덱 ${g.deck.length}`));
+
+    left.appendChild(res);
   }
 
-  res.appendChild(chipEl(`F ${g.player.fatigue}`));
-  res.appendChild(chipEl(`탐험 ${Math.max(1, g.run.nodePickCount)}`));
-  res.appendChild(chipEl(`덱 ${g.deck.length}`));
+  // (B) CENTER: enemies
 
-
-
-  left.appendChild(res);
-
-
-  // (2) CENTER: enemies in a centered box
   const center = div("enemyHudCenter");
-  const enemiesWrap = div("enemyHud");
 
+  const enemiesWrap = div(mobile ? "enemyStrip" : "enemyHud");
 
   const shaken = g.fx?.enemyShake ?? [];
 
@@ -1361,62 +1995,67 @@ function renderTopHud(g: GameState, actions: UIActions) {
       if (shaken.includes(i)) chipBox.classList.add("shake");
       if (targeting && e.hp > 0) chipBox.classList.add("targetable");
 
-
       const topRow = div("enemyChipTop");
       topRow.appendChild(divText("", `${i + 1}. ${e.name}`));
       topRow.appendChild(divText("", `${e.hp}/${e.maxHp}`));
       chipBox.appendChild(topRow);
 
-      // hp bar
-      const outer = div("enemyHPOuter");
-      const fill = div("enemyHPFill");
-      fill.style.width = `${Math.max(0, Math.min(100, (e.hp / Math.max(1, e.maxHp)) * 100))}%`;
-      outer.appendChild(fill);
-      chipBox.appendChild(outer);
+      if (!mobile) {
+        const outer = div("enemyHPOuter");
+        const fill = div("enemyHPFill");
+        fill.style.width = `${Math.max(0, Math.min(100, (e.hp / Math.max(1, e.maxHp)) * 100))}%`;
+        outer.appendChild(fill);
+        chipBox.appendChild(outer);
+      }
 
-      // intent
+
       const def = g.content.enemiesById[e.id];
       const intent = def.intents[e.intentIndex % def.intents.length];
-      chipBox.appendChild(
-        divText("enemyIntent", g.intentsRevealedThisTurn ? `의도: ${intent.label}` : "의도: (미공개)")
-      );
+      const label = e.intentLabelOverride ?? intent.label;
+
+      chipBox.appendChild(divText("enemyIntent", g.intentsRevealedThisTurn ? `${label}` : ""));
+
+      const st = e.status;
+      const badges = div("enemyBadges");
+      chipBox.appendChild(badges);
+
+      const eBadgeList: string[] = [];
+      if ((st.vuln ?? 0) > 0) eBadgeList.push(`취약 ${st.vuln}`);
+      if ((st.weak ?? 0) > 0) eBadgeList.push(`약화 ${st.weak}`);
+      if ((st.bleed ?? 0) > 0) eBadgeList.push(`출혈 ${st.bleed}`);
+      if ((st.disrupt ?? 0) > 0) eBadgeList.push(`교란 ${st.disrupt}`);
+      if (e.immuneThisTurn) eBadgeList.push("면역");
+
+      const eShown = mobile ? eBadgeList.slice(0, 2) : eBadgeList;
+      for (const t of eShown) badges.appendChild(badge(t));
+      if (mobile && eBadgeList.length > eShown.length) badges.appendChild(badge(`+${eBadgeList.length - eShown.length}`));
 
       chipBox.onclick = () => actions.onSelectEnemy(i);
       enemiesWrap.appendChild(chipBox);
-
-
-      // status badges
-      const st = e.status;
-      const badges = div("enemyBadges");
-      if ((st.vuln ?? 0) > 0) badges.appendChild(badge(`취약 ${st.vuln}`));
-      if ((st.weak ?? 0) > 0) badges.appendChild(badge(`약화 ${st.weak}`));
-      if ((st.bleed ?? 0) > 0) badges.appendChild(badge(`출혈 ${st.bleed}`));
-      if ((st.disrupt ?? 0) > 0) badges.appendChild(badge(`교란 ${st.disrupt}`));
-      if (e.immuneThisTurn) badges.appendChild(badge("면역"));
-      if (badges.childNodes.length) chipBox.appendChild(badges);
-
     }
   }
 
-
   center.appendChild(enemiesWrap);
 
-  // (3) RIGHT: top-right controls
-  const right = div("topHudRight");
-  const controls = div("topRightControls");
-  controls.appendChild(mkButton("새로운 런", actions.onNewRun));
-  controls.appendChild(mkButton("룰북", actions.onViewRulebook));
-  right.appendChild(controls);
-
+  // (C) RIGHT: buttons (add LOG)
   top.appendChild(left);
   top.appendChild(center);
-  top.appendChild(right);
 
+  if (!mobile) {
+    const right = div("topHudRight");
+    const controls = div("topRightControls");
+
+    controls.appendChild(mkButton("룰북", actions.onViewRulebook));
+    controls.appendChild(mkButton("로그", actions.onToggleLogOverlay));
+
+    right.appendChild(controls);
+    top.appendChild(right);
+  }
 
   if (g.fx?.enemyShake?.length) g.fx.enemyShake = [];
-
   return top;
 }
+
 
 
 
@@ -1429,12 +2068,17 @@ function chipEl(text: string, extraClass = "") {
 
 
 function renderBattleTitleRow(g: GameState) {
+  const mobile = isMobileUI();
+  if (mobile) {
+    const row = div("battleTitleRow");
+    row.style.display = "none"; // 또는 row.classList.add("mobileHidden")
+    return row;
+  }
   const row = div("battleTitleRow");
 
   const title = document.createElement("h2");
   title.textContent = "전장";
   row.appendChild(title);
-
 
   return row;
 }
@@ -1459,8 +2103,37 @@ function renderCombat(root: HTMLElement, g: GameState, actions: UIActions) {
 
   if (isTargeting(g) && (g as any).selectedEnemyIndex == null) {
     const hint = div("targetHint");
-    hint.textContent = "대상 선택 필요: 위의 적 박스를 클릭하세요.";
+
+    const pt = g.pendingTarget as any;
+    const fromCard =
+      pt?.sourceCardUid ? cardDisplayNameByUid(g, pt.sourceCardUid) : null;
+    const fromLabel = pt?.sourceLabel ?? null;
+    const reason = pt?.reason ?? null;
+
+    const head =
+      fromCard ? `대상 선택 (${fromCard})`
+      : fromLabel ? `대상 선택 (${fromLabel})`
+      : `대상 선택 필요`;
+    const reasonLabel =
+      reason === "FRONT" ? "전열"
+      : reason === "BACK" ? "후열"
+      : reason === "EVENT" ? "이벤트"
+      : reason === "RELIC" ? "유물"
+      : null;
+
+    const tail = reasonLabel ? ` — ${reasonLabel}` : "";
+
+
+    const qn = g.pendingTargetQueue?.length ?? 0;
+    const remaining = (g.pendingTarget ? 1 : 0) + qn;
+
+    const idxInfo = remaining > 1 ? ` (남은 ${remaining}개)` : ` (남은 1개)`;
+
+    hint.textContent = `${head}${tail}${idxInfo}: 위의 적 박스를 클릭하세요.`;
+
     wrap.appendChild(hint);
+
+
   }
 
   board.appendChild(renderSlotsGrid(g, actions, "front"));
@@ -1482,32 +2155,52 @@ function setEnterAction(fn: (() => void) | null, disabled: boolean) {
   lastEnterDisabled = disabled;
 }
 
+function computeNextStep(g: GameState, actions: UIActions, targeting: boolean): {
+  label: string;
+  fn: (() => void) | null;
+  disabled: boolean;
+  activePhase: GameState["phase"];
+} {
+  if (g.run.finished) return { label: "종료", fn: null, disabled: true, activePhase: g.phase };
+  if (g.choice || overlay) return { label: "선택 중", fn: null, disabled: true, activePhase: g.phase };
+  if (targeting) return { label: "대상 선택", fn: null, disabled: true, activePhase: g.phase };
+
+  if (g.phase === "NODE") return { label: "노드 선택", fn: null, disabled: true, activePhase: g.phase };
+
+  if (g.phase === "PLACE") {
+    const needScout = g.enemies.length > 0 && !g.intentsRevealedThisTurn;
+    if (needScout) {
+      return { label: "다음: 정찰", fn: actions.onRevealIntents, disabled: false, activePhase: g.phase };
+    }
+    return { label: "다음: 후열", fn: actions.onResolveBack, disabled: false, activePhase: g.phase };
+  }
+
+  if (g.phase === "BACK")  return { label: "다음: 전열", fn: actions.onResolveFront, disabled: false, activePhase: g.phase };
+  if (g.phase === "FRONT") return { label: "다음: 적",   fn: actions.onResolveEnemy, disabled: false, activePhase: g.phase };
+  if (g.phase === "ENEMY") return { label: "다음: 정리", fn: actions.onUpkeep, disabled: false, activePhase: g.phase };
+  if (g.phase === "UPKEEP")return { label: "다음: 드로우", fn: actions.onDrawNextTurn, disabled: false, activePhase: g.phase };
+  if (g.phase === "DRAW")  return { label: "다음 턴", fn: actions.onDrawNextTurn, disabled: false, activePhase: g.phase };
+
+  // fallback
+  return { label: "다음", fn: null, disabled: true, activePhase: g.phase };
+}
+
 
 function renderHandDock(g: GameState, actions: UIActions, targeting: boolean) {
   const old = document.querySelector(".handDock");
   if (old) old.remove();
 
   const dock = div("handDock");
-
   const controls = div("controlsDock");
-  controls.appendChild(
-    stepButton("정찰", actions.onRevealIntents, g.enemies.length === 0 || g.intentsRevealedThisTurn || g.phase !== "PLACE" || targeting, g.phase === "PLACE")
-  );
-  controls.appendChild(
-    stepButton("후열", actions.onResolveBack, !(g.phase === "PLACE" || g.phase === "BACK") || targeting, g.phase === "BACK")
-  );
-  controls.appendChild(
-    stepButton("전열", actions.onResolveFront, g.phase !== "FRONT" || targeting, g.phase === "FRONT")
-  );
-  controls.appendChild(
-    stepButton("적", actions.onResolveEnemy, g.phase !== "ENEMY" || targeting, g.phase === "ENEMY")
-  );
-  controls.appendChild(
-    stepButton("정리", actions.onUpkeep, g.phase !== "UPKEEP" || targeting, g.phase === "UPKEEP")
-  );
-  controls.appendChild(
-    stepButton("드로우", actions.onDrawNextTurn, g.phase !== "DRAW" || targeting, g.phase === "DRAW")
-  );
+
+  const step = computeNextStep(g, actions, targeting);
+
+  const nextTurnBtn = document.createElement("button");
+  nextTurnBtn.textContent = "다음 턴";
+  nextTurnBtn.className = "stepBtn primary";
+  nextTurnBtn.disabled = step.disabled || g.phase === "NODE";
+  nextTurnBtn.onclick = () => actions.onAutoAdvance();
+  controls.appendChild(nextTurnBtn);
 
   const clear = document.createElement("button");
   clear.textContent = "선택 해제";
@@ -1527,52 +2220,46 @@ function renderHandDock(g: GameState, actions: UIActions, targeting: boolean) {
     hint.textContent = "손패가 비었습니다.";
     row.appendChild(hint);
   } else {
-    for (const uid of g.hand) row.appendChild(renderCard(g, uid, true, actions.onSelectHandCard));
+    const draggable = !isMobileUI();
+    for (const uid of g.hand) row.appendChild(renderCard(g, uid, true, actions.onSelectHandCard, { draggable }));
+    
   }
 
-  (() => {
-    if (g.run.finished) return setEnterAction(null, true);
-
-    if (targeting) return setEnterAction(null, true);
-
-    if (g.phase === "PLACE") {
-      const scoutDisabled = g.enemies.length === 0 || g.intentsRevealedThisTurn;
-      if (!scoutDisabled) return setEnterAction(actions.onRevealIntents, false);
-      return setEnterAction(actions.onResolveBack, false);
-    }
-
-    if (g.phase === "BACK") return setEnterAction(actions.onResolveBack, false);
-    if (g.phase === "FRONT") return setEnterAction(actions.onResolveFront, false);
-    if (g.phase === "ENEMY") return setEnterAction(actions.onResolveEnemy, false);
-    if (g.phase === "UPKEEP") return setEnterAction(actions.onUpkeep, false);
-    if (g.phase === "DRAW") return setEnterAction(actions.onDrawNextTurn, false);
-
-    return setEnterAction(null, true);
-  })();
-
-
-
+  setEnterAction(() => actions.onAutoAdvance(), nextTurnBtn.disabled);
 
   dock.appendChild(hand);
   document.body.appendChild(dock);
-}
 
-function stepButton(label: string, onClick: () => void, disabled: boolean, active: boolean) {
-  const b = document.createElement("button");
-  b.textContent = label;
-  b.disabled = disabled;
-  b.onclick = onClick;
-  b.className = "stepBtn";
-  if (active) b.classList.add("stepOn");
-  return b;
+  if (!isMobileUI()) enableHorizontalWheelScroll(hand);
 }
 
 
+
+function enableHorizontalWheelScroll(el: HTMLElement) {
+  if ((el as any).dataset?.wheelX === "1") return;
+  (el as any).dataset.wheelX = "1";
+
+  el.addEventListener(
+    "wheel",
+    (e) => {
+      // shift+휠은 원래대로(세로 스크롤)
+      if (e.shiftKey) return;
+
+      const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      el.scrollLeft += dx;
+
+      e.preventDefault();
+    },
+    { passive: false }
+  );
+}
 
 function renderSlotsGrid(g: GameState, actions: UIActions, side: Side) {
   const grid = div("grid6");
   const hasSelected = !!g.selectedHandCardUid;
   const slots = side === "front" ? g.frontSlots : g.backSlots;
+
+  const touchUI = isMobileUI();
 
   for (let i = 0; i < 3; i++) {
     const disabled = side === "back" ? !!g.backSlotDisabled?.[i] : false;
@@ -1588,17 +2275,66 @@ function renderSlotsGrid(g: GameState, actions: UIActions, side: Side) {
 
     const uid = slots[i];
     if (uid) {
-      const cardEl = renderCard(g, uid, false) as HTMLElement;
+      const cardEl = isMobileUI()
+        ? renderCardInSlotCompact(g, uid)
+        : (renderCard(g, uid, false) as HTMLElement);
       cardEl.classList.add("inSlot");
       s.appendChild(cardEl);
 
-      cardEl.onpointerdown = (ev) => {
-        if ((ev as any).button !== 0 && (ev as any).pointerType === "mouse") return;
-        if (isTargeting(g)) return;
-        if (g.phase !== "PLACE") return;
-        beginDrag(ev as any, { kind: "slot", cardUid: uid, fromSide: side, fromIdx: i });
-      };
-      cardEl.ondblclick = () => actions.onReturnSlotToHand(side, i);
+      if (!touchUI) {
+        cardEl.onpointerdown = (ev) => {
+          if (isMobileUI()) return;
+          if ((ev as any).button !== 0 && (ev as any).pointerType === "mouse") return;
+          if (isTargeting(g)) return;
+          if (g.phase !== "PLACE") return;
+          beginDrag(ev as any, { kind: "slot", cardUid: uid, fromSide: side, fromIdx: i });
+        };
+
+        // 더블클릭 회수 유지
+        cardEl.ondblclick = () => actions.onReturnSlotToHand(side, i);
+      } else {
+        cardEl.onpointerdown = (ev) => {
+          ev.stopPropagation();
+          if (disabled) return;
+          if (isTargeting(g)) return;
+          if (g.phase !== "PLACE") return;
+
+          clearLongPress();
+          longPressStartX = ev.clientX;
+          longPressStartY = ev.clientY;
+          longPressFired = false;
+
+          longPressTimer = window.setTimeout(() => {
+            longPressFired = true;
+            actions.onReturnSlotToHand(side, i); // 꾹 누르면 회수
+          }, 420);
+        };
+
+        cardEl.onpointermove = (ev) => {
+          if (longPressTimer == null) return;
+          const dx = ev.clientX - longPressStartX;
+          const dy = ev.clientY - longPressStartY;
+          if (dx * dx + dy * dy > 64) clearLongPress(); // 8px 이상 이동 시 취소
+        };
+
+        cardEl.onpointerup = (ev) => {
+          ev.stopPropagation();
+          const fired = longPressFired;
+          clearLongPress();
+
+          if (disabled) return;
+          if (isTargeting(g)) return;
+          if (g.phase !== "PLACE") return;
+
+          if (fired) return; // 롱프레스(회수) 했으면 탭 동작 막기
+
+          openCardPeek(g, uid); // 탭하면 확대
+        };
+
+        cardEl.onpointercancel = () => clearLongPress();
+      }
+
+
     }
 
     s.onclick = () => {
@@ -1607,10 +2343,14 @@ function renderSlotsGrid(g: GameState, actions: UIActions, side: Side) {
       if (g.phase !== "PLACE") return;
 
       const uidHere = slots[i];
+
+      // 선택이 없고, 슬롯에 카드가 있으면 회수
       if (!g.selectedHandCardUid && uidHere) {
         actions.onReturnSlotToHand(side, i);
         return;
       }
+
+      // 선택된 손패가 있으면 배치
       actions.onPlaceSelected(side, i);
     };
 
@@ -1619,6 +2359,7 @@ function renderSlotsGrid(g: GameState, actions: UIActions, side: Side) {
 
   return grid;
 }
+
 
 
 // Drag + Keyboard
@@ -1734,6 +2475,14 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
     if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
 
     const g = getG();
+
+    // 새로운 런: F
+    if (ev.code === "KeyF") {
+      ev.preventDefault();
+      actions.onNewRun();
+      return;
+    }
+
     // 취소: 4
     if (ev.code === "Digit4") {
       ev.preventDefault();
@@ -1766,30 +2515,17 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
       return;
     }
 
-    // 턴 넘기기: Space (가능한 다음 단계로)
+    // 턴 넘기기: Space
     if (ev.code === "Space") {
       ev.preventDefault();
+      const g = getG();
       if (g.run.finished) return;
-
-      // 선택창 떠있으면 진행 금지
       if (g.choice) return;
-
-      // 타겟 선택 필요면 진행 금지
       if (isTargeting(g)) return;
 
-      if (g.phase === "PLACE") {
-        actions.onResolveBack();
-        return;
-      }
-      if (g.phase === "BACK") return actions.onResolveBack();
-      if (g.phase === "FRONT") return actions.onResolveFront();
-      if (g.phase === "ENEMY") return actions.onResolveEnemy();
-      if (g.phase === "UPKEEP") return actions.onUpkeep();
-      if (g.phase === "DRAW") return actions.onDrawNextTurn();
-
+      actions.onAutoAdvance();
       return;
     }
-
 
     // 전열 배치(또는 타겟 선택): 1,2,3
     if (ev.code === "Digit1" || ev.code === "Digit2" || ev.code === "Digit3") {
@@ -1931,6 +2667,16 @@ function closestWithDatasetKeys(el: HTMLElement, keys: string[]): HTMLElement | 
 }
 
 function renderDragOverlay(_app: HTMLElement, g: GameState) {
+  if (isMobileUI()) {
+    document.querySelector(".dragLayer")?.remove();
+    return;
+  }
+
+  if (!drag || !drag.dragging) {
+    document.querySelector(".dragLayer")?.remove();
+    return;
+  }
+
   if (!drag || !drag.dragging) {
     document.querySelector(".dragLayer")?.remove();
     return;
@@ -1973,8 +2719,13 @@ function closeChoiceUI(g: GameState) {
 
 // Helpers / UI primitives
 
-function isTargeting(g: GameState) {
-  return g.pendingTarget != null || (g.pendingTargetQueue?.length ?? 0) > 0;
+function pushPendingTarget(g: GameState, t: PendingTarget) {
+  if (!g.pendingTarget) {
+    g.pendingTarget = t;
+    return;
+  }
+  if (!g.pendingTargetQueue) g.pendingTargetQueue = [];
+  g.pendingTargetQueue.push(t);
 }
 
 
@@ -2003,10 +2754,11 @@ function cardDisplayNameByUid(g: GameState, uid: string) {
 
 // Cards
 
-function renderCard(g: GameState, cardUid: string, clickable: boolean, onClick?: (uid: string) => void) {
+function renderCard(g: GameState, cardUid: string, clickable: boolean, onClick?: (uid: string) => void, opt?: { draggable?: boolean }) {
   const c = g.cards[cardUid];
   const def = getCardDefByIdWithUpgrade(g.content, c.defId, c.upgrade ?? 0);
 
+  const draggable = opt?.draggable ?? true;
   const d = div("card");
   if (g.selectedHandCardUid === cardUid) d.classList.add("selected");
   if (def.tags?.includes("EXHAUST")) d.classList.add("exhaust");
@@ -2037,12 +2789,60 @@ function renderCard(g: GameState, cardUid: string, clickable: boolean, onClick?:
 
   if (clickable) {
     d.onpointerdown = (ev) => {
-      if (ev.button !== 0 && ev.pointerType === "mouse") return;
-      if (isTargeting(g)) return;
-      if (g.phase !== "PLACE") return;
+      // 데스크톱 드래그는 기존 로직 유지
+      if (!isMobileUI()) {
+        if (ev.button !== 0 && ev.pointerType === "mouse") return;
+        if (isTargeting(g)) return;
+        if (g.phase !== "PLACE") return;
+        if (!draggable) return;
 
-      const idx = g.hand.indexOf(cardUid);
-      beginDrag(ev, { kind: "hand", cardUid, fromHandIndex: idx });
+        const idx = g.hand.indexOf(cardUid);
+        beginDrag(ev, { kind: "hand", cardUid, fromHandIndex: idx });
+        return;
+      }
+
+      // ✅ 모바일: 롱프레스(확대)
+      if (isTargeting(g)) return;
+      pressedUid = cardUid;
+      pressStartX = ev.clientX;
+      pressStartY = ev.clientY;
+
+      if (pressTimer) window.clearTimeout(pressTimer);
+      pressTimer = window.setTimeout(() => {
+        // 아직 같은 카드 누르는 중이면 확대
+        if (pressedUid === cardUid) openCardZoom(g, cardUid);
+      }, 280);
+    };
+
+    d.onpointermove = (ev) => {
+      if (!isMobileUI()) return;
+      if (!pressedUid) return;
+
+      const dx = ev.clientX - pressStartX;
+      const dy = ev.clientY - pressStartY;
+      if (dx*dx + dy*dy > 36) { // 6px 이상 이동하면 취소
+        if (pressTimer) window.clearTimeout(pressTimer);
+        pressTimer = null;
+        pressedUid = null;
+      }
+    };
+
+    d.onpointerup = () => {
+      if (!isMobileUI()) return;
+      if (pressTimer) window.clearTimeout(pressTimer);
+      pressTimer = null;
+
+      // 롱프레스가 아니라면 기존 탭 동작(선택)으로
+      if (!cardZoomOpen && onClick) onClick(cardUid);
+
+      pressedUid = null;
+    };
+
+    d.onpointercancel = () => {
+      if (!isMobileUI()) return;
+      if (pressTimer) window.clearTimeout(pressTimer);
+      pressTimer = null;
+      pressedUid = null;
     };
   }
 
