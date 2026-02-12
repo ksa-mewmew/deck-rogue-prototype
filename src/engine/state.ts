@@ -35,7 +35,7 @@ export function createInitialState(content: Content): GameState {
       forcedNext: null,
       bossOmenText: null,
 
-      deckSizeAtTreasure: 0,
+      deckSizeAtTreasure: null,
 
     },
 

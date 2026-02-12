@@ -1,6 +1,8 @@
 import type { GameState } from "../engine/types";
-import { logMsg, pickOne } from "../engine/rules";
+import { logMsg, pickOne, madnessP, rollMad } from "../engine/rules";
 import { addFatigue } from "../engine/effects";
+import { addCardToDeck, removeRandomCardFromDeck } from "../content/rewards"; 
+
 
 export type EventOutcome =
   | "NONE"
@@ -28,12 +30,116 @@ export function pickRandomEvent(): EventDef {
   return EVENTS[Math.floor(Math.random() * EVENTS.length)];
 }
 
+export function pickEventByMadness(g: GameState) {
+  const { tier } = madnessP(g);
+  const pNightmare = tier === 0 ? 0 : tier === 1 ? 0.25 : tier === 2 ? 0.55 : 0.85;
+
+  if (Math.random() < pNightmare) {
+    // 악몽 풀 (따로 배열/함수로 관리)
+    return pickRandomNightmareEvent(g);
+  }
+  return pickRandomEvent();
+}
+
 export const BOSS_OMEN_HINT: Record<string, string> = {
   boss_cursed_wall: "움직이지 않는다. 당신이 닳아간다.",
   boss_giant_orc: "거대한 무언가가 기다린다.",
   boss_soul_stealer: "행동하지 않으면 종말이 온다.",
   boss_gravity_master: "몸이 점점 무겁다. 몸을 가볍게 하라.",
 };
+
+// ===== 광기(악몽) 이벤트 풀 =====
+
+export const MAD_EVENTS: EventDef[] = [
+  {
+    id: "mad_mirror",
+    name: "거울에 잠긴 물",
+    prompt: "물 속의 당신이 먼저 웃습니다.",
+    options: (g) => [
+      {
+        key: "mad_mirror:take",
+        label: "손을 넣는다",
+        detail: "카드 보상. F +2.",
+        apply: (gg) => {
+          addFatigue(gg, 2);
+          logMsg(gg, "거울: 무언가를 건져 올렸다. (F +2)");
+          return "REWARD";
+        },
+      },
+      {
+        key: "mad_mirror:leave",
+        label: "외면한다",
+        apply: (gg) => {
+          logMsg(gg, "거울: 당신은 물러났다.");
+          return "NONE";
+        },
+      },
+    ],
+  },
+
+  {
+    id: "mad_contract",
+    name: "젖은 계약서",
+    prompt: "곰팡이 냄새가 납니다.",
+    options: (g) => [
+      {
+        key: "mad_contract:sign",
+        label: "서명한다",
+        detail: "최대 HP +2. 카드 1장 제거 후 보상.",
+        apply: (gg) => {
+          gg.player.maxHp += 2;
+          gg.player.hp = Math.min(gg.player.maxHp, gg.player.hp + 2);
+          logMsg(gg, "계약: 최대 HP +2");
+          return { kind: "REMOVE_PICK", title: "대가", prompt: "제거할 카드 1장을 선택하세요.", then: "REWARD" };
+        },
+      },
+      {
+        key: "mad_contract:burn",
+        label: "찢어버린다",
+        detail: "F +1",
+        apply: (gg) => {
+          addFatigue(gg, 1);
+          logMsg(gg, "불길함: F +1");
+          return "NONE";
+        },
+      },
+    ],
+  },
+
+  {
+    id: "mad_lullaby",
+    name: "심해의 자장가",
+    prompt: "잠들면 회복하지만, 깨어나면 잊습니다.",
+    options: (g) => [
+      {
+        key: "mad_lullaby:sleep",
+        label: "잠든다",
+        detail: "HP +12. 덱에서 무작위 1장 소실.",
+        apply: (gg) => {
+          gg.player.hp = Math.min(gg.player.maxHp, gg.player.hp + 12);
+          removeRandomCardFromDeck(gg);
+          logMsg(gg, "자장가: HP 회복, 그러나 잊었다… (무작위 1장 소실)");
+          return "NONE";
+        },
+      },
+      {
+        key: "mad_lullaby:stay",
+        label: "버틴다",
+        detail: "F -1",
+        apply: (gg) => {
+          addFatigue(gg, -1);
+          logMsg(gg, "버팀: F -1");
+          return "NONE";
+        },
+      },
+    ],
+  },
+];
+
+export function pickRandomNightmareEvent(_g: GameState): EventDef {
+  return MAD_EVENTS[Math.floor(Math.random() * MAD_EVENTS.length)];
+}
+
 
 export const EVENTS: EventDef[] = [
   {
@@ -85,32 +191,6 @@ export const EVENTS: EventDef[] = [
       },
     ],
   },
-
-  {
-    id: "overweight",
-    name: "과중량",
-    prompt: "너무 많은 짐이 피로를 부른다!",
-    options: (g) => {
-      const deckSize = Object.values(g.cards).filter((c) =>
-        ["deck", "hand", "discard"].includes(c.zone)
-      ).length;
-
-      const add = Math.floor(deckSize / 5);
-
-      return [
-        {
-          key: "accept",
-          label: `F +${add}`,
-          apply: (g2) => {
-            addFatigue(g2, add);
-            logMsg(g2, `이벤트: 과중량 (덱 ${deckSize}장 → F +${add})`);
-            return "NONE";
-          },
-        },
-      ];
-    },
-  },
-
 
   {
     id: "goblin_ambush_low_supplies",
@@ -243,4 +323,44 @@ export const EVENTS: EventDef[] = [
 
 export function getEventById(id: string) {
   return EVENTS.find((e) => e.id === id) ?? null;
+}
+
+
+export function applyWhisperDeal(g: GameState) {
+  const { tier: t } = madnessP(g);
+
+  // 이득 테이블
+  const gains = [
+    () => {
+      g.player.hp = Math.min(g.player.maxHp, g.player.hp + (t >= 2 ? 14 : 10));
+      logMsg(g, "속삭임: HP 회복");
+    },
+    () => {
+      addCardToDeck(g, "mad_echo", { upgrade: 0 });
+      logMsg(g, "속삭임: [메아리]를 얻었다");
+    },
+    () => {
+      addCardToDeck(g, "mad_insight", { upgrade: 0 });
+      logMsg(g, "속삭임: [금단의 통찰]을 얻었다");
+    },
+  ];
+
+  // 대가 테이블
+  const costs = [
+    () => { addFatigue(g, 1); logMsg(g, "대가: F +1"); },
+    () => { g.player.hp = Math.max(0, g.player.hp - 6); logMsg(g, "대가: HP -6"); },
+    () => { removeRandomCardFromDeck(g); logMsg(g, "대가: 덱에서 카드 1장 소실"); },
+  ];
+
+  pickOne(gains)();
+  pickOne(costs)();
+
+  const pExtraCost = t === 1 ? 0.15 : t === 2 ? 0.35 : 0.55;
+  if (Math.random() < pExtraCost) pickOne(costs)();
+
+  if (t >= 2 && rollMad(g, 0.10)) {
+    addCardToDeck(g, "mad_bargain", { upgrade: 0 });
+    addFatigue(g, 1);
+    logMsg(g, "속삭임: 거래가 확대되었다… (추가 카드, 추가 F)");
+  }
 }

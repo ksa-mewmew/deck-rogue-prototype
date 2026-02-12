@@ -12,20 +12,14 @@ export type ResolveCtx = {
 
 function enqueueTargetSelectDamage(ctx: ResolveCtx, amount: number) {
   const g = ctx.game;
-  const req = {
-    kind: "damageSelect" as const,
-    amount,
-    sourceCardUid: ctx.cardUid,
-    reason: ctx.side === "front" ? "FRONT" : "BACK",
-  } as const;
+  const req = { kind: "damageSelect" as const, amount, sourceCardUid: ctx.cardUid, reason: ctx.side === "front" ? "FRONT" : "BACK" } as const;
 
+  g.pendingTargetQueue ??= [];
   if (g.pendingTarget == null) g.pendingTarget = req;
   else g.pendingTargetQueue.push(req);
 
-  const remaining = (g.pendingTarget ? 1 : 0) + g.pendingTargetQueue.length;
-  logMsg(g, `대상 선택 필요: 적을 클릭하세요.`);
+  logMsg(g, `대상 선택 필요: 적을 클릭하세요. (${1 + g.pendingTargetQueue.length}개 남음)`);
 }
-
 
 function enqueueTargetSelectStatus(ctx: ResolveCtx, key: "vuln" | "weak" | "bleed" | "disrupt", n: number) {
   const g = ctx.game;
@@ -37,6 +31,7 @@ function enqueueTargetSelectStatus(ctx: ResolveCtx, key: "vuln" | "weak" | "blee
     reason: ctx.side === "front" ? "FRONT" : "BACK",
   } as const;
 
+  g.pendingTargetQueue ??= [];
   if (g.pendingTarget == null) g.pendingTarget = req;
   else g.pendingTargetQueue.push(req);
 
@@ -45,6 +40,8 @@ function enqueueTargetSelectStatus(ctx: ResolveCtx, key: "vuln" | "weak" | "blee
 }
 
 function enemyWillAttackThisTurn(g: GameState, en: EnemyState): boolean {
+  if (en.id === "boss_soul_stealer" && en.soulWillNukeThisTurn) return true;
+
   const def = g.content.enemiesById[en.id];
   const intent = def.intents[en.intentIndex % def.intents.length];
   return intent.acts.some((a) => a.op === "damagePlayer" || a.op === "damagePlayerFormula");
@@ -196,7 +193,7 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
 
       case "nullifyDamageThisTurn":
         g.player.nullifyDamageThisTurn = true;
-        logMsg(g, "이번 턴 피해 무효");
+        logMsg(g, "이번 턴 적 공격 피해 무효");
         break;
 
       case "triggerFrontOfBackSlot": {

@@ -52,7 +52,8 @@ export function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-export function pickOne<T>(arr: T[]): T {
+export function pickOne<T>(arr: readonly T[], why = "pickOne"): T {
+  if (arr.length === 0) throw new Error(`${why}: empty array`);
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
@@ -65,22 +66,15 @@ export function aliveEnemies(g: GameState) {
   return g.enemies.filter((e) => e.hp > 0);
 }
 
-export function applyStatus(target: { status: Record<StatusKey, number> }, key: StatusKey, n: number) {
-  target.status[key] = clampMin((target.status[key] ?? 0) + n, 0);
-}
+
 
 export function rollNodeOffers(g: GameState): NodeType[] {
-  const nextIndex = g.run.nodePickCount + 1;
-
-  if (nextIndex % 30 === 0) {
-    return ["BATTLE", "BATTLE"];
-  }
 
   const pool: NodeType[] = [];
 
-  const battleW = !g.run.treasureObtained ? 24 : 25;
-  const restW = !g.run.treasureObtained ? 3 : 1;
-  const eventW = !g.run.treasureObtained ? 5 : 7;
+  const battleW = !g.run.treasureObtained ? 20 : 24;
+  const restW = !g.run.treasureObtained ? 4 : 1;
+  const eventW = !g.run.treasureObtained ? 5 : 5;
 
   const canOfferTreasure = !g.run.treasureObtained && g.run.nodePickCount >= 30;
   const treasureW = canOfferTreasure ? 1 : 0;
@@ -90,17 +84,35 @@ export function rollNodeOffers(g: GameState): NodeType[] {
   for (let i = 0; i < eventW; i++) pool.push("EVENT");
   for (let i = 0; i < treasureW; i++) pool.push("TREASURE");
 
-  const a = pickOne(pool);
-  let b = pickOne(pool);
+  const a = pickOne(pool, "rollNodeOffers pool");
+  let b = pickOne(pool, "rollNodeOffers pool");
 
-  if (a === "TREASURE" && b === "TREASURE") {
-    let guard = 0;
-    do {
-      b = pickOne(pool);
-      guard++;
-      if (guard > 50) break;
-    } while (b === "TREASURE");
+  if (a === "TREASURE") {
+    const poolNoTreasure = pool.filter(x => x !== "TREASURE");
+    b = pickOne(poolNoTreasure, "rollNodeOffers poolNoTreasure");
   }
 
   return [a, b];
+}
+
+
+
+
+function clamp01(x: number) { return Math.max(0, Math.min(1, x)); }
+
+// F=0~5: 거의 없음
+// F=6~: 점점 상승, F=12쯤 0.7~0.8 근처
+export function madnessP(g: GameState, base = 0.0) {
+  const f = g.player?.fatigue ?? 0;
+  const p = clamp01(base + Math.max(0, f - 5) * 0.12); // 6부터 12%p씩
+  // 단계
+  const tier = f <= 5 ? 0 : f <= 8 ? 1 : f <= 11 ? 2 : 3;
+  return { f, p, tier };
+}
+
+
+// 확률 체크 헬퍼
+export function rollMad(g: GameState, extra = 0) {
+  const { p } = madnessP(g, extra);
+  return Math.random() < p;
 }

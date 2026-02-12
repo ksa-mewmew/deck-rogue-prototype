@@ -104,8 +104,6 @@ export type EnemyState = {
   intentIndex: number;
   status: Record<StatusKey, number>;
 
-  lastIntentIndex?: number;          // 이전 의도 저장
-
   immuneNextTurn: boolean;
   immuneThisTurn: boolean;
   soulCastCount?: number;
@@ -161,7 +159,7 @@ export type PendingTarget =
       amount: number;
       sourceCardUid?: string;
       sourceLabel?: string;
-      reason?: "FRONT" | "BACK" | "EVENT" | "RELIC";
+      reason?: TargetMeta["reason"];
     }
   | {
       kind: "statusSelect";
@@ -169,7 +167,7 @@ export type PendingTarget =
       n: number;
       sourceCardUid?: string;
       sourceLabel?: string;
-      reason?: "FRONT" | "BACK" | "EVENT" | "RELIC";
+      reason?: TargetMeta["reason"];
     };
 
 
@@ -220,7 +218,7 @@ export type RunState = {
   nextBossTime: number;
   forcedNext: "BOSS" | null;
   bossOmenText: string | null;
-  deckSizeAtTreasure: number
+  deckSizeAtTreasure: number | null;
 
 };
 

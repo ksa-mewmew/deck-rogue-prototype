@@ -5,11 +5,11 @@ export const ENEMIES: EnemyData[] = [
   {
     id: "other_adventurer",
     name: "보물을 노리는 다른 모험가",
-    maxHp: 40,
+    maxHp: 60,
     intents: [
       { label: "창 찌르기: 5 피해, 3번 발동", acts:
         [{ op: "damagePlayer", n: 5 }, { op: "damagePlayer", n: 5 }, { op: "damagePlayer", n: 5 }] },
-      { label: "독약 뿌리기: 출혈4, 취약4, 약화4", acts: [
+      { label: "독약 뿌리기: 출혈 +4, 취약 +4, 약화 +4 부여", acts: [
           { op: "statusPlayer", key: "bleed", n: 4 },
           { op: "statusPlayer", key: "vuln", n: 4 },
           { op: "statusPlayer", key: "weak", n: 4 },
@@ -21,10 +21,10 @@ export const ENEMIES: EnemyData[] = [
   {
     id: "goblin_raider",
     name: "고블린 약탈자",
-    maxHp: 15,
+    maxHp: 20,
     intents: [
       {
-        label: "기습: (12-이번 턴에 사용한 카드의 수) 피해",
+        label: "기습: 12 - 이번 턴에 사용한 카드의 수만큼 피해",
         acts: [{ op: "damagePlayerFormula", kind: "goblin_raider" }],
       },
       {
@@ -39,7 +39,7 @@ export const ENEMIES: EnemyData[] = [
     maxHp: 25,
     intents: [
       {
-        label: "감시: 4+(이번 턴에 사용한 카드의 수) 피해",
+        label: "감시: 4 + 이번 턴에 사용한 카드의 수만큼 피해",
         acts: [{ op: "damagePlayerFormula", kind: "watching_statue" }],
       },
     ],
@@ -47,7 +47,7 @@ export const ENEMIES: EnemyData[] = [
   {
     id: "pebble_golem",
     name: "조약돌 골렘",
-    maxHp: 25,
+    maxHp: 30,
     intents: [
       { label: "조약돌 던지기: 7 피해", acts: [{ op: "damagePlayer", n: 7 }] },
       { label: "모래 모으기: 자신 HP 6 회복", acts: [{ op: "enemyHealSelf", n: 6 }] },
@@ -70,7 +70,7 @@ export const ENEMIES: EnemyData[] = [
     intents: [
       { label: "유연한 몸: 다음 턴 동안 피해를 입지 않음", acts: [{ op: "enemyImmuneNextTurn" }] },
       {
-        label: "산성액: 약화 3 부여 후 자신 HP 3 회복",
+        label: "산성액: 약화 +3 부여 후 자신 HP 3 회복",
         acts: [{ op: "statusPlayer", key: "weak", n: 3 }, { op: "enemyHealSelf", n: 3 }],
       },
       { label: "때리기: 6 피해", acts: [{ op: "damagePlayer", n: 6 }] },
@@ -83,7 +83,7 @@ export const ENEMIES: EnemyData[] = [
     maxHp: 28,
     intents: [
       {
-        label: "독니로 물기: 출혈 4 부여",
+        label: "독니로 물기: 출혈 +4 부여",
         acts: [{ op: "statusPlayer", key: "bleed", n: 4 }],
       },
       {
@@ -91,7 +91,7 @@ export const ENEMIES: EnemyData[] = [
         acts: [{ op: "damagePlayer", n: 7 }],
       },
       {
-        label: "단번에 물기: 출혈 2 부여, 6 피해)",
+        label: "단번에 물기: 출혈 +2 부여, 6 피해",
         acts: [
           { op: "statusPlayer", key: "bleed", n: 2 },
           { op: "damagePlayer", n: 6 },
@@ -128,10 +128,10 @@ export const ENEMIES: EnemyData[] = [
   {
     id: "boss_gravity_master",
     name: "중력 통달자",
-    omen: "몸이 점점 무겁다. 몸을 가볍게 하라.",
+    omen: "몸이 점점 무겁다.",
     maxHp: 70,
     intents: [
-      { label: "중력 수축: 약화 3 부여", acts: [{ op: "statusPlayer", key: "weak", n: 3 }] },
+      { label: "중력 수축: 약화 +3 부여", acts: [{ op: "statusPlayer", key: "weak", n: 3 }] },
       { label: "특이점 생성", acts: [{ op: "damagePlayerByDeckSize", base: 8, per: 3, div: 5, cap: 30 }] },
       { label: "천장 붕괴: 11 피해", acts: [{ op: "damagePlayer", n: 11 },] },
     ],
@@ -164,7 +164,7 @@ export const ENEMIES: EnemyData[] = [
   {
     id: "boss_soul_stealer",
     name: "영혼 강탈자",
-    omen: "행동하지 않으면 종말이 온다.",
+    omen: "행동하지 않으면 종말이 오리라.",
     maxHp: 60,
     intents: [
       { label: "허기: 7 피해, S -2", acts: [{ op: "damagePlayer", n: 7 }, { op: "supplies", n: -2 }] },

@@ -1517,3 +1517,44 @@ html, body, #app{
   width: var(--handCardW) !important;
   height: var(--handCardH) !important;
 }
+:root{
+  --slotGapXBase: 22;
+  --slotGapYBase: 6;
+  --battleChromeHBase: 140;
+}
+/* 드래그 원본 카드 */
+.card.isDraggingSource {
+  opacity: 0.35;
+  filter: saturate(1.15) contrast(1.05);
+}
+
+/* 드래그 프리뷰 컨테이너(추가 연출 원하면 여기서) */
+.dragCardPreview {
+  border-radius: 16px;
+  pointer-events: none;
+}
+.card.isDraggingSource { opacity: 0.35; filter: saturate(1.15) contrast(1.05); }
+.dragCardPreview { border-radius: 16px; pointer-events: none; }
+
+.hand {
+  overflow-x: auto;
+}
+
+.handCardsRow {
+  display: inline-flex;      /* ✅ 내용폭 기반 */
+  gap: 12px;
+  justify-content: center;
+  align-items: stretch;
+  padding: 0 12px;
+  margin: 0 auto;            /* ✅ 남는 공간에서 가운데 */
+}
+.card {
+  background: #0f1216;              /* ✅ 불투명 배경 */
+  border: 1px solid rgba(255,255,255,.14);
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+}
+
+/* 혹시 기존에 이런 게 있으면 제거/덮어쓰기 */
+.card { opacity: 1; }
+.mainPanel { overflow-anchor: none; }
+.combatRoot { overflow-anchor: none; }

@@ -9,13 +9,10 @@ const RULEBOOK_TEXT = `# Deck Rogue Prototype — 룰북 (플레이어용)
 [2] 보급과 피로도
 
 보급(S): 전열 카드 및 일부 효과의 발동에 사용됩니다. 보통 7로 시작합니다.
-보급이 부족한 상태로 턴 종료 시, 이번 전투에서 보급 없이 종료한 턴의 횟수만큼 피해를 받습니다.
+보급이 부족한 상태로 턴 종료 시 피로도만큼 피해를 받습니다.
 
-피로도(F): 덱을 섞을 때 피로도가 1 올라가며, 일부 카드의 효과로도 변합니다.
-덱을 섞을 때 피로도만큼 피해를 입습니다. 피로도는 전투가 끝나도 유지됩니다.
-
-보급이 부족한 채로 턴을 마칠 때, 사용한 전열 카드 한 장 당 피해를 2 받으며, F가 1 증가합니다.
-이 효과는 보급 자체에 의한 HP 손실과 별개입니다!
+피로도(F): 덱을 섞거나 전열 카드의 보급이 부족한 채로 턴을 마칠 때 피로도가 1 올라가며, 일부 카드의 효과로도 변합니다.
+피로도는 전투가 끝나도 유지됩니다. 너무 쌓인 피로는 때때로 당신을 변하게 합니다.
 
 [3] 전투 흐름
 배치 → 후열 발동 → 전열 발동 → 적 행동 → 정리 → 드로우
@@ -53,6 +50,11 @@ const RULEBOOK_TEXT = `# Deck Rogue Prototype — 룰북 (플레이어용)
 [6] 당신을 위한 조언
 
 덱은 당신의 비품입니다. 비품이 적으면, 늘 새로 꾸리느라 힘들 겁니다. 비품이 많으면, 들고 다니기 힘들겠지요. 균형을 찾으세요.
+
+[7] 시간
+
+시간은 금입니다. 모든 행동은 시간을 소모합니다. 싸움은 좀 더 소모할지도 모르겠군요.
+중요한 건 이곳이 당신에게 넉넉한 시간을 주지 않는다는 것이겠지요.
 `;
 
 import type { GameState, PileKind, NodeOffer, Side, PendingTarget  } from "../engine/types";
@@ -71,12 +73,12 @@ import {
   currentTotalDeckLikeSize,
   escapeRequiredNodePicks,
 } from "../engine/combat";
-import { logMsg, rollBranchOffer, advanceBranchOffer } from "../engine/rules";
+import { logMsg, rollBranchOffer, advanceBranchOffer, madnessP, rollMad } from "../engine/rules";
 import { createInitialState } from "../engine/state";
 
 import type { EventOutcome } from "../content/events";
-import { pickRandomEvent, getEventById } from "../content/events";
-import { removeCardByUid, addCardToDeck, offerRewardPair, canUpgradeUid, upgradeCardByUid, obtainTreasure } from "../content/rewards";
+import { pickEventByMadness, pickRandomEvent, getEventById } from "../content/events";
+import { removeCardByUid, addCardToDeck, offerRewardPair, offerRewardsByFatigue, canUpgradeUid, upgradeCardByUid, obtainTreasure } from "../content/rewards";
 import { getCardDefByIdWithUpgrade } from "../content/cards";
 
 import { saveGame, hasSave, loadGame, clearSave } from "../persist";
@@ -92,6 +94,42 @@ function scheduleSave(g: GameState) {
 }
 
 type ForcedNext = null | "BOSS";
+
+function runAutoAdvanceRAF(g: GameState, actions: UIActions) {
+  if (g.run.finished) return;
+  if (g.choice) return;
+  if (isTargeting(g)) return;
+  if (overlay) return;
+  if (g.phase === "NODE") return;
+
+  let sawDraw = false;
+  let guard = 0;
+
+  const tick = () => {
+    guard++;
+    if (guard > 60) return;
+
+    if (g.run.finished) return;
+    if (g.choice || overlay) return;
+    if (isTargeting(g)) return;
+
+    const step = computeNextStep(g, actions, /*targeting*/ false);
+    if (!step.fn || step.disabled) return;
+
+    if (g.phase === "DRAW") sawDraw = true;
+
+    step.fn();
+    render(g, actions);
+
+    // ✅ 턴 경계: DRAW를 지나 PLACE로 돌아오면 멈춤(한 턴 단위)
+    if (sawDraw && g.phase === "PLACE") return;
+
+    requestAnimationFrame(tick);
+  };
+
+  requestAnimationFrame(tick);
+}
+
 
 function ensureBossSchedule(g: GameState) {
   const runAny = g.run as any;
@@ -164,12 +202,6 @@ let currentG: GameState | null = null;
 
 // 모바일 카드 확대
 
-let pressTimer: number | null = null;
-let pressStartX = 0;
-let pressStartY = 0;
-let pressedUid: string | null = null;
-let cardZoomOpen = false;
-
 function openCardZoom(g: GameState, uid: string) {
   closeCardZoom();
 
@@ -198,12 +230,64 @@ function openCardZoom(g: GameState, uid: string) {
 
   layer.appendChild(panel);
   document.body.appendChild(layer);
-  cardZoomOpen = true;
 }
+
+function attachLongPress(el: HTMLElement, opts: {
+  delayMs: number;
+  moveTolerancePx?: number; // 기본 6px
+  onFire: (ev: PointerEvent) => void;
+  onTap?: (ev: PointerEvent) => void; // 롱프레스 아니면 탭 처리
+  shouldIgnore?: (ev: PointerEvent) => boolean;
+}) {
+  let timer: number | null = null;
+  let fired = false;
+  let startX = 0;
+  let startY = 0;
+
+  const tol = opts.moveTolerancePx ?? 6;
+
+  const clear = () => {
+    if (timer != null) window.clearTimeout(timer);
+    timer = null;
+    fired = false;
+  };
+
+  el.onpointerdown = (ev) => {
+    if (opts.shouldIgnore?.(ev as any)) return;
+
+    fired = false;
+    startX = ev.clientX;
+    startY = ev.clientY;
+
+    if (timer != null) window.clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      fired = true;
+      timer = null;
+      opts.onFire(ev as any);
+    }, opts.delayMs);
+  };
+
+  el.onpointermove = (ev) => {
+    if (timer == null) return;
+    const dx = ev.clientX - startX;
+    const dy = ev.clientY - startY;
+    if (dx * dx + dy * dy > tol * tol) {
+      clear();
+    }
+  };
+
+  el.onpointerup = (ev) => {
+    const wasFired = fired;
+    clear();
+    if (!wasFired && opts.onTap) opts.onTap(ev as any);
+  };
+
+  el.onpointercancel = () => clear();
+}
+
 
 function closeCardZoom() {
   document.querySelector(".cardZoomLayer")?.remove();
-  cardZoomOpen = false;
 }
 
 function renderCardInSlotCompact(g: GameState, uid: string) {
@@ -220,19 +304,6 @@ function renderCardInSlotCompact(g: GameState, uid: string) {
   d.appendChild(meta);
 
   return d;
-}
-
-let longPressTimer: number | null = null;
-let longPressFired = false;
-let longPressStartX = 0;
-let longPressStartY = 0;
-
-function clearLongPress() {
-  if (longPressTimer != null) {
-    window.clearTimeout(longPressTimer);
-    longPressTimer = null;
-  }
-  longPressFired = false;
 }
 
 function openCardPeek(g: GameState, cardUid: string) {
@@ -499,7 +570,8 @@ function renderNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
   const parts: string[] = [`[탐험 ${g.run.nodePickCount}회]`];
 
   if (g.run.treasureObtained) {
-    const req = escapeRequiredNodePicks(g.run.deckSizeAtTreasure);
+    const snap = g.run.deckSizeAtTreasure ?? currentTotalDeckLikeSize(g);
+    const req = escapeRequiredNodePicks(snap);
     parts.push(`[탈출까지 ${g.run.afterTreasureNodePicks}/${req}]`);
   }
 
@@ -507,18 +579,65 @@ function renderNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
 
   ensureBossSchedule(g);
 
-  
   if (!g.run.bossOmenText || String(g.run.bossOmenText).trim() === "") {
-    g.run.bossOmenText = "아직 징조가 없다."; // 기본 문구
+    g.run.bossOmenText = "아직 징조가 없다.";
   }
+
   const runAny = g.run as any;
+
   const T = totalTime(g);
-  const remain = Math.max(0, runAny.nextBossTime - T);
+  const nextBossTime = runAny.nextBossTime ?? 30;
 
-  const omenTxt = ` . . . ${g.run.bossOmenText}`;
-  const omen = divText("bossOmenBanner", `다음 보스까지 남은 시간: ${remain}${omenTxt}`);
+  // === UI 예측: 다음 노드 선택 시 시간 변화 ===
+  const offers = actions.getNodeOffers();
+
+  const extra = runAny.nodeExtra01 ?? 0;
+  const afterTBase = T + 1 + extra;
+
+  const forcedBossNow = runAny.forcedNext === "BOSS";
+  const willForceRest = !forcedBossNow && afterTBase >= nextBossTime;
+
+  // willForceRest면 실제로 REST로 강제 전환되므로 battleTime=0
+  // 강제보스면 전투로 들어가므로 battleTime=1(전투 시간 +1 규칙 적용)
+
+  const canPickBattle = !forcedBossNow && !willForceRest && (offers[0]?.type === "BATTLE" || offers[1]?.type === "BATTLE");
+
+  const afterT_ifBattle = afterTBase + 1;
+  const afterT2 = forcedBossNow
+    ? (afterTBase + 1)
+    : canPickBattle
+    ? afterT_ifBattle
+    : afterTBase;
+
+  const remaining = Math.max(0, nextBossTime - T);
 
 
+  const willHitBossUI = afterT2 >= nextBossTime;
+
+  if (willHitBossUI && runAny.forcedNext !== "BOSS") {
+    const warn = divText("bossIncomingBanner", "보스가 온다.");
+    warn.style.cssText =
+      "margin-top:10px; padding:10px 12px; border-radius:14px;" +
+      "border:1px solid rgba(255,255,255,.14);" +
+      "background: rgba(255,120,60,.12);" +
+      "font-weight:700; font-size:13px; line-height:1.25;";
+    root.appendChild(warn);
+  }
+
+  const { tier } = madnessP(g);
+  const extraOmen =
+    tier === 0 ? "" :
+    tier === 1 ? (Math.random() < 0.1 ? " . . . 들린다." : "") :
+    tier === 2 ? (Math.random() < 0.1 ? " . . . 보인다." : "") :
+                (Math.random() < 0.1 ? " . . . 닿았다." : "");
+
+  const omenTxt = ` . . . ${g.run.bossOmenText}${extraOmen}`;
+
+
+  const omen = divText(
+    "bossOmenBanner",
+    `다음 보스까지 남은 시간: ${remaining}${omenTxt}`
+  );
 
   omen.style.cssText =
     "margin-top:8px; padding:10px 12px; border-radius:14px;" +
@@ -526,14 +645,12 @@ function renderNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
     "background:rgba(0, 0, 0, 0.18);" +
     "font-weight:600;" +
     "font-size:13px;" +
-    "line-height:1.2;"; 
+    "line-height:1.2;";
+  omen.style.color = "white";
   root.appendChild(omen);
 
-  omen.style.color = "white";
-
-  const offers = actions.getNodeOffers();
+  // ===== 아래는 기존 브랜치 프리뷰 UI 그대로 =====
   const br = g.run.branchOffer;
-
   if (br) {
     const preview = div("nodePreviewBox");
     preview.style.cssText =
@@ -582,51 +699,16 @@ function renderNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
 
 
 
+
 function hr() {
   return document.createElement("hr");
 }
-
 
 
 // Choice types
 
 type ChoiceKind = "EVENT" | "REWARD" | "PICK_CARD" | "VIEW_PILE" | "UPGRADE_PICK";
 
-function autoAdvanceToNextTurn(g: GameState, actions: UIActions) {
-  // 이미 종료/선택중/타겟중이면 안 함
-  if (g.run.finished) return;
-  if (g.choice) return;
-  if (isTargeting(g)) return;
-
-  let sawDraw = false;
-  let guard = 0;
-
-  const tick = () => {
-    guard++;
-    if (guard > 50) return; // 안전장치 (무한루프 방지)
-
-    if (g.run.finished) return;
-    if (g.choice || overlay) return;
-    if (isTargeting(g)) return;
-
-    // “다음 한 단계” 계산
-    const step = computeNextStep(g, actions, /*targeting*/ false);
-    if (!step.fn || step.disabled) return;
-
-    // 실행 전/후로 턴 경계 감지
-    if (g.phase === "DRAW") sawDraw = true;
-
-    step.fn();
-
-    render(g, actions);
-
-    if (sawDraw && g.phase === "PLACE") return;
-
-    requestAnimationFrame(tick);
-  };
-
-  requestAnimationFrame(tick);
-}
 
 
 
@@ -645,6 +727,13 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
 
   const choiceStack: ChoiceFrame[] = [];
 
+  function clearChoiceStack(g: GameState) {
+    choiceStack.length = 0;
+    g.choice = null;
+    choiceHandler = null;
+    document.querySelector(".choice-overlay")?.remove();
+  }
+
   function pushChoice(g: GameState) {
     choiceStack.push({ choice: g.choice, handler: choiceHandler });
   }
@@ -652,14 +741,32 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
   function popChoice(g: GameState) {
     const prev = choiceStack.pop();
     if (!prev) {
-      closeChoiceUI(g);
-      choiceHandler = null;
+      closeChoiceOrPop(g);
       return;
     }
     g.choice = prev.choice;
     choiceHandler = prev.handler;
   }
 
+  function closeChoiceOrPop(g: GameState) {
+    if (choiceStack.length > 0) {
+      popChoice(g); // 내부에서 g.choice/handler 복구
+      return;
+    }
+    g.choice = null;
+    choiceHandler = null;
+    document.querySelector(".choice-overlay")?.remove();
+  }
+
+  function openChoice(
+    g: GameState,
+    next: GameState["choice"],
+    handler: (key: string) => void
+  ) {
+    if (g.choice) pushChoice(g);
+    g.choice = next;
+    choiceHandler = handler;
+  }
 
   const getG = () => {
     if (!currentG) return g0;
@@ -730,8 +837,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       hoverSlot = null;
       overlay = null;
       drag = null;
-      choiceHandler = null;
-      closeChoiceUI(g);              
+      closeChoiceOrPop(g);           
       clearSave();
       setGame(createInitialState(g.content));
     },
@@ -880,6 +986,11 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
           : willHitBoss
           ? ("REST" as const)
           : (basePicked as typeof basePicked);
+      const battleTime = actual === "BATTLE" ? 1 : 0;
+      const afterT2 = afterT + battleTime;
+
+      g.time = (g.time ?? 0) + extra + battleTime;
+      if (battleTime) logMsg(g, "전투를 선택해 시간이 더 소모된다. (시간 +1)");
 
       advanceBranchOffer(g, id);
 
@@ -888,7 +999,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       if (g.run.treasureObtained && actual !== "TREASURE") {
         g.run.afterTreasureNodePicks += 1;
 
-        const snap = g.run.deckSizeAtTreasure;
+        const snap = g.run.deckSizeAtTreasure ?? currentTotalDeckLikeSize(g);
         const req = escapeRequiredNodePicks(snap);
   
         if (g.run.afterTreasureNodePicks >= req) {
@@ -902,17 +1013,16 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       if (forcedBossNow) {
         runAny.forcedNext = null;
         runAny.nextBossTime += 30;
-
         g.run.bossOmenText = null;
 
-        logMsg(g, `=== 시간 ${afterT}: 보스 전투 ===`);
+        logMsg(g, `=== 시간 ${afterT2}: 보스 전투 ===`);
         spawnEncounter(g, { forceBoss: true });
         startCombat(g);
         render(g, actions);
         return;
       }
 
-      if (willHitBoss) {
+      if (!forcedBossNow && afterT2 >= runAny.nextBossTime) {
         runAny.forcedNext = "BOSS";
         logMsg(g, `시간이 흘러 보스가 다가옵니다!`);
       }
@@ -926,35 +1036,49 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
 
       if (actual === "REST") {
 
+        function applyRestHighFatigueCost(g: GameState) {
+          const f = g.player.fatigue ?? 0;
+          if (f < 10) return;
+
+          g.player.fatigue = Math.max(0, f - 2);
+          g.time = (g.time ?? 0) + 1;
+          logMsg(g, "피로가 너무 높아 휴식이 더 오래 걸립니다. (F -2, 시간 +1)");
+        }
+
         const openRestMenu = () => {
+          const highF = (g.player.fatigue ?? 0) >= 10;
+
+          const restTitle = highF ? "피로도가 너무 높아 더 쉬어야 합니다." : "휴식";
+          const restSuffix = highF ? " (피로도 10 이상: F -2, 시간 +1)" : "";
+
           g.choice = {
             kind: "EVENT",
-            title: "휴식",
+            title: restTitle,
             prompt: "무엇을 하시겠습니까?",
             options: [
-              { key: "rest:heal", label: "HP +15" },
-              { key: "rest:clear_f", label: "F -3" },
-              { key: "rest:upgrade", label: "강화" },
-              { key: "rest:skip", label: "생략" },
+              { key: "rest:heal",    label: `HP +15 ${restSuffix}` },
+              { key: "rest:clear_f", label: `F -3 ${restSuffix}` },
+              { key: "rest:upgrade", label: `강화 ${restSuffix}` },
+              { key: "rest:skip",    label: `생략` },
             ],
           };
 
           choiceHandler = (key: string) => {
             if (key === "rest:heal") {
+              applyRestHighFatigueCost(g);
               g.player.hp = Math.min(g.player.maxHp, g.player.hp + 15);
               logMsg(g, "휴식: HP +15");
-              closeChoiceUI(g);
-              choiceHandler = null;
+              closeChoiceOrPop(g);
               g.phase = "NODE";
               render(g, actions);
               return;
             }
 
             if (key === "rest:clear_f") {
+              applyRestHighFatigueCost(g);
               g.player.fatigue = Math.max(0, g.player.fatigue - 3);
               logMsg(g, "휴식: 피로 F-=3");
-              closeChoiceUI(g);
-              choiceHandler = null;
+              closeChoiceOrPop(g);
               g.phase = "NODE";
               render(g, actions);
               return;
@@ -963,6 +1087,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
             if (key === "rest:upgrade") {
               openUpgradePick(g, actions, "강화", "강화할 카드 1장을 선택하세요.", {
                 onDone: () => {
+                  applyRestHighFatigueCost(g);
                   g.phase = "NODE";
                   render(g, actions);
                 },
@@ -975,8 +1100,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
             }
 
             logMsg(g, "휴식: 생략");
-            closeChoiceUI(g);
-            choiceHandler = null;
+            closeChoiceOrPop(g);
             g.phase = "NODE";
             render(g, actions);
             return;
@@ -1006,12 +1130,37 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         runAny.firstEventSeen ??= false;
 
         const ev = !runAny.firstEventSeen
-          ? (getEventById("ominous_prophecy") ?? pickRandomEvent())
-          : pickRandomEvent();
+          ? (getEventById("ominous_prophecy") ?? pickEventByMadness(g))
+          : pickEventByMadness(g);
 
         runAny.firstEventSeen = true;
 
         const opts = ev.options(g);
+
+        const { tier } = madnessP(g);
+        if (tier >= 2) {
+          opts.push({
+            key: "mad:whisper",
+            label: "속삭임에 귀 기울인다.",
+            detail: "무언가를 얻는다. 그리고 무언가를 잃는다.",
+            apply: (g: GameState) => {
+              // 보상: 강화/카드/회복 중 하나
+              const r = Math.random();
+              if (r < 0.34) {
+                g.player.hp = Math.min(g.player.maxHp, g.player.hp + 10);
+                logMsg(g, "속삭임: HP +10");
+              } else if (r < 0.67) {
+                g.player.fatigue += 1;
+                logMsg(g, "속삭임: F +1 (대가)");
+              } else {
+                // 고광기 전용 카드 확률적으로 지급
+                addCardToDeck(g, "mad_echo", { upgrade: 0 });
+                logMsg(g, "속삭임: [메아리]를 얻었다.");
+              }
+              return "NONE" as any;
+            },
+          });
+        }
 
         g.choice = {
           kind: "EVENT",
@@ -1032,12 +1181,12 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
           }
 
           if (typeof outcome === "object" && outcome.kind === "REMOVE_PICK") {
-            pushChoice(g);
+
             const candidates = Object.values(g.cards)
               .filter((c) => c.zone === "deck" || c.zone === "hand" || c.zone === "discard")
               .map((c) => c.uid);
 
-            g.choice = {
+            openChoice(g, {
               kind: "PICK_CARD",
               title: outcome.title,
               prompt: outcome.prompt ?? "제거할 카드 1장을 선택하세요.",
@@ -1053,12 +1202,10 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
                 }),
                 { key: "cancel", label: "취소" },
               ],
-            };
-
-            choiceHandler = (k: string) => {
+            }, (k: string) => {
               if (k === "cancel") {
                 logMsg(g, "제거 취소");
-                popChoice(g);
+                closeChoiceOrPop(g);   // ✅ pop으로 복귀
                 render(g, actions);
                 return;
               }
@@ -1080,8 +1227,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
                 undefined;
 
               if (then === "BATTLE") {
-                closeChoiceUI(g);
-                choiceHandler = null;
+                clearChoiceStack(g);
                 spawnEncounter(g);
                 startCombat(g);
                 render(g, actions);
@@ -1090,19 +1236,17 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
 
 
               if (then === "REWARD_PICK") {
-                closeChoiceUI(g);
-                choiceHandler = null;
+                clearChoiceStack(g);
                 openRewardPick(g, actions, "카드 보상", "두 장 중 한 장을 선택하거나 생략합니다.");
                 return;
               }
 
-              closeChoiceUI(g);
-              choiceHandler = null;
+              clearChoiceStack(g);
               g.phase = "NODE";
               render(g, actions);
               return;
 
-            };
+            });
 
 
             render(g, actions);
@@ -1110,8 +1254,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
           }
 
           if (typeof outcome === "object" && outcome.kind === "BATTLE_SPECIAL") {
-            g.choice = null;
-            choiceHandler = null;
+            clearChoiceStack(g);
             logMsg(g, outcome.title ? `이벤트 전투: ${outcome.title}` : "이벤트 전투 발생!");
             spawnEncounter(g, { forcePatternIds: outcome.enemyIds });
             startCombat(g);
@@ -1120,8 +1263,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
           }
 
           if (outcome === "BATTLE") {
-            g.choice = null;
-            choiceHandler = null;
+            clearChoiceStack(g);
             spawnEncounter(g);
             startCombat(g);
             render(g, actions);
@@ -1129,13 +1271,12 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
           }
 
           if (outcome === "REWARD") {
+            clearChoiceStack(g);
             openRewardPick(g, actions, "카드 보상", "두 장 중 한 장을 선택하거나 생략합니다.");
             return;
           }
 
-          g.choice = null;
-          closeChoiceUI(g);
-          choiceHandler = null;
+          closeChoiceOrPop(g);
           render(g, actions);
           return;
         };
@@ -1163,7 +1304,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       if (kind === "REWARD" || kind === ("REWARD_PICK" as any)) {
         if (key === "skip") {
           logMsg(g, "카드 보상 생략");
-          closeChoiceUI(g);
+          closeChoiceOrPop(g);
           render(g, actions);
           return;
         }
@@ -1176,7 +1317,10 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
           addCardToDeck(g, defId, { upgrade });
           logMsg(g, `카드 획득: ${cardDisplayNameByDefId(g, defId, upgrade)}`);
 
-          closeChoiceUI(g);
+          closeChoiceOrPop(g);
+
+          if (!g.run.finished && g.enemies.length === 0) g.phase = "NODE";
+
           render(g, actions);
           return;
         }
@@ -1187,62 +1331,8 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
 
     onAutoAdvance: () => {
       const g = getG();
-      if (g.run.finished) return;
-      if (g.choice) return;
-      if (isTargeting(g)) return;
-      if (g.phase === "NODE") return;
-
-      let drew = false;
-
-      // 안전장치 (무한루프 방지)
-      for (let guard = 0; guard < 50; guard++) {
-        if (g.run.finished) break;
-        if (g.choice) break;
-        if (isTargeting(g)) break;
-
-
-        if (g.phase === "DRAW") {
-          drawStepStartNextTurn(g);
-          drew = true;
-         break;
-        }
-
-        if (g.phase === "PLACE") {
-          if (g.enemies.length > 0 && !g.intentsRevealedThisTurn) {
-            revealIntentsAndDisrupt(g);
-            continue;
-          }
-          resolveBack(g);
-          continue;
-        }
-
-        if (g.phase === "BACK") {
-          resolveBack(g);
-          continue;
-        }
-
-        if (g.phase === "FRONT") {
-          resolveFront(g);
-          continue;
-        }
-
-        if (g.phase === "ENEMY") {
-          resolveEnemy(g);
-          continue;
-        }
-
-        if (g.phase === "UPKEEP") {
-          upkeepEndTurn(g);
-          continue;
-        }
-
-        // 예상 밖 phase면 탈출
-        break;
-      }
-
-      render(g, actions);
+      runAutoAdvanceRAF(g, actions);
     },
-
 
 
     onRevealIntents: () => {
@@ -1344,21 +1434,25 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
 
   // 보상/강화 창 열기
   function openRewardPick(g: GameState, actions: any, title: string, prompt: string) {
-    const [a, b] = offerRewardPair(); // a,b: {defId, upgrade}
 
-    const da = getCardDefByIdWithUpgrade(g.content, a.defId, a.upgrade);
-    const db = getCardDefByIdWithUpgrade(g.content, b.defId, b.upgrade);
 
-    const la = displayNameForOffer(g, a);
-    const lb = displayNameForOffer(g, b);
+    const offers = offerRewardsByFatigue(g);
+    const opts = offers.map((o) => {
+      const d = getCardDefByIdWithUpgrade(g.content, o.defId, o.upgrade);
+      return {
+        key: `pick:${o.defId}:${o.upgrade}`,
+        label: displayNameForOffer(g, o),
+        detail: `전열: ${d.frontText} / 후열: ${d.backText}`,
+      };
+    });
+ 
 
     g.choice = {
       kind: "REWARD",
       title,
       prompt,
       options: [
-        { key: `pick:${a.defId}:${a.upgrade}`, label: la, detail: `전열: ${da.frontText} / 후열: ${da.backText}` },
-        { key: `pick:${b.defId}:${b.upgrade}`, label: lb, detail: `전열: ${db.frontText} / 후열: ${db.backText}` },
+        ...opts,
         { key: "skip", label: "생략" },
       ],
     };
@@ -1373,8 +1467,8 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         logMsg(g, "카드 보상 생략");
       }
 
-      closeChoiceUI(g);
-      choiceHandler = null;
+      closeChoiceOrPop(g);
+      if (!g.run.finished) g.phase = "NODE";
       render(g, actions);
       return;
     };
@@ -1393,9 +1487,18 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       onSkip?: () => void;
     }
   ) {
-    const candidates = Object.values(g.cards)
+    let candidates = Object.values(g.cards)
       .filter((c) => (c.zone === "deck" || c.zone === "hand" || c.zone === "discard") && canUpgradeUid(g, c.uid))
       .map((c) => c.uid);
+
+    const f = g.player.fatigue ?? 0;
+    let limit = Infinity;
+    if (f >= 8) limit = 4;
+    else if (f >= 5) limit = 8;
+
+    if (limit !== Infinity && candidates.length > limit) {
+      candidates = [...candidates].sort(() => Math.random() - 0.5).slice(0, limit);
+    }
 
     if (candidates.length === 0) {
       logMsg(g, "강화할 수 있는 카드가 없습니다.");
@@ -1442,8 +1545,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       // 취소
       if (k === "skip") {
         logMsg(g, "강화 취소");
-        closeChoiceUI(g);
-        choiceHandler = null;
+        closeChoiceOrPop(g);
 
         if (opts?.onSkip) opts.onSkip();
         else render(g, actions);
@@ -1456,8 +1558,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         const ok = upgradeCardByUid(g, uid);
         logMsg(g, ok ? `강화: [${cardDisplayNameByUid(g, uid)}]` : "강화 실패");
 
-        closeChoiceUI(g);
-        choiceHandler = null;
+        closeChoiceOrPop(g);
 
         if (opts?.onDone) opts.onDone();
         else render(g, actions);
@@ -1465,8 +1566,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       }
 
       // 예상 못한 키: 그냥 닫기
-      closeChoiceUI(g);
-      choiceHandler = null;
+      closeChoiceOrPop(g);
       render(g, actions);
     };
 
@@ -1596,8 +1696,8 @@ function renderLogOverlay(g: GameState, actions: UIActions) {
 
   if (!showLogOverlay) return;
 
-  const overlay = div("logOverlay");
-  overlay.style.cssText = `
+  const layer = div("logOverlay");
+  layer.style.cssText = `
     position: fixed; inset: 0;
     z-index: 6000;
     background: rgba(0,0,0,.55);
@@ -1634,11 +1734,11 @@ function renderLogOverlay(g: GameState, actions: UIActions) {
 
   sheet.appendChild(pre);
 
-  overlay.onclick = () => actions.onToggleLogOverlay();
+  layer.onclick = () => actions.onToggleLogOverlay();
   sheet.onclick = (e) => e.stopPropagation();
 
-  overlay.appendChild(sheet);
-  document.body.appendChild(overlay);
+  layer.appendChild(sheet);
+  document.body.appendChild(layer);
 }
 
 function renderOverlayLayer(
@@ -1795,6 +1895,12 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
   const list = div("choice-list");
   list.style.cssText = "display:flex; flex-direction:column; gap:10px; margin-top:12px;";
 
+  const fixPreviewSize = (cardEl: HTMLElement) => {
+    cardEl.style.width = "var(--handCardW)";
+    cardEl.style.height = "var(--handCardH)";
+    cardEl.style.boxSizing = "border-box";
+  };
+
   c.options.forEach((opt) => {
     const item = div("choice-item");
     item.style.cssText =
@@ -1807,17 +1913,19 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
 
     const uid = (opt as any).cardUid as string | undefined;
     if (uid) {
-      left.appendChild(renderCardPreviewByUid(g, uid));
+      const el = renderCardPreviewByUid(g, uid) as HTMLElement;
+      fixPreviewSize(el);
+      left.appendChild(el);
     } else {
-
       if (typeof opt.key === "string" && opt.key.startsWith("pick:")) {
         const payload = opt.key.slice("pick:".length);
         const [defId, upStr] = payload.split(":");
         const upgrade = Number(upStr ?? "0") || 0;
-        left.appendChild(renderCardPreviewByDef(g, defId, upgrade));
+        const el = renderCardPreviewByDef(g, defId, upgrade) as HTMLElement;
+        fixPreviewSize(el);
+        left.appendChild(el);
       }
     }
-
 
     const right = div("choice-right");
     right.style.cssText = "flex:1 1 auto; min-width:260px;";
@@ -1843,11 +1951,11 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
     list.appendChild(item);
   });
 
-
   panel.appendChild(list);
   overlayEl.appendChild(panel);
   document.body.appendChild(overlayEl);
 }
+
 
 // Top HUD (Player left + Enemies center + Top-right controls)
 function isMobileUI() {
@@ -1881,7 +1989,7 @@ function renderTopHud(g: GameState, actions: UIActions) {
     topLine.appendChild(chipEl(`S ${g.player.supplies}`, g.player.supplies === 0 ? "warn" : ""));
     topLine.appendChild(chipEl(`F ${g.player.fatigue}`));
 
-    topLine.appendChild(chipEl(`시간 ${Math.max(1, g.run.nodePickCount+Time)}`));
+    topLine.appendChild(chipEl(`시간 ${Math.max(1, totalTime(g))}`));
     topLine.appendChild(chipEl(`덱 ${g.deck.length}`));
 
     left.appendChild(topLine);
@@ -2011,7 +2119,11 @@ function renderTopHud(g: GameState, actions: UIActions) {
 
       const def = g.content.enemiesById[e.id];
       const intent = def.intents[e.intentIndex % def.intents.length];
-      const label = e.intentLabelOverride ?? intent.label;
+      let label = e.intentLabelOverride ?? intent.label;
+
+
+
+
 
       chipBox.appendChild(divText("enemyIntent", g.intentsRevealedThisTurn ? `${label}` : ""));
 
@@ -2096,17 +2208,22 @@ function renderLogHeaderRow() {
 
 
 function renderCombat(root: HTMLElement, g: GameState, actions: UIActions) {
-
-
   const wrap = div("combatRoot");
   const board = div("boardArea");
+
+  const hintSlot = div("targetHintSlot");  
+  hintSlot.style.cssText =
+    "height: 54px;" +                 // ✅ 고정 높이 (한 줄 + 패딩 기준)
+    "margin: 0 0 3px 0;" +
+    "display:flex; align-items:center;";
+  wrap.appendChild(hintSlot);
+
 
   if (isTargeting(g) && (g as any).selectedEnemyIndex == null) {
     const hint = div("targetHint");
 
     const pt = g.pendingTarget as any;
-    const fromCard =
-      pt?.sourceCardUid ? cardDisplayNameByUid(g, pt.sourceCardUid) : null;
+    const fromCard = pt?.sourceCardUid ? cardDisplayNameByUid(g, pt.sourceCardUid) : null;
     const fromLabel = pt?.sourceLabel ?? null;
     const reason = pt?.reason ?? null;
 
@@ -2114,6 +2231,7 @@ function renderCombat(root: HTMLElement, g: GameState, actions: UIActions) {
       fromCard ? `대상 선택 (${fromCard})`
       : fromLabel ? `대상 선택 (${fromLabel})`
       : `대상 선택 필요`;
+
     const reasonLabel =
       reason === "FRONT" ? "전열"
       : reason === "BACK" ? "후열"
@@ -2123,26 +2241,27 @@ function renderCombat(root: HTMLElement, g: GameState, actions: UIActions) {
 
     const tail = reasonLabel ? ` — ${reasonLabel}` : "";
 
-
     const qn = g.pendingTargetQueue?.length ?? 0;
     const remaining = (g.pendingTarget ? 1 : 0) + qn;
-
     const idxInfo = remaining > 1 ? ` (남은 ${remaining}개)` : ` (남은 1개)`;
 
     hint.textContent = `${head}${tail}${idxInfo}: 위의 적 박스를 클릭하세요.`;
 
-    wrap.appendChild(hint);
 
+    hintSlot.appendChild(hint);
+  } else {
 
+    hintSlot.style.visibility = "hidden";
+    hintSlot.textContent = ".";
   }
 
   board.appendChild(renderSlotsGrid(g, actions, "front"));
-
   board.appendChild(renderSlotsGrid(g, actions, "back"));
 
   wrap.appendChild(board);
   root.appendChild(wrap);
 }
+
 
 
 
@@ -2155,35 +2274,33 @@ function setEnterAction(fn: (() => void) | null, disabled: boolean) {
   lastEnterDisabled = disabled;
 }
 
-function computeNextStep(g: GameState, actions: UIActions, targeting: boolean): {
-  label: string;
-  fn: (() => void) | null;
-  disabled: boolean;
-  activePhase: GameState["phase"];
-} {
+function computeNextStep(g: GameState, actions: UIActions, targeting: boolean) {
   if (g.run.finished) return { label: "종료", fn: null, disabled: true, activePhase: g.phase };
   if (g.choice || overlay) return { label: "선택 중", fn: null, disabled: true, activePhase: g.phase };
   if (targeting) return { label: "대상 선택", fn: null, disabled: true, activePhase: g.phase };
-
   if (g.phase === "NODE") return { label: "노드 선택", fn: null, disabled: true, activePhase: g.phase };
 
   if (g.phase === "PLACE") {
     const needScout = g.enemies.length > 0 && !g.intentsRevealedThisTurn;
-    if (needScout) {
-      return { label: "다음: 정찰", fn: actions.onRevealIntents, disabled: false, activePhase: g.phase };
-    }
+    if (needScout) return { label: "다음: 정찰", fn: actions.onRevealIntents, disabled: false, activePhase: g.phase };
     return { label: "다음: 후열", fn: actions.onResolveBack, disabled: false, activePhase: g.phase };
   }
+  if (g.phase === "BACK") return { label: "다음: 후열", fn: actions.onResolveBack, disabled: false, activePhase: g.phase };
 
-  if (g.phase === "BACK")  return { label: "다음: 전열", fn: actions.onResolveFront, disabled: false, activePhase: g.phase };
-  if (g.phase === "FRONT") return { label: "다음: 적",   fn: actions.onResolveEnemy, disabled: false, activePhase: g.phase };
-  if (g.phase === "ENEMY") return { label: "다음: 정리", fn: actions.onUpkeep, disabled: false, activePhase: g.phase };
-  if (g.phase === "UPKEEP")return { label: "다음: 드로우", fn: actions.onDrawNextTurn, disabled: false, activePhase: g.phase };
-  if (g.phase === "DRAW")  return { label: "다음 턴", fn: actions.onDrawNextTurn, disabled: false, activePhase: g.phase };
 
-  // fallback
+  if (g.phase === "FRONT") return { label: "다음: 전열", fn: actions.onResolveFront, disabled: false, activePhase: g.phase };
+
+
+  if (g.phase === "ENEMY") return { label: "다음: 적", fn: actions.onResolveEnemy, disabled: false, activePhase: g.phase };
+
+  if (g.phase === "UPKEEP") return { label: "다음: 정리", fn: actions.onUpkeep, disabled: false, activePhase: g.phase };
+  if (g.phase === "DRAW") return { label: "다음 턴", fn: actions.onDrawNextTurn, disabled: false, activePhase: g.phase };
+
+
+
   return { label: "다음", fn: null, disabled: true, activePhase: g.phase };
 }
+
 
 
 function renderHandDock(g: GameState, actions: UIActions, targeting: boolean) {
@@ -2293,47 +2410,26 @@ function renderSlotsGrid(g: GameState, actions: UIActions, side: Side) {
         // 더블클릭 회수 유지
         cardEl.ondblclick = () => actions.onReturnSlotToHand(side, i);
       } else {
-        cardEl.onpointerdown = (ev) => {
-          ev.stopPropagation();
-          if (disabled) return;
-          if (isTargeting(g)) return;
-          if (g.phase !== "PLACE") return;
-
-          clearLongPress();
-          longPressStartX = ev.clientX;
-          longPressStartY = ev.clientY;
-          longPressFired = false;
-
-          longPressTimer = window.setTimeout(() => {
-            longPressFired = true;
-            actions.onReturnSlotToHand(side, i); // 꾹 누르면 회수
-          }, 420);
-        };
-
-        cardEl.onpointermove = (ev) => {
-          if (longPressTimer == null) return;
-          const dx = ev.clientX - longPressStartX;
-          const dy = ev.clientY - longPressStartY;
-          if (dx * dx + dy * dy > 64) clearLongPress(); // 8px 이상 이동 시 취소
-        };
-
-        cardEl.onpointerup = (ev) => {
-          ev.stopPropagation();
-          const fired = longPressFired;
-          clearLongPress();
-
-          if (disabled) return;
-          if (isTargeting(g)) return;
-          if (g.phase !== "PLACE") return;
-
-          if (fired) return; // 롱프레스(회수) 했으면 탭 동작 막기
-
-          openCardPeek(g, uid); // 탭하면 확대
-        };
-
-        cardEl.onpointercancel = () => clearLongPress();
+        // ✅ 모바일: 롱프레스=회수, 탭=확대 (헬퍼 사용)
+        attachLongPress(cardEl, {
+          delayMs: 420,
+          moveTolerancePx: 8,
+          shouldIgnore: () => {
+            if (disabled) return true;
+            if (isTargeting(g)) return true;
+            if (g.phase !== "PLACE") return true;
+            return false;
+          },
+          onFire: (ev) => {
+            ev.stopPropagation();
+            actions.onReturnSlotToHand(side, i);
+          },
+          onTap: (ev) => {
+            ev.stopPropagation();
+            openCardPeek(g, uid);
+          },
+        });
       }
-
 
     }
 
@@ -2491,6 +2587,7 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
       if (isTargeting(g)) {
         g.pendingTarget = null;
         g.pendingTargetQueue = [];
+        (g as any).selectedEnemyIndex = null;
         logMsg(g, "대상 선택 취소");
         render(g, actions);
         return;
@@ -2584,6 +2681,11 @@ function beginDrag(
   const grabDX = r ? (ev.clientX - r.left) : 20;
   const grabDY = r ? (ev.clientY - r.top) : 20;
 
+  // 손패 카드 크기 fallback: CSS 변수 기반으로라도 고정되게
+  const css = getComputedStyle(document.documentElement);
+  const handW = parseFloat(css.getPropertyValue("--handCardW")) || undefined;
+  const handH = parseFloat(css.getPropertyValue("--handCardH")) || undefined;
+
   drag = {
     kind: init.kind,
     cardUid: init.cardUid,
@@ -2598,13 +2700,14 @@ function beginDrag(
     dragging: false,
 
     previewEl: undefined,
-    previewW: r?.width,
-    previewH: r?.height,
+    previewW: r?.width ?? handW,
+    previewH: r?.height ?? handH,
     grabDX,
     grabDY,
   };
 
   if (cardEl) {
+    drag.sourceEl = cardEl;
     const clone = cardEl.cloneNode(true) as HTMLElement;
 
     clone.classList.remove("inSlot");
@@ -2616,10 +2719,12 @@ function beginDrag(
     clone.style.width = "100%";
     clone.style.height = "100%";
     clone.style.margin = "0";
+    clone.style.boxSizing = "border-box";
 
     drag.previewEl = clone;
   }
 }
+
 
 
 function hitTestHand(x: number, y: number): boolean {
@@ -2665,14 +2770,8 @@ function closestWithDatasetKeys(el: HTMLElement, keys: string[]): HTMLElement | 
   }
   return null;
 }
-
 function renderDragOverlay(_app: HTMLElement, g: GameState) {
   if (isMobileUI()) {
-    document.querySelector(".dragLayer")?.remove();
-    return;
-  }
-
-  if (!drag || !drag.dragging) {
     document.querySelector(".dragLayer")?.remove();
     return;
   }
@@ -2702,19 +2801,19 @@ function renderDragOverlay(_app: HTMLElement, g: GameState) {
   wrap.style.left = `${drag.x - (drag.grabDX ?? 20)}px`;
   wrap.style.top  = `${drag.y - (drag.grabDY ?? 20)}px`;
 
+  const w = drag.previewW ?? 0;
+  const h = drag.previewH ?? 0;
+  if (w > 0) wrap.style.width = `${w}px`;
+  if (h > 0) wrap.style.height = `${h}px`;
+
+  wrap.style.transform = "scale(1.03)";
+  wrap.style.opacity = "0.96";
+  wrap.style.filter = "saturate(1.05)";
+  wrap.style.willChange = "transform,left,top";
+  wrap.style.boxShadow = "0 18px 60px rgba(0,0,0,.55)";
+
   wrap.appendChild(drag.previewEl);
   layer.appendChild(wrap);
-}
-
-
-
-
-
-// Choice / Node / Overlay
-
-function closeChoiceUI(g: GameState) {
-  g.choice = null;       // ✅ choice만
-  document.querySelector(".choice-overlay")?.remove();
 }
 
 // Helpers / UI primitives
@@ -2783,13 +2882,10 @@ function renderCard(g: GameState, cardUid: string, clickable: boolean, onClick?:
   d.appendChild(sec2);
 
 
-  if (clickable && onClick) {
-    d.onclick = () => onClick(cardUid);
-  }
 
   if (clickable) {
+    // 데스크톱 드래그는 기존 로직 유지
     d.onpointerdown = (ev) => {
-      // 데스크톱 드래그는 기존 로직 유지
       if (!isMobileUI()) {
         if (ev.button !== 0 && ev.pointerType === "mouse") return;
         if (isTargeting(g)) return;
@@ -2800,50 +2896,30 @@ function renderCard(g: GameState, cardUid: string, clickable: boolean, onClick?:
         beginDrag(ev, { kind: "hand", cardUid, fromHandIndex: idx });
         return;
       }
-
-      // ✅ 모바일: 롱프레스(확대)
-      if (isTargeting(g)) return;
-      pressedUid = cardUid;
-      pressStartX = ev.clientX;
-      pressStartY = ev.clientY;
-
-      if (pressTimer) window.clearTimeout(pressTimer);
-      pressTimer = window.setTimeout(() => {
-        // 아직 같은 카드 누르는 중이면 확대
-        if (pressedUid === cardUid) openCardZoom(g, cardUid);
-      }, 280);
+      // 모바일은 attachLongPress가 처리 (아래)
     };
 
-    d.onpointermove = (ev) => {
-      if (!isMobileUI()) return;
-      if (!pressedUid) return;
-
-      const dx = ev.clientX - pressStartX;
-      const dy = ev.clientY - pressStartY;
-      if (dx*dx + dy*dy > 36) { // 6px 이상 이동하면 취소
-        if (pressTimer) window.clearTimeout(pressTimer);
-        pressTimer = null;
-        pressedUid = null;
+    if (isMobileUI()) {
+      attachLongPress(d, {
+        delayMs: 280,
+        moveTolerancePx: 6,
+        shouldIgnore: () => {
+          if (isTargeting(g)) return true;
+          return false;
+        },
+        onFire: () => {
+          openCardZoom(g, cardUid);
+        },
+        onTap: () => {
+          if (onClick) onClick(cardUid);
+        },
+      });
+    } else {
+      // 데스크톱: onpointerdown은 이미 위에서 드래그로 사용
+      if (clickable && onClick) {
+        d.onclick = () => onClick(cardUid);
       }
-    };
-
-    d.onpointerup = () => {
-      if (!isMobileUI()) return;
-      if (pressTimer) window.clearTimeout(pressTimer);
-      pressTimer = null;
-
-      // 롱프레스가 아니라면 기존 탭 동작(선택)으로
-      if (!cardZoomOpen && onClick) onClick(cardUid);
-
-      pressedUid = null;
-    };
-
-    d.onpointercancel = () => {
-      if (!isMobileUI()) return;
-      if (pressTimer) window.clearTimeout(pressTimer);
-      pressTimer = null;
-      pressedUid = null;
-    };
+    }
   }
 
 

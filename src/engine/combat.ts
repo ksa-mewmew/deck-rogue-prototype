@@ -1,6 +1,6 @@
 import type { EnemyEffect, GameState, Side, EnemyState } from "./types";
-import { aliveEnemies, applyStatus, clampMin, logMsg, pickOne, shuffle, applyStatusTo } from "./rules";
-import { applyDamageToPlayer, applyDamageToEnemy, markEnemyShaken } from "./effects";
+import { aliveEnemies, clampMin, logMsg, pickOne, shuffle, applyStatusTo } from "./rules";
+import { applyDamageToPlayer, applyDamageToEnemy, markEnemyShaken, cleanupPendingTargetsIfNoEnemies } from "./effects";
 import { resolvePlayerEffects } from "./resolve";
 import { getCardDefFor } from "../content/cards";
 import { cardNameWithUpgrade, getCardDefByIdWithUpgrade } from "../content/cards";
@@ -33,6 +33,7 @@ export function enemyStateFromId(g: GameState, enemyId: string): EnemyState {
   };
 }
 
+
 function patternAllowedByCooldown(g: GameState, pattern: string[], nowBattleNo: number, cooldownBattles = 5) {
   for (const id of pattern) {
     const last = g.run.enemyLastSeenBattle[id];
@@ -61,8 +62,8 @@ export function spawnEncounter(g: GameState, opt?: { forceBoss?: boolean; forceP
     } else {
       let bossId = g.run.nextBossId ?? null;
       if (bossId != null){
-        g.run.bossOmenText = g.content.enemiesById[bossId].omen ?? null;
-        g.run.bossOmenText = BOSS_OMEN_HINT[bossId] ?? null;
+        const def = g.content.enemiesById[bossId];
+        g.run.bossOmenText = BOSS_OMEN_HINT[bossId] ?? def.omen ?? null;
       }
         if (bossId) {
         g.run.nextBossId = null;
@@ -577,7 +578,7 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
     }
 
     case "statusPlayer": {
-      applyStatus(g.player, act.key, act.n);
+      applyStatusTo(g.player, act.key, act.n);
       logMsg(g, `적 효과: 플레이어 상태 ${act.key} ${act.n >= 0 ? "+" : ""}${act.n}`);
       return;
     }
@@ -638,19 +639,25 @@ export function upkeepEndTurn(g: GameState) {
   const frontCount = g.frontPlacedThisTurn;
   if (frontCount > 0) logMsg(g, `전열 유지비 처리: 전열 ${frontCount}장`);
 
+  let lackedSupply = false;
+
   for (let i = 0; i < frontCount; i++) {
     if (g.player.supplies > 0) {
       g.player.supplies -= 1;
     } else {
-      g.player.fatigue += 1;
-      applyDamageToPlayer(g, 2, "ZERO_SUPPLY", `전열 유지비 부족!`);
+      lackedSupply = true;
     }
+  }
+
+  if (lackedSupply) {
+    g.player.fatigue += 1;
+    logMsg(g, "전열 유지비 부족! (F +1)");
   }
 
   if (g.player.supplies === 0) {
     g.player.zeroSupplyTurns += 1;
-    const p = g.player.zeroSupplyTurns;
-    applyDamageToPlayer(g, p, "ZERO_SUPPLY", `보급 없이 턴 종료! 누적 ${p}번째`);
+    const f = g.player.fatigue;
+    applyDamageToPlayer(g, f, "ZERO_SUPPLY", `보급 없이 턴 종료! 피해 ${f}`);
   }
 
   const bleed = g.player.status.bleed ?? 0;
@@ -675,6 +682,7 @@ export function upkeepEndTurn(g: GameState) {
 
   decayStatuses(g);
   clearSlots(g);
+  cleanupPendingTargetsIfNoEnemies(g);
   checkEndConditions(g)
 
   g.phase = "DRAW";
@@ -737,13 +745,8 @@ function maybeReshuffle(g: GameState) {
     g.deck = shuffle(g.discard);
     g.discard = [];
 
-    const f = g.player.fatigue;
-    applyDamageToPlayer(g, f, "FATIGUE", "피로도");
-    checkEndConditions(g);
-    if (g.run.finished) return;
-
     g.player.fatigue += 1;
-    logMsg(g, `피로도 F +1 (현재 ${g.player.fatigue})`);
+    logMsg(g, `피로도 F +1 (셔플, 현재 ${g.player.fatigue})`);
   }
 }
 
@@ -820,16 +823,12 @@ export function resolveTargetSelection(g: GameState, enemyIndex: number): boolea
     applyStatusTo(target, req.key, req.n);
     logMsg(g, `적(${target.name}) 상태: ${req.key} ${req.n >= 0 ? "+" : ""}${req.n}`);
   }
-
+  cleanupPendingTargetsIfNoEnemies(g);
   checkEndConditions(g);
 
   if (aliveEnemies(g).length === 0) {
-    g.pendingTarget = null;
-    g.pendingTargetQueue = [];
-    (g as any).selectedEnemyIndex = null;
     return true;
   }
-
   advancePendingTarget(g);
 
   return !g.pendingTarget && (g.pendingTargetQueue?.length ?? 0) === 0;
@@ -887,7 +886,7 @@ export function checkEndConditions(g: GameState) {
         return;
       }
     }
-    const [a, b] = offerRewardPair();
+    const [a, b] = offerRewardPair(g);
 
     const da = getCardDefByIdWithUpgrade(g.content, a.defId, a.upgrade);
     const db = getCardDefByIdWithUpgrade(g.content, b.defId, b.upgrade);

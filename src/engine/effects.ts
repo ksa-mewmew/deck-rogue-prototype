@@ -24,18 +24,19 @@ export function healPlayer(g: GameState, n: number) {
   logMsg(g, `HP +${g.player.hp - before} (현재 ${g.player.hp}/${g.player.maxHp})`);
 }
 
-function cleanupPendingTargetsIfNoEnemies(g: GameState) {
+export function cleanupPendingTargetsIfNoEnemies(g: GameState) {
   if (aliveEnemies(g).length !== 0) return;
   g.pendingTarget = null;
   g.pendingTargetQueue = [];
+  (g as any).selectedEnemyIndex = null;
 }
-
 
 //애니메이션!
 
 export function markEnemyShaken(g: GameState, enemyIndex: number) {
-  if (!g.fx) g.fx = {};
-  if (!g.fx.enemyShake) g.fx.enemyShake = [];
+  if (enemyIndex < 0) return;
+  g.fx ??= {};
+  g.fx.enemyShake ??= [];
   g.fx.enemyShake.push(enemyIndex);
 }
 
@@ -44,34 +45,42 @@ export function markPlayerShaken(g: GameState) {
   g.fx.playerShake = true;
 }
 
-
 export function applyDamageToEnemy(g: GameState, enemy: EnemyState, raw: number) {
-  const idx = g.enemies.indexOf(enemy);
-  if (idx >= 0 && !g.attackedEnemyIndicesThisTurn.includes(idx)) {
-    g.attackedEnemyIndicesThisTurn.push(idx);
-  }
   if (raw <= 0) return;
 
-
-  const attackerWeak = g.player.status.weak ?? 0;
-  const targetVuln   = enemy.status.vuln ?? 0;
-
-  if (enemy.immuneThisTurn) {
-    logMsg(g, `적(${enemy.name})은(는) 이번 턴 피해 면역 → ${raw} 피해 무시`);
+  const idx = g.enemies.indexOf(enemy);
+  if (idx < 0) {
+    logMsg(g, `WARN: applyDamageToEnemy target not in g.enemies (${enemy?.id ?? "?"})`);
     return;
   }
+
+  // 시도 기준: 호출되면 일단 공격 시도로 기록
+  if (!g.attackedEnemyIndicesThisTurn.includes(idx)) {
+    g.attackedEnemyIndicesThisTurn.push(idx);
+  }
+
+  // 면역이면 시도는 했지만 피해는 0 → 애니메이션 없음
+  if (enemy.immuneThisTurn) {
+    logMsg(g, `적(${enemy.name})은(는) 이번 턴 피해 면역 → ${raw} 피해 무시`);
+    cleanupPendingTargetsIfNoEnemies(g);
+    return;
+  }
+
+  const attackerWeak = g.player.status.weak ?? 0;
+  const targetVuln = enemy.status.vuln ?? 0;
 
   let dmg = raw - attackerWeak + targetVuln;
   if (dmg < 0) dmg = 0;
 
-  enemy.hp -= dmg;
+  enemy.hp = Math.max(0, enemy.hp - dmg);
+
+  // ✅ "애니메이션은 피해 기준"
   if (dmg > 0) markEnemyShaken(g, idx);
-  if (enemy.hp < 0) enemy.hp = 0;
 
   logMsg(g, `적(${enemy.name})에게 ${dmg} 피해. (HP ${enemy.hp}/${enemy.maxHp})`);
-
   cleanupPendingTargetsIfNoEnemies(g);
 }
+
 
 
 
@@ -83,6 +92,11 @@ export function applyDamageToPlayer(
   reason?: string,
   attackerWeak?: number,
 ) {
+
+  if (kind === "ENEMY_ATTACK" && g.player.nullifyDamageThisTurn) {
+    logMsg(g, `적 공격 피해 무효 (${reason ?? kind})`);
+    return 0;
+  }
   if (raw <= 0) return 0;
 
   let dmg = raw;
