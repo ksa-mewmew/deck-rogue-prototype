@@ -41,6 +41,7 @@ export type ChoiceState = {
   kind: "EVENT" | "REWARD" | "PICK_CARD" | "VIEW_PILE" | "UPGRADE_PICK";
   title: string;
   prompt?: string;
+  art?: string,
   options: ChoiceOption[];
 };
 
@@ -220,6 +221,8 @@ export type RunState = {
   bossOmenText: string | null;
   deckSizeAtTreasure: number | null;
 
+  ominousProphecySeen: boolean
+
 };
 
 export type Content = {
@@ -276,9 +279,5 @@ export type GameState = {
 
   time: number
 
-  fx?: {
-    enemyShake?: number[]; // 이번 틱에 피해 받은 적 인덱스들
-    playerShake?: boolean;
-  };
 
 };

@@ -57,7 +57,10 @@ const RULEBOOK_TEXT = `# Deck Rogue Prototype — 룰북 (플레이어용)
 중요한 건 이곳이 당신에게 넉넉한 시간을 주지 않는다는 것이겠지요.
 `;
 
-import type { GameState, PileKind, NodeOffer, Side, PendingTarget  } from "../engine/types";
+
+import { setDevConsoleCtx, renderDevConsole, toggleDevConsole, isDevConsoleOpen } from "./dev_console";
+import { loadNineSlice, drawNineSlice } from "./nineslice";
+import type { GameState, PileKind, NodeOffer, Side, PendingTarget, CardData  } from "../engine/types";
 import {
   spawnEncounter,
   startCombat,
@@ -83,6 +86,148 @@ import { getCardDefByIdWithUpgrade } from "../content/cards";
 
 import { saveGame, hasSave, loadGame, clearSave } from "../persist";
 
+
+function sleep(ms: number) {
+  return new Promise<void>((res) => window.setTimeout(res, ms));
+}
+function tickMsForPhase(phase: GameState["phase"]) {
+  switch (phase) {
+    case "BACK":  return 400;
+    case "FRONT": return 400;
+    case "ENEMY": return 400;
+    case "UPKEEP": return 400;
+    case "DRAW":  return 400;
+    case "PLACE": return 0;   // PLACE에서는 멈추는게 자연스러움
+    default: return 220;
+  }
+}
+
+type FloatFx = {
+  id: number;
+  kind: "dmg" | "heal" | "block";
+  text: string;
+  x: number;
+  y: number;
+  born: number;
+};
+
+let fxIdSeq = 1;
+let floatFx: FloatFx[] = [];
+
+let floatingNewRunHandler: null | (() => void) = null;
+let phaseBannerText: string | null = null;
+let phaseBannerUntil = 0;
+
+function showPhaseBanner(text: string, ms = 420) {
+  phaseBannerText = text;
+  phaseBannerUntil = performance.now() + ms;
+}
+
+function pushFloatFx(kind: FloatFx["kind"], text: string, x: number, y: number) {
+  floatFx.push({ id: fxIdSeq++, kind, text, x, y, born: performance.now() });
+}
+
+function cleanupFloatFx() {
+  const now = performance.now();
+  // floatUp 애니메이션 650ms 기준으로 컷
+  floatFx = floatFx.filter((f) => now - f.born < 700);
+}
+
+let prevPlayerHp: number | null = null;
+let prevPlayerBlock: number | null = null;
+let prevEnemyHp: number[] = [];
+
+function detectAndEmitDeltas(g: GameState) {
+  const inCombat = !g.run.finished && g.enemies.length > 0 && g.phase !== "NODE";
+  if (!inCombat) {
+    prevPlayerHp = null;
+    prevPlayerBlock = null;
+    prevEnemyHp = [];
+    return;
+  }
+
+  // 플레이어
+  if (prevPlayerHp != null) {
+    const d = g.player.hp - prevPlayerHp;
+    if (d !== 0) emitPlayerDelta(d);
+  }
+  if (prevPlayerBlock != null) {
+    const d = g.player.block - prevPlayerBlock;
+    if (d !== 0) emitPlayerBlockDelta(d);
+  }
+
+  // 적들
+  for (let i = 0; i < g.enemies.length; i++) {
+    const cur = g.enemies[i].hp;
+    const prev = prevEnemyHp[i];
+    if (prev != null && cur !== prev) emitEnemyDelta(i, cur - prev);
+  }
+
+  prevPlayerHp = g.player.hp;
+  prevPlayerBlock = g.player.block;
+  prevEnemyHp = g.enemies.map((e) => e.hp);
+}
+
+function emitPlayerDelta(dhp: number) {
+  const box = document.querySelector<HTMLElement>(".playerHudBox") 
+    ?? document.querySelector<HTMLElement>(".playerHudLeft");
+  if (!box) return;
+  const r = box.getBoundingClientRect();
+  const x = (r.left + r.right) / 2;
+  const y = r.top + 14;
+
+  if (dhp < 0) pushFloatFx("dmg", `${dhp}`, x, y);
+  else pushFloatFx("heal", `+${dhp}`, x, y);
+
+  box.classList.add("fxFlash");
+  setTimeout(() => box.classList.remove("fxFlash"), 240);
+}
+
+function emitPlayerBlockDelta(d: number) {
+  const box = document.querySelector<HTMLElement>(".playerHudBox") 
+    ?? document.querySelector<HTMLElement>(".playerHudLeft");
+  if (!box) return;
+  const r = box.getBoundingClientRect();
+  const x = (r.left + r.right) / 2;
+  const y = r.top + 34;
+
+  pushFloatFx("block", (d > 0 ? `+${d}` : `${d}`), x, y);
+}
+
+function emitEnemyDelta(i: number, dhp: number) {
+  const banners = Array.from(
+    document.querySelectorAll<HTMLElement>(".enemyHudCenter .enemyBanner")
+  );
+  const el = banners[i];
+  if (!el) return;
+
+  const r = el.getBoundingClientRect();
+  const x = (r.left + r.right) / 2;
+  const y = r.top + 14;
+
+  if (dhp < 0) pushFloatFx("dmg", `${dhp}`, x, y);
+  else pushFloatFx("heal", `+${dhp}`, x, y);
+
+  el.classList.add("fxFlash");
+  setTimeout(() => el.classList.remove("fxFlash"), 240);
+}
+
+let logCollapsed = false;
+
+function loadLogCollapsed() {
+  try {
+    const v = localStorage.getItem("deckrogue_logCollapsed");
+    if (v == null) return;
+    logCollapsed = v === "1";
+  } catch {}
+}
+
+function saveLogCollapsed() {
+  try {
+    localStorage.setItem("deckrogue_logCollapsed", logCollapsed ? "1" : "0");
+  } catch {}
+}
+
 let saveTimer: number | null = null;
 
 function scheduleSave(g: GameState) {
@@ -95,45 +240,50 @@ function scheduleSave(g: GameState) {
 
 type ForcedNext = null | "BOSS";
 
-function runAutoAdvanceRAF(g: GameState, actions: UIActions) {
-  if (g.run.finished) return;
-  if (g.choice) return;
-  if (isTargeting(g)) return;
-  if (overlay) return;
-  if (g.phase === "NODE") return;
+let autoAdvancing = false;
 
-  let sawDraw = false;
-  let guard = 0;
-
-  const tick = () => {
-    guard++;
-    if (guard > 60) return;
-
+async function runAutoAdvanceRAF(g: GameState, actions: UIActions) {
+  if (autoAdvancing) return;
+  autoAdvancing = true;
+  try {
     if (g.run.finished) return;
-    if (g.choice || overlay) return;
+    if (g.choice) return;
     if (isTargeting(g)) return;
+    if (overlay) return;
+    if (g.phase === "NODE") return;
 
-    const step = computeNextStep(g, actions, /*targeting*/ false);
-    if (!step.fn || step.disabled) return;
+    let guard = 0;
+    while (guard++ < 60) {
+      if (g.run.finished) break;
+      if (g.choice || overlay) break;
+      if (isTargeting(g)) break;
 
-    if (g.phase === "DRAW") sawDraw = true;
+      const step = computeNextStep(g, actions, /*targeting*/ false);
+      if (!step.fn || step.disabled) break;
 
-    step.fn();
-    render(g, actions);
+      // 현재 단계 기억
+      const beforePhase = g.phase;
 
-    // ✅ 턴 경계: DRAW를 지나 PLACE로 돌아오면 멈춤(한 턴 단위)
-    if (sawDraw && g.phase === "PLACE") return;
+      // 1) 실행
+      step.fn();
+      render(g, actions);
 
-    requestAnimationFrame(tick);
-  };
+      // 2) PLACE로 돌아오면(플레이어 배치 턴) 자동 진행 멈춤
+      if (beforePhase === "DRAW" && g.phase === "PLACE") break;
+      if (g.phase === "PLACE") break;
 
-  requestAnimationFrame(tick);
+      // 3) 단계별 틱
+      const ms = tickMsForPhase(beforePhase);
+      if (ms > 0) await sleep(ms);
+    }
+  } finally {
+    autoAdvancing = false;
+  }
 }
-
 
 function ensureBossSchedule(g: GameState) {
   const runAny = g.run as any;
-  if (runAny.nextBossTime == null) runAny.nextBossTime = 30; // 첫 보스 시간
+  if (runAny.nextBossTime == null) runAny.nextBossTime = 40; // 첫 보스 시간
   if (runAny.forcedNext == null) runAny.forcedNext = null as ForcedNext;
 }
 
@@ -159,7 +309,7 @@ function hydrateLoadedState(loaded: any, content: any) {
   g.time ??= 0;
 
   g.run ??= {};
-  g.run.nextBossTime ??= 30;
+  g.run.nextBossTime ??= 40;
   g.run.forcedNext ??= null;
   g.run.bossOmenText ??= null;
   g.run.enemyLastSeenBattle ??= {};
@@ -193,8 +343,118 @@ export function createOrLoadGame(content: any) {
 
 
 
+let frameImgsPromise: Promise<any> | null = null;
+let frameCanvas: HTMLCanvasElement | null = null;
+let frameCtx: CanvasRenderingContext2D | null = null;
+const DEBUG_FRAME = false; // 필요할 때만 true
+
+function ensureFrameCanvas(): CanvasRenderingContext2D {
+  if (frameCanvas && frameCtx) return frameCtx;
+
+  const c = document.createElement("canvas");
+  c.className = "uiFrameCanvas";
+  c.style.cssText = `
+    position: fixed;
+    inset: 0;
+    z-index: 5;           /* UI보다 낮거나 높게 조절 가능 */
+    pointer-events: none; /* 클릭 방해 절대 안 함 */
+  `;
+  document.body.appendChild(c);
+  frameCanvas = c;
+  frameCtx = c.getContext("2d")!;
+  resizeFrameCanvasToViewport();
+  return frameCtx;
+}
+
+function ensureBgLayer() {
+  if (document.querySelector(".bgLayer")) return;
+
+  const bg = document.createElement("div");
+  bg.className = "bgLayer";
+  document.body.appendChild(bg);
+}
 
 
+
+function setBattleBgEnabled(g: GameState) {
+  ensureBgLayer();
+  const bg = document.querySelector<HTMLElement>(".bgLayer");
+  if (!bg) return;
+
+  // 전투 중 판정: 적이 있고, NODE가 아니고, 런 종료가 아님
+  const inCombat = !g.run.finished && g.enemies.length > 0 && g.phase !== "NODE";
+
+  // 석판 이미지는 전투 중에만
+  bg.classList.toggle("battleBg", inCombat);
+}
+
+function ensureFrameImgs() {
+  if (!frameImgsPromise) {
+    frameImgsPromise = loadNineSlice("ui/frame_9slice", "frame");
+  }
+  return frameImgsPromise;
+}
+
+function resizeFrameCanvasToViewport() {
+  if (!frameCanvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.max(1, window.innerWidth);
+  const h = Math.max(1, window.innerHeight);
+  frameCanvas.width = Math.floor(w * dpr);
+  frameCanvas.height = Math.floor(h * dpr);
+  frameCanvas.style.width = `${w}px`;
+  frameCanvas.style.height = `${h}px`;
+
+  frameCtx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function drawFramesOnPanels(imgs: any) {
+  const ctx = ensureFrameCanvas();
+  resizeFrameCanvasToViewport();
+
+
+  const main = document.querySelector<HTMLElement>(".mainPanel");
+  const log  = document.querySelector<HTMLElement>(".logPanel");
+
+  if (!main || !log) {
+    console.log("[frame] panels missing", { main: !!main, log: !!log });
+    return;
+  }
+
+
+  const mr = main.getBoundingClientRect();
+  const lr = log.getBoundingClientRect();
+  console.log("[frame] rect main", mr.width, mr.height, mr.left, mr.top);
+  console.log("[frame] rect log ", lr.width, lr.height, lr.left, lr.top);
+
+  const rects = [mr, lr];
+
+  const border = {
+    left: imgs.tl.naturalWidth,
+    right: imgs.tr.naturalWidth,
+    top: imgs.tl.naturalHeight,
+    bottom: imgs.bl.naturalHeight,
+  };
+
+  const pad = 6;
+
+  for (const r of rects) {
+    drawNineSlice(
+      ctx,
+      imgs,
+      Math.floor(r.left - pad),
+      Math.floor(r.top - pad),
+      Math.floor(r.width + pad * 2),
+      Math.floor(r.height + pad * 2),
+      border,
+      {
+        mode: "stretch",
+        drawCenter: false,
+        pixelated: true,
+      }
+    );
+  }
+}
 
 let lastMainPanelScrollTop = 0;
 let lastMainPanelScrollLeft = 0;
@@ -221,7 +481,7 @@ function openCardZoom(g: GameState, uid: string) {
     overflow: auto;
   `;
 
-  const big = renderCardPreviewByUid(g, uid);
+  const big = renderRealCardForOverlay(g, uid);
   big.classList.add("zoomedCard");
   panel.appendChild(big);
 
@@ -321,7 +581,7 @@ function openCardPeek(g: GameState, cardUid: string) {
     "width: fit-content; max-width: 92vw; max-height: 92vh;" +
     "overflow: visible; padding: 12px; border-radius: 16px;";
 
-  const card = renderCardPreviewByUid(g, cardUid);
+  const card = renderRealCardForOverlay(g, cardUid);
 
   (card as HTMLElement).style.width = "var(--handCardW)";
   (card as HTMLElement).style.height = "var(--handCardH)";
@@ -368,6 +628,8 @@ function renderMobileQuickMenu(g: GameState, actions: UIActions) {
   const openSheet = () => {
     document.querySelector(".mobileQuickMenuSheet")?.remove();
 
+    // 1) 플로팅 '새로운 런' 버튼 (항상 최상단)
+    // 2) 아래는 기존 시트 로직 그대로
     const layer = document.createElement("div");
     layer.className = "mobileQuickMenuSheet";
     layer.style.cssText = `
@@ -414,7 +676,6 @@ function renderMobileQuickMenu(g: GameState, actions: UIActions) {
       return b;
     };
 
-    row1.appendChild(mk("새로운 런", () => actions.onNewRun()));
     row1.appendChild(mk("룰북", () => actions.onViewRulebook()));
     row1.appendChild(mk("로그", () => actions.onToggleLogOverlay()));
 
@@ -441,7 +702,6 @@ function renderMobileQuickMenu(g: GameState, actions: UIActions) {
     document.body.appendChild(layer);
   };
 }
-
 
 
 // UI Actions
@@ -507,45 +767,60 @@ function renderCardPreviewByUid(g: GameState, cardUid: string) {
   d.appendChild(meta);
 
   const sec1 = div("cardSection");
-  sec1.appendChild(divText("cardSectionTitle", "⚔ 전열"));
+  sec1.classList.add("front");
   sec1.appendChild(divText("cardText", def.frontText));
   d.appendChild(sec1);
 
   const sec2 = div("cardSection");
   sec2.appendChild(divText("cardSectionTitle", "🕯 후열"));
-  sec2.appendChild(divText("cardText", def.backText));
+  sec2.classList.add("back");  sec2.appendChild(divText("cardText", def.backText));
   d.appendChild(sec2);
 
   return d;
 }
 
-function renderCardPreviewByDef(g: GameState, defId: string, upgrade: number) {
-  const def = getCardDefByIdWithUpgrade(g.content, defId, upgrade);
-  const baseName = g.content.cardsById[defId]?.name ?? defId;
+function renderCardPreviewByUidWithUpgrade(g: GameState, uid: string, upgrade: number): HTMLElement {
+  const c = g.cards[uid];
+  return renderCardPreviewByDef(g, c.defId, upgrade);
+}
 
-  const d = div("card");
-  d.classList.add("choiceCard");
-  if (def.tags?.includes("EXHAUST")) d.classList.add("exhaust");
-  if (def.tags?.includes("VANISH")) d.classList.add("vanish");
+function renderRealCardForOverlay(
+  g: GameState,
+  uid: string,
+  onPick?: (uid: string) => void
+): HTMLElement {
+  const clickable = !!onPick; // 선택 가능할 때만 클릭 허용
+  const el = renderCard(g, uid, clickable, onPick, { draggable: false });
+  el.classList.add("overlayCard");
+  return el;
+}
 
-  d.appendChild(divText("cardTitle", formatName(baseName, upgrade)));
+function renderCardPreviewByDef(g: GameState, defId: string, upgrade: number): HTMLElement {
 
-  const meta = div("cardMeta");
-  if (def.tags?.includes("EXHAUST")) meta.appendChild(badge("소모"));
-  if (def.tags?.includes("VANISH")) meta.appendChild(badge("소실"));
-  d.appendChild(meta);
+  const tmpUid = `__preview:${defId}:${upgrade}:${Math.random().toString(36).slice(2)}`;
 
-  const sec1 = div("cardSection");
-  sec1.appendChild(divText("cardSectionTitle", "⚔ 전열"));
-  sec1.appendChild(divText("cardText", def.frontText));
-  d.appendChild(sec1);
+  const prev = g.cards[tmpUid];
 
-  const sec2 = div("cardSection");
-  sec2.appendChild(divText("cardSectionTitle", "🕯 후열"));
-  sec2.appendChild(divText("cardText", def.backText));
-  d.appendChild(sec2);
 
-  return d;
+  g.cards[tmpUid] = {
+    uid: tmpUid,
+    defId,
+    upgrade,
+    zone: "preview",
+  } as any;
+
+
+  const el = renderCard(g, tmpUid, false, undefined, { draggable: false }) as HTMLElement;
+
+  el.classList.add("overlayCard");
+  el.draggable = false;
+  el.style.pointerEvents = "none";
+
+
+  if (prev) g.cards[tmpUid] = prev;
+  else delete (g.cards as any)[tmpUid];
+
+  return el;
 }
 
 // 길
@@ -586,9 +861,8 @@ function renderNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
   const runAny = g.run as any;
 
   const T = totalTime(g);
-  const nextBossTime = runAny.nextBossTime ?? 30;
+  const nextBossTime = runAny.nextBossTime ?? 40;
 
-  // === UI 예측: 다음 노드 선택 시 시간 변화 ===
   const offers = actions.getNodeOffers();
 
   const extra = runAny.nodeExtra01 ?? 0;
@@ -597,8 +871,6 @@ function renderNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
   const forcedBossNow = runAny.forcedNext === "BOSS";
   const willForceRest = !forcedBossNow && afterTBase >= nextBossTime;
 
-  // willForceRest면 실제로 REST로 강제 전환되므로 battleTime=0
-  // 강제보스면 전투로 들어가므로 battleTime=1(전투 시간 +1 규칙 적용)
 
   const canPickBattle = !forcedBossNow && !willForceRest && (offers[0]?.type === "BATTLE" || offers[1]?.type === "BATTLE");
 
@@ -618,8 +890,8 @@ function renderNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
     const warn = divText("bossIncomingBanner", "보스가 온다.");
     warn.style.cssText =
       "margin-top:10px; padding:10px 12px; border-radius:14px;" +
-      "border:1px solid rgba(255,255,255,.14);" +
-      "background: rgba(255,120,60,.12);" +
+      "border:1px solid rgba(255,255,255,1);" +
+      "background: rgba(255,120,60,1);" +
       "font-weight:700; font-size:13px; line-height:1.25;";
     root.appendChild(warn);
   }
@@ -641,20 +913,19 @@ function renderNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
 
   omen.style.cssText =
     "margin-top:8px; padding:10px 12px; border-radius:14px;" +
-    "border:1px solid rgba(255, 255, 255, 0);" +
-    "background:rgba(0, 0, 0, 0.18);" +
+    "border:1px solid rgba(255, 255, 255, 1);" +
+    "background:rgba(0, 0, 0, 1);" +
     "font-weight:600;" +
     "font-size:13px;" +
     "line-height:1.2;";
   omen.style.color = "white";
   root.appendChild(omen);
 
-  // ===== 아래는 기존 브랜치 프리뷰 UI 그대로 =====
   const br = g.run.branchOffer;
   if (br) {
     const preview = div("nodePreviewBox");
     preview.style.cssText =
-      "margin-top:10px; padding:12px; border:1px solid rgba(255,255,255,.10); border-radius:16px; background:rgba(0,0,0,.18);";
+      "margin-top:10px; padding:12px; border:1px solid rgba(255,255,255,1); border-radius:16px; background:rgba(0,0,0,1);";
 
     const forcedBoss = runAny.forcedNext === "BOSS";
 
@@ -711,6 +982,34 @@ type ChoiceKind = "EVENT" | "REWARD" | "PICK_CARD" | "VIEW_PILE" | "UPGRADE_PICK
 
 
 
+
+function getMainPanel(): HTMLElement {
+  const el = document.querySelector<HTMLElement>(".mainPanel");
+  if (!el) throw new Error("mainPanel not found");
+  return el;
+}
+
+function ensurePanelOverlayRoot(): HTMLElement {
+  const main = getMainPanel();
+  main.classList.add("overlayOpen");
+
+  let root = main.querySelector<HTMLElement>(":scope > .panelOverlay");
+  if (!root) {
+    root = document.createElement("div");
+    root.className = "panelOverlay";
+    main.appendChild(root);
+  }
+  root.innerHTML = "";
+  return root;
+}
+
+function clearPanelOverlayRoot() {
+  const main = document.querySelector<HTMLElement>(".mainPanel");
+  if (!main) return;
+  main.classList.remove("overlayOpen");
+  const root = main.querySelector<HTMLElement>(":scope > .panelOverlay");
+  if (root) root.remove();
+}
 
 
 export function makeUIActions(g0: GameState, setGame: (next: GameState) => void) {
@@ -1012,7 +1311,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
 
       if (forcedBossNow) {
         runAny.forcedNext = null;
-        runAny.nextBossTime += 30;
+        runAny.nextBossTime += 40;
         g.run.bossOmenText = null;
 
         logMsg(g, `=== 시간 ${afterT2}: 보스 전투 ===`);
@@ -1055,6 +1354,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
             kind: "EVENT",
             title: restTitle,
             prompt: "무엇을 하시겠습니까?",
+            art: "assets/events/event_rest.png",   
             options: [
               { key: "rest:heal",    label: `HP +15 ${restSuffix}` },
               { key: "rest:clear_f", label: `F -3 ${restSuffix}` },
@@ -1125,16 +1425,23 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       }
 
       if (actual === "EVENT") {
+        const runAny = g.run;
+        runAny.ominousProphecySeen ??= false;
 
-        const runAny = g.run as any;
-        runAny.firstEventSeen ??= false;
+        const OMEN_CHANCE = 0.3;
+        let ev = pickEventByMadness(g);
+        if (runAny.ominousProphecySeen === true) {
 
-        const ev = !runAny.firstEventSeen
-          ? (getEventById("ominous_prophecy") ?? pickEventByMadness(g))
-          : pickEventByMadness(g);
-
-        runAny.firstEventSeen = true;
-
+          for (let i = 0; i < 50 && (ev as any).id === "ominous_prophecy"; i++) {
+            ev = pickEventByMadness(g);
+          }
+        } else {
+          if (Math.random() < OMEN_CHANCE) {
+            ev = getEventById("ominous_prophecy") ?? ev;
+            runAny.ominousProphecySeen = true
+          }
+        }
+      
         const opts = ev.options(g);
 
         const { tier } = madnessP(g);
@@ -1166,6 +1473,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
           kind: "EVENT",
           title: ev.name,
           prompt: ev.prompt,
+          art: (ev as any).art ?? null,
           options: opts.map((o) => ({ key: o.key, label: o.label, detail: o.detail })),
         };
 
@@ -1205,7 +1513,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
             }, (k: string) => {
               if (k === "cancel") {
                 logMsg(g, "제거 취소");
-                closeChoiceOrPop(g);   // ✅ pop으로 복귀
+                closeChoiceOrPop(g);
                 render(g, actions);
                 return;
               }
@@ -1305,6 +1613,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         if (key === "skip") {
           logMsg(g, "카드 보상 생략");
           closeChoiceOrPop(g);
+          if (!g.run.finished && g.enemies.length === 0) g.phase = "NODE";
           render(g, actions);
           return;
         }
@@ -1320,7 +1629,6 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
           closeChoiceOrPop(g);
 
           if (!g.run.finished && g.enemies.length === 0) g.phase = "NODE";
-
           render(g, actions);
           return;
         }
@@ -1458,6 +1766,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
     };
 
     choiceHandler = (kk: string) => {
+      choiceHandler = null;
       if (kk.startsWith("pick:")) {
         const payload = kk.slice("pick:".length);
         const [defId, upStr] = payload.split(":");
@@ -1468,6 +1777,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       }
 
       closeChoiceOrPop(g);
+      g.choice = null;
       if (!g.run.finished) g.phase = "NODE";
       render(g, actions);
       return;
@@ -1601,8 +1911,149 @@ function mkButton(label: string, onClick: () => void, className = "") {
   return b;
 }
 
+function normalizeEnemyNameWidth() {
+  const names = Array.from(document.querySelectorAll<HTMLElement>(".enemyName"));
+  if (names.length === 0) return;
+
+  // 한 번 폭 제한 풀고 실제 필요한 폭(스크롤폭)을 측정
+  names.forEach((el) => {
+    el.style.display = "inline-block";
+    el.style.width = "auto";
+    el.style.whiteSpace = "nowrap";
+  });
+
+  let maxW = 0;
+  for (const el of names) maxW = Math.max(maxW, el.scrollWidth);
+
+  // 너무 길어질 때 UI 깨지는 것 방지(원하는 값으로 조절)
+  const cap = 320; // px
+  const w = Math.min(maxW, cap);
+
+  // 전부 동일 폭 적용
+  names.forEach((el) => {
+    el.style.width = `${w}px`;
+    el.style.overflow = "hidden";
+    el.style.textOverflow = "ellipsis";
+  });
+}
+
+function renderPhaseBanner() {
+  document.querySelector(".phaseBanner")?.remove();
+  const now = performance.now();
+  if (!phaseBannerText || now > phaseBannerUntil) return;
+
+  const el = document.createElement("div");
+  el.className = "phaseBanner";
+  el.textContent = phaseBannerText;
+  document.body.appendChild(el);
+}
+
+function renderFloatFxLayer() {
+  cleanupFloatFx();
+
+  let layer = document.querySelector<HTMLElement>(".floatFxLayer");
+  if (!layer) {
+    layer = document.createElement("div");
+    layer.className = "floatFxLayer";
+    document.body.appendChild(layer);
+  }
+  layer.style.cssText =
+    "position:fixed; inset:0;" +
+    "pointer-events:none;" +
+    "z-index: 100000;"; 
+
+  // 1) 현재 살아있는 fx id 집합
+  const alive = new Set(floatFx.map((f) => String(f.id)));
+
+  // 2) DOM에 있는데, 더 이상 alive가 아니면 제거
+  for (const child of Array.from(layer.children) as HTMLElement[]) {
+    const id = child.dataset.fxId;
+    if (!id) continue;
+    if (!alive.has(id)) child.remove();
+  }
+
+  // 3) 없는 fx만 새로 생성(있으면 그대로 둠 → 애니메이션 재시작 방지)
+  for (const f of floatFx) {
+    const id = String(f.id);
+    let el = layer.querySelector<HTMLElement>(`.floatNum[data-fx-id="${id}"]`);
+    if (!el) {
+      el = document.createElement("div");
+      el.className = `floatNum ${f.kind}`;
+      el.dataset.fxId = id;
+      el.textContent = f.text;
+      el.style.left = `${Math.round(f.x)}px`;
+      el.style.top = `${Math.round(f.y)}px`;
+      layer.appendChild(el);
+    } else {
+      // 위치가 조금 달라질 수 있으면 업데이트(원치 않으면 이 블록 제거)
+      el.style.left = `${Math.round(f.x)}px`;
+      el.style.top = `${Math.round(f.y)}px`;
+    }
+  }
+}
+
+export function ensureFloatingNewRunButton() {
+  // 이미 있으면 끝
+  if (document.querySelector(".floatingNewRun")) return;
+
+  const btn = document.createElement("button");
+  btn.className = "floatingNewRun";
+  btn.type = "button";
+  btn.textContent = "새로운 런";
+
+  btn.style.cssText = `
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 10px);
+    left: calc(env(safe-area-inset-left, 0px) + 10px);
+    z-index: 99999;
+    pointer-events: auto;
+
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.16);
+    background: rgba(0,0,0,.55);
+    color: #fff;
+
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    cursor: pointer;
+    touch-action: manipulation;
+  `;
+
+  // 클릭이 항상 최신 actions를 타도록 “저장소”를 거쳐 호출
+  btn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    floatingNewRunHandler?.();
+  });
+
+  document.body.appendChild(btn);
+}
+
 export function render(g: GameState, actions: UIActions) {
+
   currentG = g;
+
+  setDevConsoleCtx({
+    getG: () => currentG ?? g,
+    actions: { onNewRun: () => actions.onNewRun() },
+    rerender: () => render(currentG ?? g, actions),
+    log: (msg) => logMsg((currentG ?? g), msg),
+  });
+
+  // 콘솔이 켜져있으면 DOM 유지/갱신
+  renderDevConsole();
+
+  floatingNewRunHandler = () => actions.onNewRun();
+  ensureFloatingNewRunButton();
+  ensureBgLayer();
+
+  if (!(render as any)._logInitDone) {
+    (render as any)._logInitDone = true;
+    loadLogCollapsed();
+  }
+
+
   const prevMain = document.querySelector<HTMLElement>(".mainPanel");
   if (prevMain) {
     lastMainPanelScrollTop = prevMain.scrollTop;
@@ -1612,6 +2063,15 @@ export function render(g: GameState, actions: UIActions) {
   const app = mountRoot();
 
   if (!uiMounted) {
+    window.addEventListener("resize", () => {
+      if (!frameImgsPromise) return;
+      frameImgsPromise.then((imgs) => drawFramesOnPanels(imgs));
+      if (currentG){
+        normalizeEnemyNameWidth();
+        alignHandToBoardAnchor(currentG);
+        alignEnemyHudToViewportCenter();
+      }
+    });
     bindGlobalInput(() => currentG ?? g, actions);
     uiMounted = true;
   }
@@ -1623,6 +2083,9 @@ export function render(g: GameState, actions: UIActions) {
   const stage = div("stage");
   const stageInner = div("stageInner");
   const main = div("panel mainPanel");
+
+  const inCombat = !g.run.finished && g.enemies.length > 0 && g.phase !== "NODE";
+  main.classList.toggle("inCombat", inCombat);
 
   main.scrollTop = lastMainPanelScrollTop;
   main.scrollLeft = lastMainPanelScrollLeft;
@@ -1637,56 +2100,70 @@ export function render(g: GameState, actions: UIActions) {
   stage.appendChild(stageInner);
 
   const logPanel = div("panel logPanel");
-  logPanel.appendChild(renderLogHeaderRow());
-  const lb = logBox(g.log.join("\n"));
-  (lb as HTMLElement).classList.add("log");
-  logPanel.appendChild(lb);
+  logPanel.classList.toggle("collapsed", logCollapsed);
+
+  logPanel.appendChild(renderLogHeaderRow(logCollapsed, () => {
+    logCollapsed = !logCollapsed;
+    saveLogCollapsed();
+    render(g, actions);
+  }));
+
+
+  if (!logCollapsed) {
+    const lb = logBox(g.log.join("\n"));
+    (lb as HTMLElement).classList.add("log");
+    logPanel.appendChild(lb);
+  }
 
   mainRow.appendChild(stage);
   mainRow.appendChild(logPanel);
   app.appendChild(mainRow);
 
+  normalizeEnemyNameWidth();
+  renderStageCornerResourceHud(g); 
   renderHandDock(g, actions, isTargeting(g));
+  alignHandToBoardAnchor(g);
+  alignEnemyHudToViewportCenter();
   renderDragOverlay(app, g);
 
   renderOverlayLayer(g, actions);
   renderChoiceLayer(g, actions);
-
-  if (g.fx) {
-    g.fx.enemyShake = [];
-    g.fx.playerShake = false;
-  }
   renderLogOverlay(g, actions);
-  renderFloatingNewRun(actions);
   renderMobileQuickMenu(g, actions);
-
+  detectAndEmitDeltas(g);
+  renderPhaseBanner();
+  renderFloatFxLayer();
   scheduleSave(g);
 }
 
-function renderFloatingNewRun(actions: UIActions) {
-  document.querySelector(".floatingNewRun")?.remove();
-  if (isMobileUI()) return;
 
-  const btn = mkButton("새로운 런", () => actions.onNewRun(), "floatingNewRun");
 
-  btn.style.cssText = `
-    position: fixed;
-    top: calc(env(safe-area-inset-top, 0px) + 10px);
-    left: calc(env(safe-area-inset-left, 0px) + 10px);
-    z-index: 10000;
-    pointer-events: auto;
-    padding: 10px 12px;
-    border-radius: 14px;
-    border: 1px solid rgba(255,255,255,.16);
-    background: rgba(0,0,0,.55);
-    color: #fff;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    cursor: pointer;
-  `;
+function renderStageCornerResourceHud(g: GameState) {
+  const anchor = document.querySelector<HTMLElement>(".stageInner");
+  if (!anchor) return;
 
-  document.body.appendChild(btn);
+  document.querySelector(".stageCornerHud")?.remove();
+
+  const hud = document.createElement("div");
+  hud.className = "stageCornerHud";
+  hud.textContent = buildResourceText(g);
+  document.body.appendChild(hud);
+
+  const r = anchor.getBoundingClientRect();
+
+  const padTop = -12;
+
+  const centerX = (r.left + r.right) / 2;
+
+  hud.style.right = "";
+  hud.style.left = `${Math.round(centerX)}px`;
+  hud.style.top  = `${Math.round(r.top + padTop)}px`;
+
+
+  hud.style.transform = "translateX(-50%)";
 }
+
+
 
 
 function renderLogOverlay(g: GameState, actions: UIActions) {
@@ -1699,7 +2176,8 @@ function renderLogOverlay(g: GameState, actions: UIActions) {
   const layer = div("logOverlay");
   layer.style.cssText = `
     position: fixed; inset: 0;
-    z-index: 6000;
+    pointer-events:auto;
+    z-index: 100000;
     background: rgba(0,0,0,.55);
     backdrop-filter: blur(6px);
     display: flex;
@@ -1751,7 +2229,7 @@ function renderOverlayLayer(
 
   const layer = div("overlay-layer");
   layer.style.cssText =
-    "position:fixed; inset:0; z-index:2500; background:rgba(0,0,0,.55); display:flex; justify-content:center; align-items:center;";
+    "position:fixed; inset:0; z-index:30000; background:rgba(0,0,0,.55); display:flex; justify-content:center; align-items:center;";
 
   layer.onclick = (e) => {
     if (e.target === layer) actions.onCloseOverlay();
@@ -1822,78 +2300,163 @@ function renderOverlayLayer(
       return (ca.upgrade ?? 0) - (cb.upgrade ?? 0);
     });
 
-    const list = div("overlayList");
-    list.style.cssText = "display:flex; flex-direction:column; gap:10px;";
+    const wrap = div("pileView");
+    wrap.style.cssText =
+      "display:grid;" +
+      "grid-template-columns: 1fr 320px;" +
+      "gap:16px;" +
+      "align-items:start;";
+
+    const grid = div("pileGrid");
+    grid.style.cssText =
+      "display:grid;" +
+      "grid-template-columns: repeat(auto-fill, minmax(var(--handCardW), 1fr));" +
+      "gap:10px;" +
+      "align-content:start;" +
+      "min-width:0;"+
+      "max-height: 62vh;" + 
+      "overflow-y: auto;" +
+      "overflow-x: hidden;";
+
+    const side = div("pileSide");
+    side.style.cssText =
+      "position:sticky; top:72px;" +
+      "align-self:start;" +
+      "border:1px solid rgba(255,255,255,.10);" +
+      "border-radius:14px;" +
+      "padding:12px;" +
+      "background:rgba(0,0,0,.22);";
+
+    const sideTitle = div("pileSideTitle");
+    sideTitle.style.cssText = "font-weight:800; margin:0 0 10px 0; opacity:.95;";
+    side.appendChild(sideTitle);
+
+    const previewBox = div("pilePreviewBox");
+    previewBox.style.cssText =
+      "display:flex; justify-content:center; align-items:flex-start;" +
+      "padding:8px 0 10px 0;";
+    side.appendChild(previewBox);
+
+    const sidePre = document.createElement("pre");
+    sidePre.className = "pileSideDetail";
+    sidePre.style.cssText =
+      "margin:0;" +
+      "padding:10px;" +
+      "white-space:pre-wrap;" +
+      "border-radius:12px;" +
+      "border:1px solid rgba(255,255,255,.10);" +
+      "background:rgba(0,0,0,.20);" +
+      "font-size:12px;" +
+      "line-height:1.45;";
+    side.appendChild(sidePre);
+
+    // 선택 처리
+    let selectedUid: string | null = sortedUids[0] ?? null;
+
+    const renderSide = () => {
+      previewBox.innerHTML = "";
+      if (!selectedUid) {
+        sideTitle.textContent = "선택된 카드 없음";
+        sidePre.textContent = "";
+        return;
+      }
+      const def = getCardDefByUid(g, selectedUid);
+      const name = displayNameForUid(g, selectedUid);
+      sideTitle.textContent = name;
+
+      const big = renderRealCardForOverlay(g, selectedUid);
+      previewBox.appendChild(big);
+
+      sidePre.textContent = `전열: ${def.frontText}\n후열: ${def.backText}`;
+    };
 
     if (sortedUids.length === 0) {
       const empty = div("overlayEmpty");
-      empty.textContent = "비어 있습니다.";
+      empty.textContent = "비어 있음";
       empty.style.cssText =
         "padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,.10); background:rgba(255,255,255,.03);";
-      list.appendChild(empty);
+      grid.appendChild(empty);
     } else {
       for (const uid of sortedUids) {
-        const def = getCardDefByUid(g, uid);
-        const name = displayNameForUid(g, uid);
+        const thumb = renderRealCardForOverlay(g, uid, (picked) => {
+          selectedUid = picked;
+          renderSide();
+        });
+        thumb.style.width = "var(--handCardW)";
+        thumb.style.height = "var(--handCardH)";
+        thumb.style.boxSizing = "border-box";
+        thumb.style.cursor = "pointer";
 
-        const item = div("overlayItem");
-        item.style.cssText =
-          "border:1px solid rgba(255,255,255,.10); border-radius:14px; padding:10px; background:rgba(255,255,255,.03);";
+        const setSelected = () => {
+          selectedUid = uid;
+          // 선택 강조(간단 링)
+          grid.querySelectorAll(".pileSelected").forEach((el) => el.classList.remove("pileSelected"));
+          thumb.classList.add("pileSelected");
+          renderSide();
+        };
 
-        const top = div("overlayItemTop");
-        top.style.cssText =
-          "display:flex; align-items:center; justify-content:space-between; gap:10px;";
+        thumb.onclick = setSelected;
+        thumb.onmouseenter = setSelected;
 
-        const titleEl = div("overlayItemTitle");
-        titleEl.textContent = name;
-        titleEl.style.cssText = "font-weight:700;";
-
-        const zoneEl = div("overlayItemMeta");
-        zoneEl.textContent = `(${g.cards[uid].zone})`;
-        zoneEl.style.cssText = "opacity:.7; font-size:12px; white-space:nowrap;";
-
-        top.appendChild(titleEl);
-        top.appendChild(zoneEl);
-        item.appendChild(top);
-
-        const pre = document.createElement("pre");
-        pre.className = "overlayItemDetail";
-        pre.textContent = `전열: ${def.frontText}\n후열: ${def.backText}`;
-        pre.style.cssText =
-          "margin:10px 0 0 0; padding:10px; white-space:pre-wrap; border-radius:12px; border:1px solid rgba(255,255,255,.10); background:rgba(0,0,0,.20); font-size:12px; line-height:1.45;";
-        item.appendChild(pre);
-
-        list.appendChild(item);
+        grid.appendChild(thumb);
       }
     }
 
-    panel.appendChild(list);
+    wrap.appendChild(grid);
+    wrap.appendChild(side);
+    panel.appendChild(wrap);
+
+    if (selectedUid) {
+      const first = grid.firstElementChild as HTMLElement | null;
+      if (first) first.classList.add("pileSelected");
+    }
+    renderSide();
   }
 
   layer.appendChild(panel);
   document.body.appendChild(layer);
 }
 
-
 function renderChoiceLayer(g: GameState, actions: UIActions) {
+  // 기존 choice 제거
   document.querySelector(".choice-overlay")?.remove();
 
   const c = g.choice;
-  if (!c) return;
+  if (!c) {
+    document.querySelector(".mainPanel")?.classList.remove("choiceOpen");
+    return;
+  }
+
+  const main = document.querySelector<HTMLElement>(".mainPanel");
+  if (!main) return;
+
+  main.classList.add("choiceOpen");
 
   const overlayEl = div("choice-overlay");
   overlayEl.style.cssText =
-    "position:fixed; inset:0; z-index:3000; background:rgba(0,0,0,0.82); display:flex; justify-content:center; align-items:center;";
+    "position:fixed; inset:0; z-index:22000;" +
+    "background: transparent; display:flex; justify-content:center; align-items:flex-start; padding:180px 36px 12px 12px; box-sizing:border-box;"+
+    "pointer-events:auto;";
+  overlayEl.style.setProperty("pointer-events", "auto", "important");
+  
+
+  overlayEl.onclick = (e) => {
+    if (e.target === overlayEl) actions.onChooseChoice("close");
+  };
 
   const panel = div("choice-panel");
   panel.style.cssText =
-    "width:min(980px, 92vw); max-height:80vh; overflow:auto; padding:16px; border:1px solid rgba(255,255,255,.12); border-radius:16px; background:rgba(15,18,22,.92);";
+    "width:min(750px, 88vw); max-height:70vh;" +
+    "overflow:auto; overflow-x:hidden; padding:16px;" +
+    "border:1px solid rgba(255,255,255,.14); border-radius:16px;" +
+    "background:rgba(0,0,0,1);"+
+    "pointer-events:auto;";
+  panel.style.setProperty("pointer-events", "auto", "important");
+
+  panel.onclick = (e) => e.stopPropagation();
 
   panel.appendChild(h2(c.title));
   if (c.prompt) panel.appendChild(p(c.prompt));
-
-  const list = div("choice-list");
-  list.style.cssText = "display:flex; flex-direction:column; gap:10px; margin-top:12px;";
 
   const fixPreviewSize = (cardEl: HTMLElement) => {
     cardEl.style.width = "var(--handCardW)";
@@ -1901,23 +2464,146 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
     cardEl.style.boxSizing = "border-box";
   };
 
-  c.options.forEach((opt) => {
-    const item = div("choice-item");
-    item.style.cssText =
-      "display:flex; gap:12px; align-items:flex-start;" +
-      "border:1px solid rgba(255,255,255,.10); border-radius:14px; padding:12px;" +
-      "background:rgba(255,255,255,.03);";
+  // 카드 프리뷰가 포함된 선택(리워드/강화 등) vs 텍스트 선택(이벤트/휴식)
+  const hasCardPreview = c.options.some((opt) => {
+    if ((opt as any).cardUid) return true;
+    return typeof opt.key === "string" && opt.key.startsWith("pick:");
+  });
 
-    const left = div("choice-left");
-    left.style.cssText = "flex:0 0 auto;";
+  if (!hasCardPreview) {
 
-    const uid = (opt as any).cardUid as string | undefined;
-    if (uid) {
-      const el = renderCardPreviewByUid(g, uid) as HTMLElement;
-      fixPreviewSize(el);
-      left.appendChild(el);
-    } else {
-      if (typeof opt.key === "string" && opt.key.startsWith("pick:")) {
+    // EVENT / REST: 왼쪽(선택지) + 오른쪽(일러스트)
+
+    const contentRow = div("choice-contentRow");
+    contentRow.style.cssText =
+      "display:flex; gap:18px; margin-top:12px;" +
+      "justify-content:center; align-items:stretch;";
+
+    const leftCol = div("choice-leftCol");
+    leftCol.style.cssText = "flex:1 1 640px; max-width:720px; min-width:0;";
+
+    const illuCol = div("choice-illuCol");
+    illuCol.style.cssText =
+      "flex:0 0 var(--choiceIlluSize, 260px); min-width:200px;" +
+      "display:flex; align-items:center; justify-content:center;";
+
+    const illuBox = div("choice-illuBox");
+    illuBox.style.cssText =
+      "width:100%; aspect-ratio:1/1;" +
+      "border-radius:18px; border:1px solid rgba(255,255,255,.16);" +
+      "background:rgba(0,0,0,.35);";
+
+    const art = (c as any).art as string | undefined;
+    if (art) {
+      const img = document.createElement("img");
+      img.src = art;
+      img.alt = c.title ?? "illustration";
+
+      // 줌 비율
+      const ZOOM = 1.5;
+
+      // illuBox가 잘라내도록
+      illuBox.style.overflow = "hidden";
+      // (중요) 브라우저가 이미지 확대 시 필터링 안 하게
+      (img.style as any).imageRendering = "pixelated";
+
+      img.style.cssText =
+        "position:absolute; inset:0;" +
+        "width:" + (ZOOM * 100) + "%;" +
+        "height:" + (ZOOM * 100) + "%;" +
+        "left:" + (-(ZOOM - 1) * 50) + "%;" +
+        "top:" + (-(ZOOM - 1) * 50) + "%;" +
+        "object-fit:cover;" +
+        "object-position:50% 50%;" +
+        "image-rendering: pixelated; image-rendering: crisp-edges;" +
+        "border-radius:18px;";
+
+      // illuBox가 absolute 자식 기준이 되도록
+      illuBox.style.position = "relative";
+
+      illuBox.appendChild(img);
+    }
+
+    illuCol.appendChild(illuBox);
+
+    const list = div("choice-list");
+    list.style.cssText = "display:flex; flex-direction:column; gap:10px;";
+
+    c.options.forEach((opt) => {
+      const item = div("choice-item");
+      item.style.cssText =
+        "display:flex; gap:12px; align-items:flex-start;" +
+        "border:1px solid rgba(255,255,255,.10); border-radius:14px; padding:12px;" +
+        "background:rgba(255,255,255,.03);" +
+        "position:relative;";
+
+        
+      const b = button(opt.label, () => actions.onChooseChoice(opt.key), false);
+      b.classList.add("choiceOptBtn");
+      item.appendChild(b);
+
+      if ((opt as any).detail) {
+        const pre = document.createElement("pre");
+        pre.className = "choice-detail";
+        pre.textContent = String((opt as any).detail);
+        pre.style.cssText =
+          "margin:10px 0 0 0; padding:10px; white-space:pre-wrap;" +
+          "border-radius:12px; border:1px solid rgba(255,255,255,.10);" +
+          "background:rgba(0,0,0,.22); font-size:12px; line-height:1.45;" +
+          "max-height:220px; overflow:auto;" +
+          "font-family: Mulmaru, ui-sans-serif, system-ui;";
+        item.appendChild(pre);
+      }
+
+      list.appendChild(item);
+    });
+
+    leftCol.appendChild(list);
+    contentRow.appendChild(leftCol);
+    contentRow.appendChild(illuCol);
+    panel.appendChild(contentRow);
+  } else {
+
+    // 카드 프리뷰가 있는 선택(리워드/강화/카드픽 등)
+
+    const list = div("choice-list");
+    list.style.cssText = "display:flex; flex-direction:column; gap:10px; margin-top:12px;";
+
+    c.options.forEach((opt) => {
+      const item = div("choice-item");
+      item.style.cssText =
+        "display:flex; gap:12px; align-items:flex-start;" +
+        "border:1px solid rgba(255,255,255,.10); border-radius:14px; padding:12px;" +
+        "background:rgba(255,255,255,.03);";
+
+      const left = div("choice-left");
+      left.style.cssText = "flex:0 0 auto;";
+
+      const uid = (opt as any).cardUid as string | undefined;
+      if (uid) {
+
+        const isUpgradePick = g.choice?.kind === ("UPGRADE_PICK" as any);
+        const c = g.cards[uid];
+
+        // 다음 강화 단계(현재 + 1)
+        const nextUp = (c.upgrade ?? 0) + 1;
+
+
+        let el: HTMLElement;
+        try {
+          if (isUpgradePick) {
+            el = renderCardPreviewByUidWithUpgrade(g, uid, nextUp);
+            el.classList.add("upgradePreview"); // (선택) 스타일링용
+          } else {
+            el = renderRealCardForOverlay(g, uid) as HTMLElement;
+          }
+        } catch {
+          el = renderRealCardForOverlay(g, uid) as HTMLElement;
+        }
+
+        fixPreviewSize(el);
+        left.appendChild(el);
+      } else if (typeof opt.key === "string" && opt.key.startsWith("pick:")) {
         const payload = opt.key.slice("pick:".length);
         const [defId, upStr] = payload.split(":");
         const upgrade = Number(upStr ?? "0") || 0;
@@ -1925,33 +2611,34 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
         fixPreviewSize(el);
         left.appendChild(el);
       }
-    }
 
-    const right = div("choice-right");
-    right.style.cssText = "flex:1 1 auto; min-width:260px;";
+      const right = div("choice-right");
+      right.style.cssText = "flex:1 1 auto; min-width:260px;";
 
-    const b = button(opt.label, () => actions.onChooseChoice(opt.key), false);
-    b.classList.add("primary");
-    right.appendChild(b);
+      const b = button(opt.label, () => actions.onChooseChoice(opt.key), false);
+      b.classList.add("primary");
+      right.appendChild(b);
 
-    if ((opt as any).detail) {
-      const pre = document.createElement("pre");
-      pre.className = "choice-detail";
-      pre.textContent = String((opt as any).detail);
-      pre.style.cssText =
-        "margin:10px 0 0 0; padding:10px; white-space:pre-wrap;" +
-        "border-radius:12px; border:1px solid rgba(255,255,255,.10);" +
-        "background:rgba(0,0,0,.22); font-size:12px; line-height:1.45;" +
-        "max-height:220px; overflow:auto;";
-      right.appendChild(pre);
-    }
+      if ((opt as any).detail) {
+        const pre = document.createElement("pre");
+        pre.className = "choice-detail";
+        pre.textContent = String((opt as any).detail);
+        pre.style.cssText =
+          "margin:10px 0 0 0; padding:10px; white-space:pre-wrap;" +
+          "border-radius:12px; border:1px solid rgba(255,255,255,.10);" +
+          "background:rgba(0,0,0,.22); font-size:12px; line-height:1.45;" +
+          "max-height:220px; overflow:auto;";
+        right.appendChild(pre);
+      }
 
-    item.appendChild(left);
-    item.appendChild(right);
-    list.appendChild(item);
-  });
+      item.appendChild(left);
+      item.appendChild(right);
+      list.appendChild(item);
+    });
 
-  panel.appendChild(list);
+    panel.appendChild(list);
+  }
+
   overlayEl.appendChild(panel);
   document.body.appendChild(overlayEl);
 }
@@ -1959,14 +2646,18 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
 
 // Top HUD (Player left + Enemies center + Top-right controls)
 function isMobileUI() {
-  return window.matchMedia && window.matchMedia("(max-width: 900px)").matches;
+  const narrow = window.matchMedia?.("(max-width: 900px)").matches ?? false;
+  const coarse = window.matchMedia?.("(pointer: coarse)").matches ?? false; // 터치 위주 기기
+  return narrow && coarse;
 }
-
 function renderTopHud(g: GameState, actions: UIActions) {
+
+
+
   document.querySelectorAll(".topHud").forEach((el) => el.remove());
+  document.querySelectorAll(".enemyHudCenter").forEach((el) => el.remove());
 
 
-  const Time = g.time
   const top = div("topHud");
 
   const mobile = isMobileUI();
@@ -1986,11 +2677,11 @@ function renderTopHud(g: GameState, actions: UIActions) {
     topLine.appendChild(chipEl(`HP ${g.player.hp}/${g.player.maxHp}`));
     topLine.appendChild(chipEl(`블록 ${g.player.block}`));
 
-    topLine.appendChild(chipEl(`S ${g.player.supplies}`, g.player.supplies === 0 ? "warn" : ""));
+    topLine.appendChild(chipEl(`S ${g.player.supplies} |`, g.player.supplies === 0 ? "warn" : ""));
     topLine.appendChild(chipEl(`F ${g.player.fatigue}`));
 
-    topLine.appendChild(chipEl(`시간 ${Math.max(1, totalTime(g))}`));
-    topLine.appendChild(chipEl(`덱 ${g.deck.length}`));
+    topLine.appendChild(chipEl(`| 시간 ${Math.max(1, totalTime(g))}`));
+    topLine.appendChild(chipEl(`| 덱 ${g.deck.length}`));
 
     left.appendChild(topLine);
 
@@ -2026,7 +2717,6 @@ function renderTopHud(g: GameState, actions: UIActions) {
 
     const pbox = div("enemyChip");
     pbox.classList.add("playerHudBox");
-    if (g.fx?.playerShake) pbox.classList.add("shake");
 
     const hpTop = div("enemyChipTop");
     hpTop.appendChild(divText("", "HP"));
@@ -2063,73 +2753,82 @@ function renderTopHud(g: GameState, actions: UIActions) {
 
     const shown = mobile ? pBadgeList.slice(0, 3) : pBadgeList;
     for (const t of shown) pBadges.appendChild(badge(t));
-    if (mobile && pBadgeList.length > shown.length) pBadges.appendChild(badge(`+${pBadgeList.length - shown.length}`)); // ✅ 모바일 요약
+    if (mobile && pBadgeList.length > shown.length) pBadges.appendChild(badge(`+${pBadgeList.length - shown.length}`));
 
     left.appendChild(pbox);
-
-    const res = div("resourceRow inline");
-    const inCombat = g.enemies.length > 0 && g.phase !== "NODE";
-    const bonusS = g.run.nextBattleSuppliesBonus ?? 0;
-
-    if (inCombat) {
-      res.appendChild(chipEl(`S ${g.player.supplies}`, g.player.supplies === 0 ? "warn" : ""));
-    } else {
-      if (bonusS > 0) res.appendChild(chipEl(`보너스 S +${bonusS}`, "bonus"));
-    }
-    res.appendChild(chipEl(`F ${g.player.fatigue}`));
-    res.appendChild(chipEl(`시간 ${Math.max(1, g.run.nodePickCount+Time)}`));
-    res.appendChild(chipEl(`덱 ${g.deck.length}`));
-
-    left.appendChild(res);
   }
 
-  // (B) CENTER: enemies
+// (B) CENTER: enemies
+  const inCombat = !g.run.finished && g.enemies.length > 0 && g.phase !== "NODE";
 
-  const center = div("enemyHudCenter");
+  if (inCombat) {
+    const center = div("enemyHudCenter");
+    const mover = div("enemyHudCenterMover");
+    const enemiesWrap = div(mobile ? "enemyStrip" : "enemyHud");
+    
+    if (!mobile) {
+      enemiesWrap.style.cssText = `
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;          /* ✅ 줄바꿈 금지 */
+        justify-content: center;    /* ✅ 묶음 자체 중앙 */
+        align-items: stretch;
+        gap: 14px;
+        overflow: visible;          /* ✅ 스크롤바/잘림 방지 */
+        white-space: nowrap;
+      `;
+    }
+    center.style.overflow = "visible";
+    mover.style.overflow = "visible";
+    mover.style.width = "max-content";
 
-  const enemiesWrap = div(mobile ? "enemyStrip" : "enemyHud");
-
-  const shaken = g.fx?.enemyShake ?? [];
-
-  if (g.enemies.length === 0) {
-    enemiesWrap.appendChild(divText("enemyNone", ""));
-  } else {
     const targeting = isTargeting(g);
+
+    // 구조: center > mover > enemiesWrap
+    mover.appendChild(enemiesWrap);
+
+    document.querySelectorAll(".enemyHudCenter").forEach((el) => el.remove());
+    center.appendChild(mover);
+
+    document.body.appendChild(center);
+
 
     for (let i = 0; i < g.enemies.length; i++) {
       const e = g.enemies[i];
-      const chipBox = div("enemyChip");
-
-      if (shaken.includes(i)) chipBox.classList.add("shake");
-      if (targeting && e.hp > 0) chipBox.classList.add("targetable");
+      const banner = div("enemyBanner");
+      banner.style.cssText = `
+        flex: 0 0 var(--enemyBannerW, 520px);  /* 고정 폭 */
+        width: var(--enemyBannerW, 520px);
+        max-width: min(var(--enemyBannerW, 520px), 92vw);
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,.14);
+        background: rgba(0,0,0,.78);
+        padding: 12px 14px;
+        box-sizing: border-box;
+      `;
+      if (targeting && e.hp > 0) banner.classList.add("targetable");
 
       const topRow = div("enemyChipTop");
       topRow.appendChild(divText("", `${i + 1}. ${e.name}`));
       topRow.appendChild(divText("", `${e.hp}/${e.maxHp}`));
-      chipBox.appendChild(topRow);
+      banner.appendChild(topRow);
 
       if (!mobile) {
         const outer = div("enemyHPOuter");
         const fill = div("enemyHPFill");
         fill.style.width = `${Math.max(0, Math.min(100, (e.hp / Math.max(1, e.maxHp)) * 100))}%`;
         outer.appendChild(fill);
-        chipBox.appendChild(outer);
+        banner.appendChild(outer);
       }
-
 
       const def = g.content.enemiesById[e.id];
       const intent = def.intents[e.intentIndex % def.intents.length];
-      let label = e.intentLabelOverride ?? intent.label;
-
-
-
-
-
-      chipBox.appendChild(divText("enemyIntent", g.intentsRevealedThisTurn ? `${label}` : ""));
+      const label = e.intentLabelOverride ?? intent.label;
+      banner.appendChild(divText("enemyIntent", g.intentsRevealedThisTurn ? `${label}` : ""));
 
       const st = e.status;
       const badges = div("enemyBadges");
-      chipBox.appendChild(badges);
+      banner.appendChild(badges);
 
       const eBadgeList: string[] = [];
       if ((st.vuln ?? 0) > 0) eBadgeList.push(`취약 ${st.vuln}`);
@@ -2140,35 +2839,64 @@ function renderTopHud(g: GameState, actions: UIActions) {
 
       const eShown = mobile ? eBadgeList.slice(0, 2) : eBadgeList;
       for (const t of eShown) badges.appendChild(badge(t));
-      if (mobile && eBadgeList.length > eShown.length) badges.appendChild(badge(`+${eBadgeList.length - eShown.length}`));
+      if (mobile && eBadgeList.length > eShown.length) {
+        badges.appendChild(badge(`+${eBadgeList.length - eShown.length}`));
+      }
 
-      chipBox.onclick = () => actions.onSelectEnemy(i);
-      enemiesWrap.appendChild(chipBox);
+      banner.onclick = () => actions.onSelectEnemy(i);
+      enemiesWrap.appendChild(banner);
     }
   }
 
-  center.appendChild(enemiesWrap);
-
-  // (C) RIGHT: buttons (add LOG)
+  // (C) RIGHT: buttons
   top.appendChild(left);
-  top.appendChild(center);
-
   if (!mobile) {
     const right = div("topHudRight");
-    const controls = div("topRightControls");
 
-    controls.appendChild(mkButton("룰북", actions.onViewRulebook));
-    controls.appendChild(mkButton("로그", actions.onToggleLogOverlay));
+    right.appendChild(mkButton("룰북", () => actions.onViewRulebook()));
+    right.appendChild(mkButton("로그", () => actions.onToggleLogOverlay()));
 
-    right.appendChild(controls);
     top.appendChild(right);
   }
-
-  if (g.fx?.enemyShake?.length) g.fx.enemyShake = [];
   return top;
 }
 
 
+function buildResourceText(g: GameState): string {
+  const inCombat = g.enemies.length > 0 && g.phase !== "NODE";
+  const bonusS = g.run.nextBattleSuppliesBonus ?? 0;
+
+  const parts: string[] = [];
+
+  if (inCombat) {
+    parts.push(`🧰 S ${g.player.supplies} |`);
+  } else {
+    if (bonusS > 0) parts.push(`보너스 🧰 S +${bonusS} |`);
+  }
+
+  parts.push(`💤 F ${g.player.fatigue}`);
+  parts.push(`| ⏳ 시간 ${Math.max(0, (g.run.nodePickCount ?? 0) + (g.time ?? 0))}`);
+  parts.push(`| 🃏 덱 ${g.deck.length}`);
+
+  return parts.join(" ");
+}
+
+function ensureResourceHudHost(): HTMLElement {
+  // 보드 안에 붙일 거면 boardArea / mainPanel 중 하나를 host로
+  const host = document.querySelector<HTMLElement>(".mainPanel")!;
+  let el = host.querySelector<HTMLElement>(".resourceHud");
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "stageCornerHud resourceHud";
+    host.appendChild(el);
+  }
+  return el;
+}
+
+function renderResourceText(g: GameState){
+  const el = ensureResourceHudHost();
+  el.textContent = buildResourceText(g);
+}
 
 
 function chipEl(text: string, extraClass = "") {
@@ -2183,76 +2911,158 @@ function renderBattleTitleRow(g: GameState) {
   const mobile = isMobileUI();
   if (mobile) {
     const row = div("battleTitleRow");
-    row.style.display = "none"; // 또는 row.classList.add("mobileHidden")
+    row.style.display = "none";
     return row;
   }
-  const row = div("battleTitleRow");
 
+  const row = div("battleTitleRow");
+  row.style.display = "flex";
+  row.style.alignItems = "center";
+  row.style.gap = "12px";
+
+  // (1) 왼쪽: 타이틀
   const title = document.createElement("h2");
-  title.textContent = "전장";
+  title.textContent = "";
   row.appendChild(title);
+
+  // (2) 가운데: 대상 선택 배너 (폭 제한)
+  const hintText = getTargetHintText(g);
+
+  const warn = divText("targetHintInline", "");
+  warn.style.cssText =
+    "padding:6px 8px; border-radius:10px;" +
+    "border:1px solid rgb(0, 0, 0);" +
+    "background: rgb(255, 0, 0);" +
+    "opacity:.82;" +
+    "font-weight:700; font-size:12px; line-height:1.2;" +
+    "white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" +
+    "max-width: 520px;" + 
+    "pointer-events:auto;";
+
+  if (hintText) {
+    warn.textContent = hintText;
+    warn.style.visibility = "visible";
+    warn.style.pointerEvents = "auto";
+  } else {
+    warn.textContent = "대상 선택 필요"; // 더미(숨김)
+    warn.style.visibility = "hidden";    // 공간 유지
+    warn.style.pointerEvents = "none";
+  }
+
+  // (3) 오른쪽: (나중에 S/F/시간/덱 들어갈 자리)
+  const right = div("battleTitleRight");
+  right.style.cssText =
+    "margin-left:auto;" +
+    "display:flex; align-items:center; gap:10px;" +
+    "flex: 0 0 auto;" +
+    "white-space:nowrap;" +
+    "position:relative;";
+
+  const res = div("resourceRow inline");
+
+  res.appendChild(chipEl(``));
+  res.appendChild(chipEl(``));
+  res.appendChild(chipEl(``));
+
+  right.appendChild(res);
+
+  warn.style.position = "absolute";
+  warn.style.right = "207px";
+  warn.style.top = "100%";
+  warn.style.marginTop = "4px";
+  warn.style.zIndex = "5";
+  warn.style.pointerEvents = hintText ? "auto" : "none";
+  row.appendChild(warn); 
+
+  row.appendChild(right);
 
   return row;
 }
 
 
 
-
-function renderLogHeaderRow() {
+function renderLogHeaderRow(collapsed: boolean, onToggle: () => void) {
   const row = div("logHeaderRow");
+  row.tabIndex = 0;
+
   const title = document.createElement("h2");
   title.textContent = "로그";
+
+  const chev = document.createElement("span");
+  chev.className = "chev";
+  chev.textContent = collapsed ? "▸" : "▾";
+
   row.appendChild(title);
+  row.appendChild(chev);
+
+  row.onclick = () => onToggle();
+  row.onkeydown = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onToggle();
+    }
+  };
+
   return row;
 }
 
+
+function getTargetHintText(g: GameState): string | null {
+  if (!isTargeting(g)) return null;
+  if ((g as any).selectedEnemyIndex != null) return null;
+
+  const pt = (g.pendingTarget as any) ?? null;
+  const fromCard = pt?.sourceCardUid ? cardDisplayNameByUid(g, pt.sourceCardUid) : null;
+  const fromLabel = pt?.sourceLabel ?? null;
+  const reason = pt?.reason ?? null;
+
+  const head =
+    fromCard ? `대상 선택 (${fromCard})`
+    : fromLabel ? `대상 선택 (${fromLabel})`
+    : `대상 선택 필요`;
+
+  const reasonLabel =
+    reason === "FRONT" ? "전열"
+    : reason === "BACK" ? "후열"
+    : reason === "EVENT" ? "이벤트"
+    : reason === "RELIC" ? "유물"
+    : null;
+
+  const tail = reasonLabel ? ` — ${reasonLabel}` : "";
+
+  const qn = g.pendingTargetQueue?.length ?? 0;
+  const remaining = (g.pendingTarget ? 1 : 0) + qn;
+  const idxInfo = remaining > 1 ? ` (남은 ${remaining}개)` : ` (남은 1개)`;
+
+  return `${head}${tail}${idxInfo}: 위의 적 박스를 클릭하세요.`;
+}
 
 function renderCombat(root: HTMLElement, g: GameState, actions: UIActions) {
   const wrap = div("combatRoot");
   const board = div("boardArea");
 
-  const hintSlot = div("targetHintSlot");  
-  hintSlot.style.cssText =
-    "height: 54px;" +                 // ✅ 고정 높이 (한 줄 + 패딩 기준)
-    "margin: 0 0 3px 0;" +
-    "display:flex; align-items:center;";
-  wrap.appendChild(hintSlot);
+  const inCombat = !g.run.finished && g.enemies.length > 0 && g.phase !== "NODE";
+  board.classList.toggle("slabOn", inCombat);
 
 
-  if (isTargeting(g) && (g as any).selectedEnemyIndex == null) {
-    const hint = div("targetHint");
+  
+  if (isMobileUI()) {
+    const hintSlot = div("targetHintSlot");
+    hintSlot.style.cssText =
+      "height: 54px;" +
+      "margin: 0 0 3px 0;" +
+      "display:flex; align-items:center;";
+    wrap.appendChild(hintSlot);
 
-    const pt = g.pendingTarget as any;
-    const fromCard = pt?.sourceCardUid ? cardDisplayNameByUid(g, pt.sourceCardUid) : null;
-    const fromLabel = pt?.sourceLabel ?? null;
-    const reason = pt?.reason ?? null;
-
-    const head =
-      fromCard ? `대상 선택 (${fromCard})`
-      : fromLabel ? `대상 선택 (${fromLabel})`
-      : `대상 선택 필요`;
-
-    const reasonLabel =
-      reason === "FRONT" ? "전열"
-      : reason === "BACK" ? "후열"
-      : reason === "EVENT" ? "이벤트"
-      : reason === "RELIC" ? "유물"
-      : null;
-
-    const tail = reasonLabel ? ` — ${reasonLabel}` : "";
-
-    const qn = g.pendingTargetQueue?.length ?? 0;
-    const remaining = (g.pendingTarget ? 1 : 0) + qn;
-    const idxInfo = remaining > 1 ? ` (남은 ${remaining}개)` : ` (남은 1개)`;
-
-    hint.textContent = `${head}${tail}${idxInfo}: 위의 적 박스를 클릭하세요.`;
-
-
-    hintSlot.appendChild(hint);
-  } else {
-
-    hintSlot.style.visibility = "hidden";
-    hintSlot.textContent = ".";
+    const hintText = getTargetHintText(g);
+    if (hintText) {
+      const hint = div("targetHint");
+      hint.textContent = hintText;
+      hintSlot.appendChild(hint);
+    } else {
+      hintSlot.style.visibility = "hidden";
+      hintSlot.textContent = ".";
+    }
   }
 
   board.appendChild(renderSlotsGrid(g, actions, "front"));
@@ -2307,26 +3117,48 @@ function renderHandDock(g: GameState, actions: UIActions, targeting: boolean) {
   const old = document.querySelector(".handDock");
   if (old) old.remove();
 
+  const inCombat = !g.run.finished && g.enemies.length > 0 && g.phase !== "NODE";
+
+  document.querySelector(".combatControls")?.remove();
+
   const dock = div("handDock");
-  const controls = div("controlsDock");
 
   const step = computeNextStep(g, actions, targeting);
 
-  const nextTurnBtn = document.createElement("button");
-  nextTurnBtn.textContent = "다음 턴";
-  nextTurnBtn.className = "stepBtn primary";
-  nextTurnBtn.disabled = step.disabled || g.phase === "NODE";
-  nextTurnBtn.onclick = () => actions.onAutoAdvance();
-  controls.appendChild(nextTurnBtn);
+  if (inCombat) {
+    const controls = div("combatControls");
 
-  const clear = document.createElement("button");
-  clear.textContent = "선택 해제";
-  clear.disabled = !g.selectedHandCardUid;
-  clear.onclick = actions.onClearSelected;
-  controls.appendChild(clear);
+    const nextTurnBtn = document.createElement("button");
+    nextTurnBtn.textContent = "다음 턴";
+    nextTurnBtn.className = "stepBtn primary";
+    nextTurnBtn.disabled = step.disabled || g.phase === "NODE";
+    nextTurnBtn.onclick = () => actions.onAutoAdvance();
 
-  dock.appendChild(controls);
+    const clear = document.createElement("button");
+    clear.textContent = "선택 해제";
+    clear.disabled = !g.selectedHandCardUid;
+    clear.onclick = actions.onClearSelected;
 
+    controls.appendChild(nextTurnBtn);
+    controls.appendChild(clear);
+
+    document.body.appendChild(controls);
+
+    const slot = document.querySelector<HTMLElement>(`.slot[data-slot-side="front"][data-slot-index="1"]`)
+      ?? document.querySelector<HTMLElement>(".stageInner");
+    if (slot) {
+      const r = slot.getBoundingClientRect();
+      const centerX = r.left + r.width / 2;
+      controls.style.left = `${Math.round(centerX)}px`;
+    }
+
+    // Enter 처리 유지
+    setEnterAction(() => actions.onAutoAdvance(), nextTurnBtn.disabled);
+  } else {
+    setEnterAction(null, true);
+  }
+
+  // ---- 아래는 기존 손패 렌더 그대로 ----
   const hand = div("hand");
   hand.dataset.dropHand = "1";
   const row = div("handCardsRow");
@@ -2334,15 +3166,12 @@ function renderHandDock(g: GameState, actions: UIActions, targeting: boolean) {
 
   if (g.hand.length === 0) {
     const hint = div("handEmptyHint");
-    hint.textContent = "손패가 비었습니다.";
+    hint.textContent = "";
     row.appendChild(hint);
   } else {
     const draggable = !isMobileUI();
     for (const uid of g.hand) row.appendChild(renderCard(g, uid, true, actions.onSelectHandCard, { draggable }));
-    
   }
-
-  setEnterAction(() => actions.onAutoAdvance(), nextTurnBtn.disabled);
 
   dock.appendChild(hand);
   document.body.appendChild(dock);
@@ -2350,7 +3179,7 @@ function renderHandDock(g: GameState, actions: UIActions, targeting: boolean) {
   if (!isMobileUI()) enableHorizontalWheelScroll(hand);
 }
 
-
+//손패 UI
 
 function enableHorizontalWheelScroll(el: HTMLElement) {
   if ((el as any).dataset?.wheelX === "1") return;
@@ -2371,6 +3200,125 @@ function enableHorizontalWheelScroll(el: HTMLElement) {
   );
 }
 
+function getBoardAnchorEl(): HTMLElement | null {
+  return (
+    document.querySelector<HTMLElement>(`.slot[data-slot-side="front"][data-slot-index="1"]`)
+    ?? document.querySelector<HTMLElement>(".stageInner")
+  );
+}
+
+function getBoardAnchorCenterX(): number | null {
+  const el = getBoardAnchorEl();
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  return r.left + r.width / 2;
+}
+
+
+function alignEnemyHudToViewportCenter() {
+  const hud = document.querySelector<HTMLElement>(".enemyHudCenter");
+  if (!hud) return;
+
+  const mover = hud.querySelector<HTMLElement>(".enemyHudCenterMover") ?? hud;
+  const wrap =
+    hud.querySelector<HTMLElement>(".enemyHud") ??
+    hud.querySelector<HTMLElement>(".enemyStrip") ??
+    mover;
+
+  // 공통: hud 자체를 화면 중앙에 박기
+  hud.style.position = "fixed";
+  hud.style.top = "8px";
+  hud.style.left = "50%";
+  hud.style.right = "auto";
+  hud.style.transform = "translateX(-50%)";
+  hud.style.overflow = "visible";
+
+  // 내부는 transform으로 흔들지 않게
+  mover.style.transform = "";
+  mover.style.overflow = "visible";
+
+  const banners = Array.from(hud.querySelectorAll<HTMLElement>(".enemyBanner"));
+  const n = banners.length;
+  if (n === 0) {
+    hud.style.width = "";
+    return;
+  }
+
+  const maxOne = Math.min(520, Math.floor(window.innerWidth * 0.92));
+  const GAP = 14; // desktop에서 쓰던 gap 값
+
+  const W1 = maxOne;
+  const W2 = Math.min(window.innerWidth - 16, W1 * 2 + GAP);
+  const W3 = Math.min(window.innerWidth - 16, W1 * 3 + GAP * 2);
+
+  // wrap은 항상 가운데로
+  wrap.style.display = "flex";
+  wrap.style.flexWrap = "nowrap";
+  wrap.style.justifyContent = "center";
+  wrap.style.alignItems = "stretch";
+  (wrap.style as any).gap = `${GAP}px`;
+
+  if (n === 1) {
+    hud.style.width = `${W1}px`;
+    mover.style.width = "100%";
+  } else if (n === 2) {
+    hud.style.width = `${W2}px`;
+    mover.style.width = "100%";
+  } else {
+    // 3 이상이면 어차피 최대 3이라 했으니 3으로 클램프
+    hud.style.width = `${W3}px`;
+    mover.style.width = "100%";
+  }
+}
+
+function alignHandToBoardAnchor(_g: GameState) {
+  const hand = document.querySelector<HTMLElement>(".hand");
+  const row  = document.querySelector<HTMLElement>(".handCardsRow");
+  if (!hand || !row) return;
+
+  const slot = document.querySelector<HTMLElement>(
+    `.slot[data-slot-side="front"][data-slot-index="1"]`
+  );
+  const stage = document.querySelector<HTMLElement>(".stageInner");
+  const anchorRect = slot?.getBoundingClientRect() ?? stage?.getBoundingClientRect();
+  if (!anchorRect) return;
+
+  const anchorX = anchorRect.left + anchorRect.width / 2;
+  const handRect = hand.getBoundingClientRect();
+  const anchorLocal = anchorX - handRect.left; // hand 내부 좌표
+
+  const cards = Array.from(row.querySelectorAll<HTMLElement>(".card"));
+  if (cards.length === 0) return;
+
+  const firstR = cards[0].getBoundingClientRect();
+  const lastR  = cards[cards.length - 1].getBoundingClientRect();
+  const contentLeftViewport  = firstR.left;
+  const contentRightViewport = lastR.right;
+  const contentCenterViewport = (contentLeftViewport + contentRightViewport) / 2;
+
+  const deltaViewport = anchorX - contentCenterViewport;
+
+  const rowW = row.scrollWidth;
+  const viewW = hand.clientWidth;
+
+  if (rowW <= viewW + 1) {
+    row.style.transform = `translateX(${Math.round(deltaViewport)}px)`;
+    hand.scrollLeft = 0;
+    return;
+  }
+
+  let next = hand.scrollLeft - deltaViewport;
+
+  const maxScroll = Math.max(0, rowW - viewW);
+  if (next < 0) next = 0;
+  if (next > maxScroll) next = maxScroll;
+
+  hand.scrollLeft = Math.round(next);
+  row.style.transform = ""; // 스크롤 모드에서는 transform 끄기
+}
+
+
+
 function renderSlotsGrid(g: GameState, actions: UIActions, side: Side) {
   const grid = div("grid6");
   const hasSelected = !!g.selectedHandCardUid;
@@ -2388,7 +3336,6 @@ function renderSlotsGrid(g: GameState, actions: UIActions, side: Side) {
     if (hoverSlot && hoverSlot.side === side && hoverSlot.idx === i) s.classList.add("dropHover");
     if (hasSelected && !disabled) s.classList.add("placeable");
 
-    s.appendChild(small(`${side === "front" ? "전열" : "후열"} ${i + 1}`));
 
     const uid = slots[i];
     if (uid) {
@@ -2410,7 +3357,6 @@ function renderSlotsGrid(g: GameState, actions: UIActions, side: Side) {
         // 더블클릭 회수 유지
         cardEl.ondblclick = () => actions.onReturnSlotToHand(side, i);
       } else {
-        // ✅ 모바일: 롱프레스=회수, 탭=확대 (헬퍼 사용)
         attachLongPress(cardEl, {
           delayMs: 420,
           moveTolerancePx: 8,
@@ -2452,7 +3398,6 @@ function renderSlotsGrid(g: GameState, actions: UIActions, side: Side) {
 
     grid.appendChild(s);
   }
-
   return grid;
 }
 
@@ -2572,6 +3517,14 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
 
     const g = getG();
 
+    if (isDevConsoleOpen()) return;
+
+    if (ev.ctrlKey && ev.shiftKey && ev.code === "KeyK") {
+      ev.preventDefault();
+      toggleDevConsole();
+      return;
+    }
+
     // 새로운 런: F
     if (ev.code === "KeyF") {
       ev.preventDefault();
@@ -2597,7 +3550,7 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
       actions.onClearSelected();
       return;
     }
-
+  
     // 카드 교체: Tab
     if (ev.key === "Tab") {
       ev.preventDefault();
@@ -2721,6 +3674,11 @@ function beginDrag(
     clone.style.margin = "0";
     clone.style.boxSizing = "border-box";
 
+    clone.style.opacity = "1";
+    clone.style.filter = "none";
+    clone.style.transform = "none";
+    clone.style.backgroundColor = "transparent";
+
     drag.previewEl = clone;
   }
 }
@@ -2787,7 +3745,7 @@ function renderDragOverlay(_app: HTMLElement, g: GameState) {
     layer.className = "dragLayer";
     layer.style.position = "fixed";
     layer.style.inset = "0";
-    layer.style.zIndex = "5000";
+    layer.style.zIndex = "21000";
     layer.style.pointerEvents = "none";
     document.body.appendChild(layer);
   }
@@ -2796,22 +3754,30 @@ function renderDragOverlay(_app: HTMLElement, g: GameState) {
   if (!drag.previewEl) return;
 
   const wrap = document.createElement("div");
+
+  
   wrap.className = "dragCardPreview";
   wrap.style.position = "fixed";
-  wrap.style.left = `${drag.x - (drag.grabDX ?? 20)}px`;
-  wrap.style.top  = `${drag.y - (drag.grabDY ?? 20)}px`;
+  wrap.style.left = `${Math.round(drag.x - (drag.grabDX ?? 20))}px`;
+  wrap.style.top  = `${Math.round(drag.y - (drag.grabDY ?? 20))}px`;
 
   const w = drag.previewW ?? 0;
   const h = drag.previewH ?? 0;
-  if (w > 0) wrap.style.width = `${w}px`;
-  if (h > 0) wrap.style.height = `${h}px`;
+  if (w > 0) wrap.style.width  = `${Math.round(w)}px`;
+  if (h > 0) wrap.style.height = `${Math.round(h)}px`;
 
-  wrap.style.transform = "scale(1.03)";
-  wrap.style.opacity = "0.96";
-  wrap.style.filter = "saturate(1.05)";
-  wrap.style.willChange = "transform,left,top";
-  wrap.style.boxShadow = "0 18px 60px rgba(0,0,0,.55)";
+  wrap.style.transform = "none";
+  wrap.style.opacity = "1";
+  wrap.style.filter = "none";
+  wrap.style.boxShadow = "0 16px 44px rgba(0,0,0,.65)";
+  (wrap.style as any).backdropFilter = "none";
+  wrap.style.isolation = "isolate";
+  wrap.style.mixBlendMode = "normal";
 
+  wrap.style.overflow = "hidden";
+  wrap.style.borderRadius = "16px";
+  wrap.style.background = "transparent";
+  wrap.style.clipPath = "inset(0 round 16px)";
   wrap.appendChild(drag.previewEl);
   layer.appendChild(wrap);
 }
@@ -2853,78 +3819,99 @@ function cardDisplayNameByUid(g: GameState, uid: string) {
 
 // Cards
 
-function renderCard(g: GameState, cardUid: string, clickable: boolean, onClick?: (uid: string) => void, opt?: { draggable?: boolean }) {
+function getUpgradedPreviewDefByIndex(
+  base: CardData,
+  upgradeIdx: number
+): CardData {
+  const up = base.upgrades?.[upgradeIdx];
+  if (!up) return base;
+
+  // NOTE: upgrades는 "부분 덮어쓰기" 구조라 가정
+  // base의 나머지 필드는 유지하고, up에 있는 것만 교체
+  const merged: CardData = {
+    ...base,
+    ...up,
+    // 안전: upgrades 자체는 원본 유지(프리뷰에서 또 덮어쓰기 반복 방지)
+    upgrades: base.upgrades,
+  };
+
+  return merged;
+}
+
+function renderCard(
+  g: GameState,
+  cardUid: string,
+  clickable: boolean,
+  onClick?: (uid: string) => void,
+  opt?: { draggable?: boolean }
+) {
   const c = g.cards[cardUid];
   const def = getCardDefByIdWithUpgrade(g.content, c.defId, c.upgrade ?? 0);
 
   const draggable = opt?.draggable ?? true;
+
   const d = div("card");
   if (g.selectedHandCardUid === cardUid) d.classList.add("selected");
   if (def.tags?.includes("EXHAUST")) d.classList.add("exhaust");
   if (def.tags?.includes("VANISH")) d.classList.add("vanish");
 
+  // HEADER
+  const header = div("cardHeader");
   const title = displayNameForUid(g, cardUid);
-  d.appendChild(divText("cardTitle", title));
+  header.appendChild(divText("cardTitle", title));
 
   const meta = div("cardMeta");
   if (def.tags?.includes("EXHAUST")) meta.appendChild(badge("소모"));
   if (def.tags?.includes("VANISH")) meta.appendChild(badge("소실"));
-  d.appendChild(meta);
+  header.appendChild(meta);
+
+  d.appendChild(header);
+
+  // BODY (남은 공간 50:50)
+  const body = div("cardBody");
 
   const sec1 = div("cardSection");
-  sec1.appendChild(divText("cardSectionTitle", "⚔ 전열"));
-  sec1.appendChild(divText("cardText", def.frontText));
-  d.appendChild(sec1);
+  sec1.classList.add("front");
+  sec1.appendChild(renderCardRichTextNode(def.frontText));
+  body.appendChild(sec1);
 
   const sec2 = div("cardSection");
-  sec2.appendChild(divText("cardSectionTitle", "🕯 후열"));
-  sec2.appendChild(divText("cardText", def.backText));
-  d.appendChild(sec2);
+  sec2.classList.add("back");
+  sec2.appendChild(renderCardRichTextNode(def.backText));
+  body.appendChild(sec2);
 
+  d.appendChild(body);
 
+  // 이하 클릭/드래그 로직은 기존 그대로 유지
+  if (clickable && onClick) d.onclick = () => onClick(cardUid);
 
   if (clickable) {
-    // 데스크톱 드래그는 기존 로직 유지
     d.onpointerdown = (ev) => {
       if (!isMobileUI()) {
-        if (ev.button !== 0 && ev.pointerType === "mouse") return;
+        if ((ev as any).button !== 0 && (ev as any).pointerType === "mouse") return;
         if (isTargeting(g)) return;
         if (g.phase !== "PLACE") return;
         if (!draggable) return;
 
         const idx = g.hand.indexOf(cardUid);
-        beginDrag(ev, { kind: "hand", cardUid, fromHandIndex: idx });
-        return;
+        beginDrag(ev as any, { kind: "hand", cardUid, fromHandIndex: idx });
       }
-      // 모바일은 attachLongPress가 처리 (아래)
     };
 
     if (isMobileUI()) {
       attachLongPress(d, {
         delayMs: 280,
         moveTolerancePx: 6,
-        shouldIgnore: () => {
-          if (isTargeting(g)) return true;
-          return false;
-        },
-        onFire: () => {
-          openCardZoom(g, cardUid);
-        },
-        onTap: () => {
-          if (onClick) onClick(cardUid);
-        },
+        shouldIgnore: () => isTargeting(g),
+        onFire: () => openCardZoom(g, cardUid),
+        onTap: () => { if (onClick) onClick(cardUid); },
       });
-    } else {
-      // 데스크톱: onpointerdown은 이미 위에서 드래그로 사용
-      if (clickable && onClick) {
-        d.onclick = () => onClick(cardUid);
-      }
     }
   }
 
-
   return d;
 }
+
 
 
 // Small UI primitives
@@ -2997,3 +3984,66 @@ function displayNameForOffer(g: GameState, offer: { defId: any; upgrade: number 
   return formatName(base, offer.upgrade);
 }
 
+
+const KW_ICON: Record<string, string> = {
+  "취약": "🎯",
+  "약화": "🥀",
+  "출혈": "🩸",
+  "교란": "🌀",
+  "면역": "✨",
+  "S": "🧰",
+  "F": "💤",
+  "드로우": "🃏",
+  "피해": "🗡️",
+  "회복": "💊",
+  "방어": "🛡️",
+  "블록": "🛡️",
+  "소모": "🔥",
+  "소실": "🕳️",
+};
+
+function badgeHtml(kw: string, n?: string, punc?: string) {
+  const icon = KW_ICON[kw] ?? "";
+  const label = n != null ? `${kw} ${n}` : kw;
+  const tail = punc ? punc : "";
+  return `<span class="kwBadge"><span class="kwIcon">${icon}</span> <span class="kwLabel">${label}</span><span class="kwPunc">${tail}</span></span>`;
+}
+
+function badgeIconText(icon: string, text: string, extraClass = "") {
+  const s = document.createElement("span");
+  s.className = "badge kw" + (extraClass ? ` ${extraClass}` : "");
+
+  const i = document.createElement("span");
+  i.className = "badgeIcon";
+  i.textContent = icon;
+
+  const t = document.createElement("span");
+  t.className = "badgeText";
+  t.textContent = text;
+
+  s.appendChild(i);
+  s.appendChild(t);
+  return s;
+}
+
+const PUNC = "[,，、]";
+
+const reNum  = new RegExp(`(취약|약화|출혈|교란|면역|S|F|드로우|피해|방어|블록|회복|소모|소실)\\s*([+-]?\\d+)\\s*(${PUNC})?`, "g");
+const reBare = new RegExp(`\\b(소모|소실|피해)\\b\\s*(${PUNC})?`, "g");
+
+function renderCardRichText(text: string): string {
+  // 1) 숫자 있는 키워드(+콤마)
+  let out = text.replace(reNum, (_m, kw, n, punc) => badgeHtml(kw, n, punc));
+
+  // 2) 숫자 없는 키워드(+콤마)
+  out = out.replace(reBare, (_m, kw, punc) => badgeHtml(kw, undefined, punc));
+
+  out = out.replace(/\n/g, "<br>");
+  return out;
+}
+
+function renderCardRichTextNode(text: string): HTMLElement {
+  const el = div("cardText");
+  el.innerHTML = renderCardRichText(text);
+  return el;
+}

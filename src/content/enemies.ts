@@ -28,8 +28,8 @@ export const ENEMIES: EnemyData[] = [
         acts: [{ op: "damagePlayerFormula", kind: "goblin_raider" }],
       },
       {
-        label: "훔치기: S -3",
-        acts: [{ op: "supplies", n: -3 }],
+        label: "훔치기: 출혈 +2 부여, S -3",
+        acts: [{ op: "supplies", n: -3 }, { op: "statusPlayer", key: "bleed", n: 2 }],
       },
     ],
   },
@@ -49,7 +49,7 @@ export const ENEMIES: EnemyData[] = [
     name: "조약돌 골렘",
     maxHp: 30,
     intents: [
-      { label: "조약돌 던지기: 7 피해", acts: [{ op: "damagePlayer", n: 7 }] },
+      { label: "조약돌 던지기: 8 피해", acts: [{ op: "damagePlayer", n: 8 }] },
       { label: "모래 모으기: 자신 HP 6 회복", acts: [{ op: "enemyHealSelf", n: 6 }] },
     ],
   },
@@ -59,7 +59,7 @@ export const ENEMIES: EnemyData[] = [
     name: "바위 골렘",
     maxHp: 50,
     intents: [
-      { label: "바위 던지기: 9 피해", acts: [{ op: "damagePlayer", n: 9 }] },
+      { label: "바위 던지기: 10 피해", acts: [{ op: "damagePlayer", n: 10 }] },
       { label: "땅 모으기: 자신 HP 10 회복", acts: [{ op: "enemyHealSelf", n: 10 }] },
     ],
   },

@@ -1,6 +1,6 @@
 import type { EnemyEffect, GameState, Side, EnemyState } from "./types";
 import { aliveEnemies, clampMin, logMsg, pickOne, shuffle, applyStatusTo } from "./rules";
-import { applyDamageToPlayer, applyDamageToEnemy, markEnemyShaken, cleanupPendingTargetsIfNoEnemies } from "./effects";
+import { applyDamageToPlayer, applyDamageToEnemy, cleanupPendingTargetsIfNoEnemies } from "./effects";
 import { resolvePlayerEffects } from "./resolve";
 import { getCardDefFor } from "../content/cards";
 import { cardNameWithUpgrade, getCardDefByIdWithUpgrade } from "../content/cards";
@@ -73,6 +73,8 @@ export function spawnEncounter(g: GameState, opt?: { forceBoss?: boolean; forceP
         g.run.bossPool = g.run.bossPool.filter((x) => x !== bossId);
       }
       g.enemies = [enemyStateFromId(g, bossId)];
+      const runAny = g.run;
+      runAny.ominousProphecySeen = false;
       logMsg(g, `보스 등장! (노드 ${nodeNo}) 적: ${g.enemies[0].name}`);
       return;
     }
@@ -201,6 +203,8 @@ function calcDeckSizeDamage(act: { base: number; per: number; div: number; cap?:
 const NO_REPEAT_INTENT_INDEXES: Record<string, ReadonlySet<number>> = {
   other_adventurer: new Set([1]),
   slime: new Set([0, 1]),
+  pebble_golem: new Set([1]),
+  rock_golem: new Set([1]),
   poison_spider: new Set([0, 2]),
   boss_cursed_wall: new Set([0]),
   boss_giant_orc: new Set([1]),
@@ -363,9 +367,8 @@ export function revealIntentsAndDisrupt(g: GameState) {
     if (deckAct && deckAct.op === "damagePlayerByDeckSize") {
       const deckSize = getCombatDeckSize(g);
       const { dmg } = calcDeckSizeDamage(deckAct, deckSize);
-      const capText = deckAct.cap != null ? ` (최대 ${deckAct.cap})` : "";
       const head = intent.label.split(":")[0].trim();
-      label = `${head}: ${dmg} 피해${capText}`;
+      label = `${head}: ${dmg} 피해`;
     }
 
     e.intentLabelOverride = label;
@@ -669,7 +672,6 @@ export function upkeepEndTurn(g: GameState) {
       if (!en.immuneThisTurn) {
         en.hp = Math.max(0, en.hp - b);
         const idx = g.enemies.indexOf(en);
-        if (idx >= 0) markEnemyShaken(g, idx);
         logMsg(g, `적(${en.name}) 출혈로 HP -${b} (HP ${en.hp}/${en.maxHp})`);
       } else {
         logMsg(g, `적(${en.name})은(는) 이번 턴 면역이라 출혈 피해 무시`);

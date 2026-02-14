@@ -1,5 +1,6 @@
 import type { GameState, EnemyState, PlayerDamageKind } from "./types";
 import { logMsg, clampMin, aliveEnemies } from "./rules";
+import { checkEndConditions } from "./combat";
 
 export function addBlock(g: GameState, n: number) {
   if (n <= 0) return;
@@ -33,17 +34,6 @@ export function cleanupPendingTargetsIfNoEnemies(g: GameState) {
 
 //애니메이션!
 
-export function markEnemyShaken(g: GameState, enemyIndex: number) {
-  if (enemyIndex < 0) return;
-  g.fx ??= {};
-  g.fx.enemyShake ??= [];
-  g.fx.enemyShake.push(enemyIndex);
-}
-
-export function markPlayerShaken(g: GameState) {
-  g.fx ??= {};
-  g.fx.playerShake = true;
-}
 
 export function applyDamageToEnemy(g: GameState, enemy: EnemyState, raw: number) {
   if (raw <= 0) return;
@@ -74,11 +64,15 @@ export function applyDamageToEnemy(g: GameState, enemy: EnemyState, raw: number)
 
   enemy.hp = Math.max(0, enemy.hp - dmg);
 
-  // ✅ "애니메이션은 피해 기준"
-  if (dmg > 0) markEnemyShaken(g, idx);
 
   logMsg(g, `적(${enemy.name})에게 ${dmg} 피해. (HP ${enemy.hp}/${enemy.maxHp})`);
+  
   cleanupPendingTargetsIfNoEnemies(g);
+  if (aliveEnemies(g).length === 0) {
+    // 타겟팅 남아있을 수 있으니 정리도 같이
+    cleanupPendingTargetsIfNoEnemies(g);
+    checkEndConditions(g);
+  }
 }
 
 
@@ -118,7 +112,6 @@ export function applyDamageToPlayer(
   if (dmg <= 0) return 0;
 
   g.player.hp = Math.max(0, g.player.hp - dmg);
-  if (dmg > 0) markPlayerShaken(g);
 
   logMsg(g, `플레이어 ${dmg} 피해 (${reason ?? kind}). (HP ${g.player.hp}/${g.player.maxHp})`);
   return dmg;

@@ -1,4 +1,8 @@
+/* =========================
+   0) ROOT VARIABLES
+   ========================= */
 :root{
+  /* base colors */
   --bg0:#060708;
   --bg1:#0b0d10;
   --panel:#0f1216cc;
@@ -7,34 +11,76 @@
   --line2:#ffffff1f;
   --text:#e7e9ee;
   --muted:#b7bdc8;
-  --chip:#ffffff10;
-  --chip2:#ffffff18;
-  --shadow: 0 18px 60px rgba(0,0,0,.65);
-  --radius:18px;
 
-  --hudH: 112px;
-  --dockH: 210px;
-  --uiGap: 16px;
-
+  /* spacing / sizing */
+  --edgePad: 14px;
   --logW: 360px;
   --logGap: 14px;
-  --edgePad: 14px;
 
-  --handCardW: 132px;
-  --handCardH: 178px;
+  --hudH: 100px;
+  --dockH: 185px;
+
+  --stageMaxW: 800px;
+
+  --handCardW: 110px;
+  --handCardH: 165px;
 
   --slotW: 180px;
   --slotGapX: 22px;
   --slotGapY: 6px;
+
+  --shadow: 0 18px 60px rgba(0,0,0,.65);
+  --radius: 18px;
+  --selR: 8px; 
+
+  /* board aspect ratio (image: 2048x1365) */
+  --boardAR: 1200/922;
+
+  --logLine: rgba(255,255,255,.22);
+  --logLineStrong: rgba(255,255,255,.32);
+  --logShadow: 0 18px 60px rgba(0,0,0,.70);
+
 }
 
-html,body{ height:100%; }
+@font-face{
+  font-family: "Mulmaru";
+  src: url("fonts/Mulmaru.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* 1) 게임 전체 기본 폰트 = Mulmaru */
+html, body, #app, button, input, textarea, select{
+  font-family: "Mulmaru", ui-sans-serif, system-ui, -apple-system,
+               "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif !important;
+}
+
+/* (선택) 숫자/기호 가독성 */
+body{
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+pre.log,
+.logPanel pre.log,
+.logOverlay pre.log,
+pre.log.log{
+  font-family: ui-sans-serif, system-ui, -apple-system,
+               "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif !important;
+}
+
+/* =========================
+   1) BASE
+   ========================= */
+html, body{ height:100%; }
 body{
   margin:0;
-  background: radial-gradient(1200px 700px at 50% -20%, #1b1f27 0%, var(--bg0) 55%) fixed;
   color:var(--text);
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", "Apple SD Gothic Neo", Arial;
   overflow:hidden;
+  background: transparent;
 }
 #app{
   height:100vh;
@@ -43,779 +89,45 @@ body{
   flex-direction:column;
 }
 
-.panel{
-  background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
-  border:1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(10px);
-}
-h2,h3{ margin:0 0 10px 0; letter-spacing:.2px; }
-h2{ font-size:18px; }
-h3{ font-size:14px; color:var(--muted); }
-
-.topHud{
-  display: grid;
-  grid-template-columns: 280px 1fr 280px;
-  gap: 12px;
-  align-items: start;
-  padding: 6px 14px 0 14px;
-  box-sizing: border-box;
-  margin: 0;
-}
-
-.playerHud{
-  display:flex;
-  align-items:flex-start;
-  gap:14px;
-  min-width: 360px;
-}
-.playerHudLeft{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-  min-width:260px;
-}
-.playerHudTitle{
-  font-weight:700;
-  font-size:14px;
-  color:var(--muted);
-  margin-bottom:6px;
-}
-.playerTitleRow{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  flex-wrap: nowrap;
-  white-space: nowrap;
-}
-.playerBars{
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-}
-.playerStatsRow{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  margin-top:10px;
-  align-items:center;
-}
-.playerHudLeft .playerStatsRow .chip{
-  background: rgba(255,255,255,.06);
-}
-
-.statBar{
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-  min-width:320px;
-}
-.statBarTop{
-  display:flex;
-  justify-content:space-between;
-  font-size:12px;
-  color:var(--muted);
-}
-.barOuter{
-  width:340px;
-  height:8px;
-  border-radius:999px;
-  border:1px solid var(--line2);
-  background: rgba(255,255,255,.06);
-  overflow:hidden;
-}
-.barFill{
-  height:100%;
-  border-radius:999px;
-  filter: saturate(1.2);
-}
-.barFill.hp{ background: linear-gradient(90deg, #ff5a5a, #ff2f2f); }
-.barFill.block{ background: linear-gradient(90deg, #64b5ff, #2a7cff); }
-
-.enemyHudCenter{
-  justify-self: center;
-  width: min(760px, 100%);
-  max-height: 140px;
-  overflow: hidden;
-}
-.enemyHud{
-  flex:1;
-  display:flex;
-  align-items:flex-start;
-  justify-content:center;
-  overflow:hidden;
-  gap:14px;
-}
-.enemyChip{
-  width: 320px;
-  max-width: 360px;
-  min-width: 200px;
-  padding: 14px 14px;
-  border-radius: 16px;
-  border:1px solid var(--line);
-  background: rgba(255,255,255,.04);
-}
-.enemyChipTop{
-  display:flex;
-  justify-content:space-between;
-  font-size:13px;
-  color:var(--muted);
-  gap:10px;
-  margin-bottom:4px;
-}
-.enemyHPOuter{
-  width:100%;
-  height:8px;
-  border-radius:999px;
-  border:1px solid var(--line2);
-  background: rgba(255,255,255,.06);
-  overflow:hidden;
-}
-.enemyHPFill{
-  height:100%;
-  border-radius:999px;
-  background: linear-gradient(90deg, #ff5a5a, #ff2f2f);
-}
-.enemyBadges{
-  margin-top:4px;
-  display:flex;
-  flex-wrap:wrap;
-  gap:6px;
-  align-items:center;
-  min-height: calc(18px * 2 + 6px);
-}
-.enemyBadges .badge{
-  font-size:12px;
-  padding:3px 8px;
-}
-.enemyIntent{
-  color: var(--muted);
-  line-height: 1.2;
-  margin-top: 8px;
-  font-size: 13px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.resourceRow{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  min-width:260px;
-  justify-content:flex-end;
-}
-.resourceRow.inline{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  justify-content:flex-end;
-  margin-bottom:0;
-}
-.chip{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  padding:7px 10px;
-  border-radius:999px;
-  border:1px solid var(--line);
-  background: var(--chip);
-  font-size:12px;
-  color: var(--text);
-}
-.chip.warn{
-  border-color: rgba(255,80,80,.55);
-  background: rgba(255,80,80,.10);
-  box-shadow: 0 0 0 2px rgba(255,80,80,.10) inset, 0 0 18px rgba(255,80,80,.10);
-  color: #ffd6d6;
-}
-
-.mainRow{
-  position: relative !important;
-  display: block !important;
-  flex: 1;
-  min-height:0;
-  overflow: hidden !important;
-  padding: 0 var(--edgePad) 12px var(--edgePad) !important;
-  height: calc(100vh - var(--topHudH, var(--hudH)) - var(--dockH) - var(--uiGap));
-  box-sizing: border-box;
-}
-
-.stage{
-  width: 100% !important;
-  min-width: 0 !important;
-  display:flex;
-  align-items:stretch;
-}
-.stageInner{
-  margin: 0 auto !important;
-  width: 100% !important;
-  display:flex;
-  align-items:stretch;
-  max-width: min(760px, calc(100vw - (var(--logW) + var(--logGap) + var(--edgePad)*2))) !important;
-  box-sizing: border-box;
-}
-
-.mainPanel{
-  width:100%;
-  padding: 16px 16px 12px 16px;
-  box-sizing: border-box;
-  min-height:0;
-  height: 100%;
-  overflow: auto;
-  margin-top: 0 !important;
-  padding-top: 10px !important;
-  padding-bottom: calc(var(--dockH) + 16px);
-}
-
-.logPanel{
-  position: absolute !important;
-  top: 12px !important;
-  right: var(--edgePad) !important;
-  bottom: 12px !important;
-  width: var(--logW) !important;
-  z-index: 50 !important;
-  padding: 14px;
-  min-height:0;
-  display:flex;
-  flex-direction:column;
-}
-.logPanel .log{
-  flex:1;
-  min-height:0;
-  margin:0;
-  padding: 10px;
-  border-radius: 12px;
-  border:1px solid var(--line);
-  background: rgba(0,0,0,.25);
-  color: #cfd5e2;
-  font-size: 12px;
-  line-height: 1.45;
-  overflow:auto;
-  white-space: pre-wrap;
-  height: 100%;
-}
-
-.combatRoot{
-  display:flex;
-  flex-direction:column;
-  gap: 6px;
-}
-.boardArea{
-  display:flex;
-  flex-direction:column;
-  gap: 6px;
-  margin-top: 6px;
-}
-.boardArea > .grid6 + .grid6{
-  margin-top: 6px;
-}
-
-.grid6{
-  display:grid;
-  grid-template-columns: repeat(3, var(--slotW));
-  justify-content: center;
-  column-gap: var(--slotGapX);
-  row-gap: var(--slotGapY);
-}
-.slot{
-  position: relative;
-  border-radius: 16px;
-  border: 1px dashed rgba(255,255,255,0.12);
-  background: rgba(0,0,0,0.18);
-  overflow: hidden;
-  aspect-ratio: 5 / 7 !important;
-  height: auto !important;
-  width: 100%;
-  padding: 10px;
-  box-sizing: border-box;
-}
-.slot.disabled{ opacity:.45; filter: grayscale(1); }
-.slot.dropHover{
-  border-color: rgba(255,255,255,.38);
-  box-shadow: 0 0 0 2px rgba(255,255,255,.10) inset;
-}
-.slot small{ color: var(--muted); font-size: 11px; }
-.slot > small{
-  position: relative;
-  z-index: 2;
-  opacity: 0.75;
-}
-.slot.sWarn{
-  border-color: rgba(255,80,80,.55) !important;
-  box-shadow: 0 0 0 2px rgba(255,80,80,.18) inset, 0 0 22px rgba(255,80,80,.12);
-}
-.slot.sWarn .card.inSlot{
-  box-shadow: 0 0 0 1px rgba(255,80,80,.22) inset, 0 16px 40px rgba(0,0,0,.55);
-}
-
-.controls{
-  display:flex;
-  flex-wrap:wrap;
-  gap: 12px;
-}
-.controls.topClose{ justify-content:flex-end; }
-
-button{
-  position: relative;
-  overflow: hidden;
-  appearance:none;
-  border: 1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.06);
-  color: rgba(255,255,255,.92);
-  border-radius: 14px;
-  padding: 10px 14px;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  transition: transform .08s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease, opacity .15s ease;
-  box-shadow: 0 6px 18px rgba(0,0,0,.35);
-}
-button::before{
-  content: "";
-  position: absolute;
+/* =========================
+   2) GLOBAL BACKGROUND LAYER
+   (ensureBgLayer()가 body에 div.bgLayer 추가)
+   ========================= */
+.bgLayer{
+  position: fixed;
   inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: radial-gradient(120% 80% at 20% 10%, rgba(255,255,255,.10), transparent 55%);
-  opacity: .9;
-}
-button:hover{
-  background: rgba(255,255,255,.10);
-  border-color: rgba(255,255,255,.20);
-  transform: translateY(-1px);
-}
-button:active{
-  transform: translateY(0px);
-  background: rgba(255,255,255,.08);
-}
-button:disabled{
-  opacity: .38;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-button:focus{ outline: none; }
-button:focus-visible{
-  outline: 2px solid rgba(255,255,255,.22);
-  outline-offset: 2px;
-}
-button.primary{
-  border-color: rgba(255,255,255,.16);
-  background: rgba(255,255,255,.08);
-}
-button.stepOn{
-  box-shadow: 0 0 0 2px rgba(255,255,255,.10) inset;
+  z-index: -1;
+  background: url("ui/background/dungeon_bg.png") center / cover no-repeat;
+  image-rendering: pixelated;
 }
 
-.stepBtn{
-  padding: 8px 10px;
-  border-radius: 999px;
-  background: rgba(255,255,255,.05);
-  border: 1px solid rgba(255,255,255,.10);
-  font-size: 13px;
-}
-
-.pileButtons{
-  margin-top: 10px;
-  margin-left:auto;
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  justify-content:flex-end;
-  white-space: nowrap;
-}
-.pileButtons button{
-  padding: 8px 10px;
-  border-radius: 999px;
-  font-size: 13px;
-  background: rgba(255,255,255,.045);
-}
-.pileButtons button:hover{ background: rgba(255,255,255,.085); }
-
-.handDock{
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: var(--dockH);
-  padding: 6px 14px 10px 18px;
-  background: linear-gradient(180deg, rgba(0,0,0,.00), rgba(0,0,0,.65));
-  pointer-events: none;
-}
-.handDock > *{ pointer-events: auto; }
-
-.controlsDock{
-  display:flex;
-  gap: 8px;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  padding-left: 6px;
-  margin-bottom: 10px;
-}
-.hand{
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding-bottom: 6px;
-}
-.handCardsRow{
-  display: flex;
-  justify-content: flex-start;
-  align-items: flex-end;
-  gap: 10px;
-  min-width: max-content;
-}
-
-.card{
-  flex: 0 0 auto;
-  width: 168px;
-  border-radius: 16px;
-  border:1px solid var(--line);
-  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
-  padding: 10px 10px 8px 10px;
-  box-shadow: 0 16px 40px rgba(0,0,0,.55);
-  user-select:none;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-.card.selected{
-  outline: 2px solid rgba(255,255,255,.18);
-  box-shadow: 0 0 0 2px rgba(255,255,255,.10) inset, 0 18px 60px rgba(0,0,0,.65);
-}
-.cardTitle{
-  font-weight: 800;
-  font-size: 13px;
-  margin-bottom: 6px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.cardMeta{
-  display:flex;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-.badge{
-  display:inline-flex;
-  align-items:center;
-  padding: 4px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  color: var(--muted);
-  border:1px solid var(--line);
-  background: rgba(255,255,255,.05);
-  height:18px;
-  line-height:18px;
-  white-space:nowrap;
-}
-.badge.placeholder{ visibility: hidden; }
-
-.cardSection{ margin-top: 8px; }
-.cardSectionTitle{
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted);
-  margin-bottom: 4px;
-}
-.cardText{
-  font-size: 12px;
-  line-height: 1.25;
-  color: #e9ecf3;
-  white-space: normal;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 6;
-  line-clamp: 6;
-  word-break: break-word;
-  flex: 1;
-}
-
-.handDock .card{
-  width: var(--handCardW);
-  height: var(--handCardH);
-}
-.slot .card{
-  width: 100%;
-  height: 100%;
-}
-.card.inSlot{
-  position: absolute;
-  inset: 26px 10px 10px 10px;
-  width: auto;
-  height: auto;
-  margin: 0;
-  box-sizing: border-box;
-  border-radius: 14px;
-  overflow: hidden;
-  pointer-events: auto;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  padding: 7px;
-}
-.card.inSlot .cardTitle{
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1.25;
-  margin-bottom: 4px;
-  padding-top: 0;
-}
-.card.inSlot .cardMeta{ margin-bottom: 6px; }
-.card.inSlot .badge{
-  line-height: 1.1;
-  padding: 3px 7px;
-}
-.card.inSlot .cardText{
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  white-space: normal;
-  word-break: break-word;
-  line-height: 1.2;
-  opacity: 0.9;
-}
-.card.inSlot .cardSection{ margin-top: 6px; }
-.card.inSlot .cardSectionTitle{
-  font-size: 11px;
-  opacity: 0.9;
-  margin-bottom: 2px;
-}
-
-.handEmptyHint{
-  color: var(--muted);
-  font-size: 12px;
-  padding: 10px;
-}
-
-.dragLayer{ pointer-events:none; }
-.dragGhost{
-  padding: 8px 10px;
-  border-radius: 12px;
-  border:1px solid var(--line2);
-  background: rgba(10,12,15,.85);
-  color: var(--text);
-  box-shadow: var(--shadow);
-}
-.dragCardPreview{
-  position: fixed;
-  z-index: 2200;
-  pointer-events: none;
-  transform: translate3d(0,0,0);
-  filter: drop-shadow(0 18px 50px rgba(0,0,0,.65));
-  opacity: .96;
-  width: var(--handCardW);
-  height: var(--handCardH);
-}
-.dragCardPreview .card{
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  filter: brightness(1.06) saturate(1.08);
-  transform: translateZ(0) scale(1.02);
-  box-shadow: 0 22px 70px rgba(0,0,0,.75);
-}
-.card.isDraggingSource{
-  filter: brightness(.78) saturate(.90);
-  opacity: .65;
-  box-shadow: none;
-}
-
-.rulebook{
-  margin:0;
-  padding: 12px;
-  border-radius: 12px;
-  border:1px solid var(--line);
-  background: rgba(0,0,0,.25);
-  white-space: pre-wrap;
-  overflow:auto;
-  max-height: 52vh;
-}
-
-.overlayHeader{
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  margin-bottom: 10px;
-  border-radius: 14px;
-  border:1px solid var(--line);
-  background: rgba(0,0,0,.25);
-  backdrop-filter: blur(10px);
-}
-.overlayTitle{ margin:0; }
-.overlayClose{ margin-left:auto; }
-
-.panelHeader{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  margin-bottom:10px;
-}
-.battleTitleRow{
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 12px;
-  margin: 0 0 6px 0;
-  padding: 0;
-}
-.battleTitleRow h2{
-  line-height: 1.2;
-  padding-top: 2px;
-  margin: 0;
-}
-.topRightControls{
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.targetHint{
-  padding: 8px 10px;
-  border-radius: 12px;
-  border:1px solid rgba(255, 80, 80, 0.45);
-  background: rgba(255, 80, 80, 0.12);
-  color: #ffd9d9;
-  font-size: 12px;
-  margin-bottom: 10px;
-}
-.enemyChip.targetable{
-  border-color: rgba(255, 80, 80, 0.55);
-  box-shadow: 0 0 0 1px rgba(255, 80, 80, 0.18) inset, 0 10px 26px rgba(0,0,0,0.55);
-  cursor: pointer;
-}
-.enemyChip.targetable:hover{
-  border-color: rgba(255, 80, 80, 0.85);
-  box-shadow:
-    0 0 0 2px rgba(255, 80, 80, 0.22) inset,
-    0 0 18px rgba(255, 60, 60, 0.22),
-    0 14px 32px rgba(0,0,0,0.6);
-}
-.enemyChip.targetSelected{
-  border-color: rgba(255, 80, 80, 0.95);
-  box-shadow:
-    0 0 0 2px rgba(255, 80, 80, 0.30) inset,
-    0 0 22px rgba(255, 60, 60, 0.28),
-    0 18px 40px rgba(0,0,0,0.65);
-}
-
-.enemyChip.shake { animation: enemyHitShake 140ms linear; }
-@keyframes enemyHitShake{
-  0%{ transform: translateX(0); }
-  20%{ transform: translateX(-4px); }
-  40%{ transform: translateX(4px); }
-  60%{ transform: translateX(-2px); }
-  80%{ transform: translateX(2px); }
-  100%{ transform: translateX(0); }
-}
-
-.previewPickBox{
-  border: 1px solid rgba(255,255,255,.10);
-  border-radius: 14px;
-  padding: 12px;
-  background: rgba(255,255,255,.03);
-  margin-top: 12px;
-}
-.previewTitle{ opacity: .85; margin-bottom: 10px; }
-.previewRow{
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px;
-  border-radius: 12px;
-  cursor: pointer;
-  user-select: none;
-}
-.previewRow:hover{
-  background: rgba(255,255,255,.04);
-  border: 1px solid rgba(255,255,255,.06);
-}
-.previewRow:focus{
-  outline: 2px solid rgba(255,255,255,.18);
-  outline-offset: 2px;
-}
-.previewRowLabel{
-  width: 56px;
-  opacity: .85;
-}
-.previewPills{
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.nodePill{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  padding:6px 10px;
-  border-radius:999px;
-  border:1px solid rgba(255,255,255,.14);
-  background:rgba(255,255,255,.06);
-  min-width: 64px;
-  text-align:center;
-  white-space:nowrap;
-  font-size: 12px;
-  font-weight: 600;
-}
-.nodePill.picked{
-  border-color: rgba(255,255,255,.20);
-  background: rgba(255,255,255,.06);
-  font-weight: 700;
-}
-.previewArrow, .previewSlash{
-  opacity: .5;
-  padding: 0 2px;
-}
-
-:root{
-  --edgePad: 14px;
-  --logW: 360px;
-  --logGap: 14px;
-
-  --playerW: 320px;     /* 플레이어 UI 박스 폭 */
-  --hudH: 140px;        /* 상단 HUD 영역 높이 */
-  --dockH: 210px;       /* 손패 도크 높이 */
-
-  --stageMaxW: 760px;   /* 전장 최대 폭(중앙) */
-}
-
-/* ===== Top HUD: 적 중앙 상부 + 우상단 버튼 ===== */
+/* =========================
+   3) TOP HUD LAYOUT (desktop)
+   ========================= */
 .topHud{
   height: var(--hudH);
   display: grid;
-  grid-template-columns: 1fr minmax(0, var(--stageMaxW)) 1fr; /* 가운데가 진짜 중앙 */
+  grid-template-columns: 1fr minmax(0, var(--stageMaxW)) 1fr;
   align-items: start;
   gap: 12px;
   padding: 8px var(--edgePad) 0 var(--edgePad);
   margin: 0;
   box-sizing: border-box;
-  overflow: hidden; /* 배지 때문에 HUD가 아래로 늘어나지 않게 */
+  overflow: visible;
 }
-
-/* 적 UI는 중앙 상부 */
+.enemyHud{ 
+  display: flex; 
+  gap: 10px; 
+  flex-wrap: wrap;
+}
 .enemyHudCenter{
   grid-column: 2;
   justify-self: center;
-  width: 100%;
-  max-height: 100%;
-  overflow: auto; /* 적 많아지면 여기만 스크롤 */
+  width: 360px;
+  max-width: 360px;
+  max-height: 110%;
+  overflow: auto;
 }
-
-/* 우상단 버튼(새 런/룰북 등) */
 .topHudRight{
   grid-column: 3;
   justify-self: end;
@@ -824,737 +136,1788 @@ button.stepOn{
   gap: 8px;
 }
 
-/* (좌측 칸은 비워둬도 됨. 플레이어는 fixed로 갈 거라) */
-.topHudLeftSpacer{
-  grid-column: 1;
-}
-
-/* ===== 플레이어 UI: 좌측 중간 고정 ===== */
+/* (플레이어 UI를 fixed로 쓰는 구조 유지) */
 .playerHudLeft{
   position: fixed;
-  left: var(--edgePad);
-  top: 50%;
-  transform: translateY(-50%);
-  width: var(--playerW);
+  left: calc(var(--edgePad) + 30px);
+
+  /* 핵심: 상단 HUD 아래로 내려 붙이기 */
+  top: calc(var(--hudH) + 157px);
+
+  transform: none;
+  width: 360px;
   z-index: 1200;
 }
-
-/* ===== 로그: 우측 고정 ===== */
-.logPanel{
-  position: fixed;
-  top: calc(var(--hudH) + 8px);
-  right: var(--edgePad);
-  bottom: calc(var(--dockH) + 8px);
-  width: var(--logW);
-  z-index: 900;
-  display: flex;
-  flex-direction: column;
-}
-
-/* ===== 전장: 화면 정중앙 (우측 로그/좌측 플레이어는 '겹치지 않게' padding으로 비워줌) ===== */
+/* =========================
+   4) MAIN AREA + STAGE (desktop)
+   ========================= */
 .mainRow{
   position: relative;
+  flex: 1;
+  min-height: 0;
   height: calc(100vh - var(--hudH) - var(--dockH));
   padding:
     8px
     calc(var(--logW) + var(--logGap) + var(--edgePad))
     12px
-    calc(var(--playerW) + var(--logGap) + var(--edgePad));
+    calc(320px + var(--logGap) + var(--edgePad));
   box-sizing: border-box;
   overflow: hidden;
 }
 
-/* stage는 중앙 컨테이너만 가운데 정렬 */
 .stage{
   height: 100%;
-  display: flex;
-  justify-content: center; /* ✅ 전장 정중앙 */
-  align-items: stretch;
+  display:flex;
+  justify-content:center;   /* ✅ 전장 정중앙 */
+  align-items:center;
 }
+
 .stageInner{
+  height: auto;
+  aspect-ratio: var(--boardAR);     /* ✅ 보드 비율 고정 */
   width: min(var(--stageMaxW), 100%);
-  height: 100%;
-  margin: 0;
-  display: flex;
-}
-
-/* 전장 패널은 내부 스크롤 */
-.mainPanel{
-  width: 100%;
-  height: 100%;
-  overflow: auto;
-  margin: 0;
-  padding-bottom: 16px; /* 도크는 fixed라 mainRow가 이미 공간을 뺌 */
-}
-
-/* 손패 도크는 그대로 fixed 유지 */
-.handDock{
-  height: var(--dockH);
+  aspect-ratio: var(--boardAR);
+  max-height: 100%;
+  display:flex;
+  margin: 0 auto;
+  box-shadow: none !important;
+  filter: none !important;
 }
 
 /* =========================
-   MOBILE LAYOUT ONLY
-   - desktop은 원본 유지
+   5) MAIN PANEL (BOARD BACKGROUND)
    ========================= */
-@media (max-width: 900px){
+.mainPanel{
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+
+  /* 기존 글래스 패널 효과는 전장 보드에서는 끄기 */
+  background: transparent !important;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none !important;
+
+  /* 내부 콘텐츠 패딩 */
+  padding: 10px 16px 16px 16px;
+}
+
+/* 보드 이미지(석판 전장) */
+.mainPanel::before{
+  content:"";
+  position:absolute;
+  inset: 0;
+  pointer-events:none;
+  z-index: 0;
+  opacity: 0;               /* ✅ 기본은 꺼짐 */
+}
+
+.mainPanel.inCombat::before{
+  box-shadow: none !important;
+  filter: none !important;
+  opacity: 1;
+  background: url("ui/boards/battle_board.png") center / cover no-repeat;
+  image-rendering: pixelated;
+    /* 원래 cover/contain이 뭐든 상관 없이 */
+  background-repeat: no-repeat;
+  background-size: 110% 110%;   /* 118% → 108~112%부터 맞추기 */
+  background-position: 50% 10%; /* 50%보다 위로: 아래를 더 잘라냄 */
+  transform: translateY(-40px);
+}
+
+/* mainPanel 안 실제 UI는 보드 위로 */
+.mainPanel > *{
+  position: relative;
+  z-index: 1;
+}
+
+/* =========================
+   6) LOG PANEL (desktop)
+   ========================= */
+.logPanel{
+  position: fixed;
+  top: calc(var(--hudH) + 8px);
+  right: var(--edgePad);
+  width: var(--logW);
+  height: min(46vh, 420px);
+  z-index: 20000;
+  padding: 14px;
+  display:flex;
+  flex-direction:column;
+  box-sizing: border-box;
+  background: var(--logBg);
+  border: 1px solid var(--logLine);
+  box-shadow: var(--logShadow);
+  border-radius: 18px;
+
+}
+.logPanel .log{
+  flex:1;
+  min-height:0;
+  margin:0;
+  padding: 10px;
+  border-radius: 12px;
+  border:1px solid var(--line);
+  background: rgba(0,0,0,.55);
+  color: #cfd5e2;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow:auto;
+  white-space: pre-wrap;
+}
+
+
+/* 접힌 로그 패널은 “작은 버튼”만 남김 */
+.logPanel.collapsed{
+  width: 56px;
+  height: 56px;
+  padding: 10px;
+  opacity: 1;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.logPanel.collapsed .log{
+  display:none;
+}
+
+
+/* 로그 접힘: 공간은 유지, 내용만 숨김 */
+.logPanel.collapsed .log{
+  display:none;
+}
+
+
+.logPanel.collapsed:hover{
+  opacity: .85;
+}
+
+
+/* 혹시 패널이 가상요소로 halo를 깔면 그것도 제거 */
+.logPanel.collapsed::before,
+.logPanel.collapsed::after{
+  content: none !important;
+  display: none !important;
+}
+
+/* 접힘 상태에서 헤더(버튼)만 또렷하게 */
+.logPanel.collapsed .logHeaderRow{
+  background: rgba(0,0,0,.92) !important;
+  border: 1px solid rgba(255,255,255,.22) !important;
+  box-shadow: 0 10px 24px rgba(0,0,0,.55) !important;
+}
+
+/* 헤더는 클릭 가능한 손잡이 */
+.logHeaderRow{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 8px;
+  user-select:none;
+  cursor:pointer;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(0,0,0,1);
+  margin-bottom: 10px;
+}
+.logHeaderRow h2{
+  margin:0;
+  font-size: 14px;
+}
+.logHeaderRow .chev{
+  opacity:.85;
+  font-size: 14px;
+}
+
+/* =========================
+   7) HAND DOCK
+   ========================= */
+
+:root{
+  --handDockH: 220px;   /* 대충: 핸드도크 실제 높이로 맞춰가며 조정 */
+  --topHudH: 120px;     /* 상단 몬스터/버튼 영역 대충 */
+  --stageGap: 18px;     /* 위아래 여유 */
+}
+
+.handDock{
+  z-index: 12000 !important;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--dockH);
+  padding: 6px 14px calc(10px + env(safe-area-inset-bottom)) 18px;
+  background: linear-gradient(180deg, rgba(0,0,0,.00), rgba(0,0,0,.65));
+  pointer-events: none;
+}
+.handDock * { pointer-events: auto; }
+
+.hand{
+  height: calc(var(--handCardH) + 12px);
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+}
+.handCardsRow{
+  display: flex;
+  justify-content: center;
+  flex-wrap: nowrap;
+  gap: 10px;
+  align-items: flex-end;
+  width: max-content;
+  min-width: 100%;
+  padding: 0 12px;
+  box-sizing: border-box;
+  overflow: visible !important;
+  padding-top: 6px; /* 테두리/글로우가 위로 나가도 여유 */
+
+}
+
+/* =========================
+   8) PIXEL-ISH THEME OVERRIDES (가볍게)
+   ========================= */
+.pixel-art{
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* 텍스트 톤만 픽셀 던전 느낌으로 살짝 */
+:root{
+  --ink:#e6e2d8;
+  --muted:#a9b2b8;
+}
+body{ background-color: #000; /* 또는 bgLayer가 제대로 깔려 있으면 생략 가능 */; }
+
+/* =========================
+   9) MOBILE (필요 최소만)
+   ========================= */
+@media (max-width: 900px) and (pointer: coarse){
+  
   :root{
     --edgePad: 10px;
-    --logW: auto;
-    --dockH: 180px; /* 모바일에서 손패 조금 얇게 */
+    --dockH: 180px;
+    --slotW: 108px;
+    --slotGapX: 10px;
+    --slotGapY: 8px;
   }
 
-  /* 전체는 스크롤 금지 유지, 내부만 스크롤 */
-  body{ overflow: hidden; }
 
-  /* ===== 상단 HUD: 1열로 ===== */
+
   .topHud{
     height: auto;
     grid-template-columns: 1fr;
-    gap: 10px;
-    padding: 10px var(--edgePad) 6px var(--edgePad);
     overflow: visible;
   }
+  .topHudRight{ display:none !important; }
 
-  /* 적 UI는 전체폭 */
-  .enemyHudCenter{
-    grid-column: auto;
-    width: 100%;
-    max-height: none;
-    overflow: visible;
-  }
-
-  /* 우상단 버튼(새로운 런/룰북)은 HUD 안 오른쪽 정렬 */
-  .topHudRight{
-    grid-column: auto;
-    justify-self: end;
-    position: sticky;
-    top: 8px;
-    z-index: 50;
-  }
-
-  /* ===== 플레이어 UI: fixed 해제, 전장 위에 배치 ===== */
-  .playerHudLeft{
-    position: static !important;
-    transform: none !important;
-    width: 100% !important;
-    z-index: auto !important;
-    margin: 6px var(--edgePad) 0 var(--edgePad);
-  }
-
-  /* HP바 등 가로 꽉 */
-  .statBar{ min-width: 0; width: 100%; }
-  .barOuter{ width: 100%; }
-
-  /* ===== 메인 영역: 좌우 패딩 제거하고 1열 ===== */
   .mainRow{
-    height: calc(100vh - var(--dockH) - 12px);
+    height: calc(100vh - var(--dockH));
     padding: 0 var(--edgePad) 0 var(--edgePad) !important;
   }
 
-  .stage{
-    justify-content: stretch;
-  }
-
+  .stage{ justify-content: stretch; }
   .stageInner{
-    max-width: none !important;
-    width: 100% !important;
-    margin: 0 !important;
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: var(--boardAR);
   }
 
-  /* 전장 패널은 내부 스크롤 허용(여기가 메인 스크롤) */
-  .mainPanel{
-    overflow: auto !important;
-    height: 100% !important;
-    padding-bottom: calc(var(--dockH) + 16px) !important; /* 손패 도크에 안 가리게 */
-  }
-
-  /* ===== 로그: fixed 해제해서 전장 아래로 ===== */
   .logPanel{
     position: static !important;
     width: 100% !important;
     height: auto !important;
     margin-top: 10px;
   }
-  .logPanel .log{
-    max-height: 28vh; /* 너무 길면 여기만 스크롤 */
-  }
-
-  /* ===== 슬롯: 모바일에서는 2열(너무 좁으면 1열) ===== */
-  .grid6{
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 10px;
-    row-gap: 10px;
-  }
+  .logPanel .log{ max-height: 28vh; }
 }
 
-@media (max-width: 520px){
-  /* 더 작은 폰에서는 1열 */
-  .grid6{
-    grid-template-columns: 1fr;
-  }
+/* 전장 바탕 제거 */
+.combatRoot,
+/* 보드 기본: 투명 -> 복도 바닥이 비침 */
+.boardArea{
+  background: transparent !important;
 }
+
+/* 전투 중: 석판을 보드에만 깔기 */
+.boardArea.slabOn{
+  background-image: url("ui/battle_board.png"); /* 석판 */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-position: 50% 40%;
+  border-radius: 18px;            /* 원하시면 */
+}
+
+
+html, body {
+  background: transparent;
+}
+
+/* 전장/메인 레이아웃 래퍼들: 모바일로 바뀌어도 흰색 금지 */
+#app,
+.mainRow,
+.stage,
+.stageInner,
+.combatRoot,
+.boardArea,
+.handDock {
+  background: transparent !important;
+}
+
+/* 슬롯: 카드가 올라가는 '홈' */
+.slot{
+  position: relative;
+  overflow: hidden;
+  border-radius: 2px; /* 석판 홈 둥글게 */
+  border: 0 !important;              /* 지금 border 남겨둔 걸 홈 스타일로 대체 */
+  background: transparent !important; /* 카드만 보이게 */
+}
+
+
+
+/* 홈 모서리 강조(픽셀 느낌 살짝) */
+.slot::after{
+  content:"";
+  position:absolute;
+  inset: 6px;
+  border-radius: 2px;
+  pointer-events:none;
+  z-index: 0;
+
+  /* '깎인 모서리'처럼 보이는 얇은 하이라이트 */
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.10),
+    inset 1px 0 0 rgba(255,255,255,.06),
+    inset 0 -1px 0 rgba(0,0,0,.45),
+    inset -1px 0 0 rgba(0,0,0,.35);
+  mix-blend-mode: normal;
+  opacity: .85;
+}
+
+/* 슬롯 안의 카드/텍스트는 홈 위로 */
+.slot > *{
+  position: relative;
+  z-index: 1;
+}
+
+/* 배치 가능/드롭호버 상태에서 홈이 반응하도록 */
+.slot.placeable::before{
+  box-shadow:
+    inset 0 10px 18px rgba(0,0,0,.52),
+    inset 0 0 0 1px rgba(255,255,255,.16),
+    0 0 0 1px rgba(255,255,255,.10);
+}
+
+.slot.dropHover::before{
+  box-shadow:
+    inset 0 10px 18px rgba(0,0,0,.52),
+    inset 0 0 0 1px rgba(255,255,255,.22),
+    0 0 0 2px rgba(255,255,255,.18);
+  opacity: 1;
+}
+
+
+/* =========================
+   SLOT LAYOUT (card ratio 5:7 + centered)
+   ========================= */
+
+/* 미세 조정용(여기만 만지면 위치가 움직임) */
 :root{
-  --handCardW: 132px;
-  --handCardH: 178px;
-  --handCardAR: calc(132 / 178);
+  /* 카드 크기(단일 기준) */
+  --cardW: 118px;
+  --cardH: calc(var(--cardW) * 7 / 5);
+
+  /* 슬롯 여유(한쪽 여백). 3~6px 추천 */
+  --slotPad: 6px;
+
+  /* 슬롯은 카드보다 조금 크게 */
+  --slotW: calc(var(--cardW) + (var(--slotPad) * 2));
+  --slotH: calc(var(--cardH) + (var(--slotPad) * 2));
+
+  --cardPadX: 10px;
+  --cardPadY: 10px;
+
+  --cardTitleH: 22px;             /* 타이틀 영역 높이 */
+  --cardFont: 12px;               /* 본문 폰트 */
+  --cardLine: 1.25;               /* 줄간격 */
+
+  /* ✅ 손패도 같은 카드 크기 */
+  --handCardW: var(--cardW);
+  --handCardH: var(--cardH);
+
+  --slotXGap: 18px;
+  --slotRowGap: 20px;
+
+  --boardPadX: 56px;
+  --boardPadY: 34px;
+
+  --slotCenterNudgeY: 0px;
+  
+  --slotR: 7px; /* 슬롯 라운딩 통일 */
 }
 
-/* 보상/선택 오버레이에서 '왼쪽 프리뷰 카드'를 손패 카드와 동일 규격으로 */
-.choice-left .card,
-.reward-left .card,
-.preview-left .card,
-.choiceCard{
-  width: var(--handCardW) !important;
-  aspect-ratio: var(--handCardAR) !important;
-  height: auto !important;
-  transform: none !important; /* 예전 scale 남아있으면 제거 */
+/* boardArea가 슬롯들을 "정중앙"에 배치하도록 */
+.boardArea{
+  position: relative;
+  z-index: 2;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;        /* ✅ 두 줄이 보드 중앙에 오게 */
+  gap: var(--slotRowGap);
+
+  padding: var(--boardPadY) var(--boardPadX);
+  box-sizing: border-box;
+
+  transform: translateY(var(--slotCenterNudgeY));
 }
 
-/* 내부 레이아웃이 늘어나며 찌그러지지 않게 */
-.choice-left .card,
-.reward-left .card,
-.preview-left .card,
-.choiceCard{
+/* 각 줄(전열/후열) */
+.grid6{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--slotXGap);
+  width: 100%;
+}
+
+.slot{
+  display: grid;
+  place-items: center;
+
+  justify-content:center;
+  width: var(--slotW);
+  height: var(--slotH);
+
+
+  position: relative;
+  border: 0 !important;           /* 테두리는 제거 */
+  background: transparent !important;
+  border-radius: 14px;            /* 카드 라운드랑 맞추기 */
+  overflow: hidden;               /* 모서리 정돈 */
+
+}
+
+
+
+/* 슬롯 안 카드 크기 강제 */
+.slot > .card{
+  width: var(--cardW) !important;
+  height: var(--cardH) !important;
+}
+
+.card{
+  position: relative;
+  width: var(--handCardW);
+  height: var(--handCardH);
+
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+
+  padding: 12px 14px;
+  box-sizing: border-box;
+
   display: flex;
   flex-direction: column;
 }
-/* 오버레이 영역 글꼴/자간/렌더링을 카드 느낌으로 */
-.overlay,
-.choiceOverlay,
-.rewardOverlay,
-.modal{
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", Arial;
-  letter-spacing: -0.2px;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: geometricPrecision;
+
+
+.card::before{
+  content:"";
+  position:absolute;
+  inset:0;
+
+  background: url("ui/cards/card_parchment.png") center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+
+  pointer-events:none;
+  z-index:0;
 }
 
-/* 오버레이 제목/설명 약간 세련되게 */
-.overlay h2,
-.choiceOverlay h2,
-.rewardOverlay h2,
-.modal h2{
+.card > *{
+  position: relative;
+  z-index: 1;
+}
+
+
+
+/* 슬롯이 혹시 ::before/::after로 뭘 갖고 있으면 다 날립니다(유령 라운딩 원인) */
+
+.slot::before{
+  content:"";
+  position:absolute;
+  inset: 6px;                     /* 홈이 안쪽으로 들어간 느낌 */
+  border-radius: 0px;
+
+  pointer-events:none;
+  z-index: 0;
+
+  border-radius: 4px;
+  pointer-events:none;
+  z-index: 0;
+
+  /* "파임" 느낌 핵심: 인셋 그림자 + 가장자리 하이라이트 */
+  box-shadow:
+    inset 0 12px 18px rgba(0,0,0,.65),   /* 윗쪽/안쪽으로 깊이감 */
+    inset 0 -10px 16px rgba(255,255,255,.06), /* 아주 약한 바닥 반사 */
+    inset 0 0 0 1px rgba(255,255,255,.08);    /* 홈 경계선(너무 티나면 삭제) */
+
+  /* 바탕: 돌 재질 흉내(너무 티나면 이 부분 삭제 가능) */
+  background: rgba(0,0,0,.50);
+  opacity: .95;
+}
+.slot::after{
+  content: none !important;
+  display: none !important;
+}
+
+.slot .card.inSlot{
+  width: var(--cardW) !important;
+  height: var(--cardH) !important;
+}
+
+.card{
+  width: var(--cardW);
+  height: var(--cardH);
+  padding: var(--cardPadY) var(--cardPadX);
+  box-sizing: border-box;
+
+  display:flex;
+  flex-direction:column;
+
+  /* 글씨 대비: 양피지에서 흰 글씨는 날아갑니다 */
+  color: rgba(25, 18, 10, .92);
+  text-shadow: 0 1px 0 rgba(255,255,255,.35);
+}
+
+/* 타이틀 */
+.cardTitle{
+  font-size: 13px;
+  line-height: 1.1;
   font-weight: 800;
-  letter-spacing: -0.4px;
+  height: var(--cardTitleH);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.overlay p,
-.choiceOverlay p,
-.rewardOverlay p,
-.modal p{
-  color: rgba(231,233,238,.88);
+/* 카드 본문 */
+.cardText{
+  font-size: var(--cardFont);
+  line-height: var(--cardLine);
+  letter-spacing: -0.2px;
 }
-/* ✅ 손패 영역 고정(한 줄) */
-.hand {
-  height: calc(var(--handCardH) + 12px); /* 카드 높이 + 여백 */
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding-bottom: 6px;
-}
-.handCardsRow {
-  display: flex;
-  flex-wrap: nowrap;    /* ✅ 한 줄 고정 */
-  gap: 10px;
-  align-items: flex-end;
-  min-width: max-content;
-}
-.handDock { z-index: 700; overflow: hidden; }
-.logPanel { z-index: 900; }
-.dragCardPreview { z-index: 1200; }
-.handCardsRow { flex-wrap: nowrap; }
-.hand { height: calc(var(--handCardH) + 12px); }
 
-/* ✅ 로그를 중앙쯤에서 끝내기 */
-.logPanel{
+/* 섹션 간격 압축 */
+.cardBody{
+  display:flex;
+  flex-direction:column;
+  gap: 6px;
+  min-height: 0;
+}
+.cardSection{
+  min-height: 0;
+}
+
+
+/* 드래그 고스트: 바깥쪽(안 쓰는 부분) 잘라버리기 */
+.dragLayer .dragCardPreview{
+  overflow: hidden;                  /* ✅ 제일 중요 */
+  border-radius: 10px;               /* 카드 라운드와 맞추기 */
+  background: transparent !important;
+
+  /* 둥근 모서리 자르기 보강 (지원하는 브라우저에서) */
+  clip-path: inset(0 round 16px);
+
+  /* 혹시 겹침/합성 이슈 줄이기 */
+  isolation: isolate;
+}
+
+/* 고스트 내부도 혹시 이상한 배경/필터가 묻어있으면 제거 */
+.dragLayer .dragCardPreview *{
+  background: transparent !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  mix-blend-mode: normal !important;
+}
+
+:root{
+  /* 카드 룩 & 타입 */
+  --cardR: 16px;
+  --cardInk: rgba(28, 20, 10, .92);
+  --cardInkMuted: rgba(28, 20, 10, .68);
+
+  --cardPadX: 12px;
+  --cardPadY: 10px;
+
+  --cardTitleSize: 13px;
+  --cardTextSize: 12px;
+  --cardLine: 1.28;
+
+  /* 전열/후열 비율 (원하시는 4.5 : 5.5) */
+  --frontFlex: 4.5;
+  --backFlex: 5.5;
+
+  /* 섹션 구분 */
+  --sectionGap: 8px;
+  --sectionSep: rgba(0,0,0,.12);
+}
+
+/* 카드 베이스: “실물 카드”로 보이게 */
+.card{
+  position: relative;
+  border-radius: var(--cardR);
+  padding: var(--cardPadY) var(--cardPadX);
+  box-sizing: border-box;
+
+  display:flex;
+  flex-direction:column;
+
+  color: var(--cardInk);
+  text-shadow: 0 1px 0 rgba(255,255,255,.28);
+
+  /* 카드가 떠 보이는 깊이 */
+  filter: drop-shadow(0 10px 18px rgba(0,0,0,.35));
+  transform: translateZ(0);
+}
+
+/* 양피지 바탕 + 가장자리 비네팅 */
+.card::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius: var(--cardR);
+
+  background:
+    radial-gradient(120% 90% at 20% 10%, rgba(255,255,255,.35), rgba(255,255,255,0) 55%),
+    radial-gradient(120% 90% at 80% 90%, rgba(0,0,0,.10), rgba(0,0,0,0) 55%),
+    url("ui/cards/card_parchment.png") center / 100% 100% no-repeat;
+
+  image-rendering: pixelated;
+  pointer-events:none;
+  z-index:0;
+}
+
+/* 얇은 테두리 + “카드 엣지” 느낌 */
+.card::after{
+  content:"";
+  position:absolute;
+  inset: 0;
+  border-radius: var(--cardR);
+  pointer-events:none;
+  z-index:0;
+
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,.18),
+    inset 0 0 0 2px rgba(255,255,255,.08),
+    inset 0 -10px 18px rgba(0,0,0,.10);
+}
+
+/* 내용은 항상 위로 */
+.card > *{ position: relative; z-index: 1; }
+
+/* 아이콘+텍스트(,+공백까지) 한 덩어리로 */
+.kwRun{
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+/* 혹시 내부에서 또 쪼개질까봐 */
+.kwRun *{
+  white-space: nowrap;
+}
+
+:root{
+  --cardR: 16px;
+  --cardInk: rgba(28, 20, 10, .92);
+  --cardInkMuted: rgba(28, 20, 10, .70);
+
+  --cardPadX: 12px;
+  --cardPadY: 10px;
+
+  --cardTitleSize: 13px;
+  --cardTextSize: 12px;
+  --cardLine: 1.32;
+
+  /* 전열/후열 비율 4.5 : 5.5 */
+  --frontFlex: 4.5;
+  --backFlex: 5.5;
+
+  --sectionGap: 8px;
+}
+
+.card{
+  position: relative;
+  border-radius: var(--cardR);
+  padding: var(--cardPadY) var(--cardPadX);
+  box-sizing: border-box;
+
+  display:flex;
+  flex-direction:column;
+
+  color: var(--cardInk);
+  text-shadow: 0 1px 0 rgba(255,255,255,.28);
+  filter: drop-shadow(0 10px 18px rgba(0,0,0,.35));
+}
+
+.card::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius: var(--cardR);
+  background:
+    radial-gradient(120% 90% at 20% 10%, rgba(255,255,255,.35), rgba(255,255,255,0) 55%),
+    radial-gradient(120% 90% at 80% 90%, rgba(0,0,0,.10), rgba(0,0,0,0) 55%),
+    url("ui/cards/card_parchment.png") center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+  pointer-events:none;
+  z-index:0;
+}
+
+.card::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius: var(--cardR);
+  pointer-events:none;
+  z-index:0;
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,.18),
+    inset 0 0 0 2px rgba(255,255,255,.08),
+    inset 0 -10px 18px rgba(0,0,0,.10);
+}
+
+.card > *{ position: relative; z-index: 1; }
+
+/* =========================================
+   PARCHMENT ONLY (텍스트 카드)
+   - 양피지(card_parchment.png)만 유지
+   - 그 외 배경/톤/테두리/그림자/홈/스크롤 제거
+   - 전열/후열 텍스트 50:50
+   - 폰트 크기 축소
+   ========================================= */
+
+/* 1) 카드: 양피지 이미지만 남기고 나머지 효과 제거 */
+.card{
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  text-shadow: none !important;
+
+  padding: 10px 12px !important;
+  color: rgba(25,18,10,.92) !important;
+}
+
+/* ✅ 양피지 레이어는 유지 */
+.card::before{
+  content:"" !important;
+  display:block !important;
+  position:absolute !important;
+  inset:0 !important;
+  border-radius: 16px !important;
+
+  background: url("ui/cards/card_parchment.png") center / 100% 100% no-repeat !important;
+  image-rendering: pixelated;
+  pointer-events:none !important;
+  z-index:0 !important;
+}
+
+/* ❌ 양피지 외 오버레이/테두리/비네팅 다 제거 */
+.card::after{
+  content:none !important;
+  display:none !important;
+}
+
+/* 2) 헤더/메타: 배경/테두리/배지 전부 제거 + 글씨 작게 */
+.cardHeader{
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  margin: 0 0 6px 0 !important;
+  padding: 0 !important;
+}
+.cardTitle{
+  font-size: 12px !important;
+  line-height: 1.1 !important;
+  font-weight: 800 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+
+/* 3) 섹션: 톤 차이(회색 박스) 없애고, 반반 분할 */
+.cardBody{
+  display:flex !important;
+  flex-direction:column !important;
+  gap: 0 !important;
+  min-height: 0 !important;
+  flex: 1 1 auto !important;
+}
+.cardSection{
+  flex: 1 1 0 !important;      /* ✅ 50:50 */
+  min-height: 0 !important;
+
+  background: transparent !important; /* ✅ 섹션 배경 제거 */
+  border: 0 !important;               /* ✅ 섹션 테두리 제거 */
+  border-radius: 0 !important;
+  box-shadow: none !important;
+
+  padding: 0 !important;
+  overflow: hidden !important;        /* ✅ 스크롤 방지 */
+}
+
+/* 4) 텍스트: 스크롤 없애고 폰트 줄이기 */
+.cardText{
+  font-size: 11px !important;
+  line-height: 1.25 !important;
+  letter-spacing: -0.2px !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  overflow: hidden !important;        /* ✅ 스크롤 완전 제거 */
+  max-height: none !important;
+
+  overflow-wrap: anywhere !important;
+  word-break: keep-all !important;
+}
+
+
+.dragLayer .dragCardPreview{
+  background: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+.card{
+  font-family: "Mulmaru", serif !important;
+}
+
+/* 제목만: 세리프/명조 계열을 우선 시도 */
+.cardTitle{
+  text-align: center !important;
+  font-family: "Mulmaru", serif !important;
+  font-weight: 400 !important;
+
+  /* Mulmaru는 화면에서 작게 느껴질 수 있어 +1px 추천 */
+  font-size: 13px !important;
+  line-height: 1.1 !important;
+  letter-spacing: -0.2px !important;
+}
+
+.card.selected{
+  border-radius: var(--selR) !important;
+
+  /* outline 대신 ring(안전) */
+  outline: none !important;
+  box-shadow:
+    0 0 0 2px rgba(255,255,255,.60),      /* 바깥 링 */
+    0 12px 22px rgba(0,0,0,.35) !important;
+
+  /* 폴짝 뜨는 느낌(선택사항) */
+  transform: translateY(-2px);
+}
+/* 선택된 카드 제목도 살짝 강조 */
+.card.selected .cardTitle{
+  text-shadow: 0 0 10px rgba(255,255,255,.28);
+}
+
+@keyframes pickPulse{
+  0%{ transform: translateY(0); }
+  40%{ transform: translateY(-3px); }
+  100%{ transform: translateY(0); }
+}
+.card.selected{
+  animation: pickPulse .16s ease-out;
+}
+
+:root{
+  --dockDrop: 10px; /* 취향: 6~16 */
+  --dockContentDrop: 10px;
+}
+
+.handDock{
+  bottom: calc(-1 * var(--dockDrop)) !important;
+}
+
+.handDock > .controlsDock,
+.handDock > .hand{
+  transform: translateY(var(--dockContentDrop));
+}
+
+
+:root{
+  --hudPanelBg: rgba(10,12,14,1);
+  --hudPanelLine: rgba(255,255,255,.14);
+  --hudPanelR: 18px;
+}
+
+/* 공통: HUD 박스 */
+.hudPanel{
+  background: var(--hudPanelBg);
+  border: 1px solid var(--hudPanelLine);
+  border-radius: var(--hudPanelR);
+  box-shadow: 0 14px 40px rgba(0,0,0,.40);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* 플레이어 왼쪽 박스에 적용 */
+.playerHudLeft{
+  padding: 12px;
+}
+.playerHudLeft{ /* 기존 fixed는 유지하면서 겉모습만 통일 */
+  background: var(--hudPanelBg);
+  border: 1px solid var(--hudPanelLine);
+  border-radius: var(--hudPanelR);
+  box-shadow: 0 14px 40px rgba(0,0,0,.40);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* 가운데 적 줄(적들이 올라가는 컨테이너)도 박스화 */
+.enemyHudCenter{
+  padding: 10px 12px;
+  background: var(--hudPanelBg);
+  border: 1px solid var(--hudPanelLine);
+  border-radius: var(--hudPanelR);
+  box-shadow: 0 14px 40px rgba(0,0,0,.40);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+:root{
+  --hpH: 10px;        /* 바 높이 */
+  --hpSeg: 6px;       /* 세그먼트 폭(픽셀 칸 느낌) */
+  --hpBorder: rgba(0,0,0,.65);
+  --hpFrame: rgba(255,255,255,.18);
+}
+
+/* 바 외곽(픽셀 프레임) */
+.enemyHPOuter{
+  height: var(--hpH) !important;
+  border-radius: 2px !important;      /* 둥글지 않게 */
+  overflow: hidden !important;
+
+  background: rgba(0,0,0,.35) !important;
+  border: 1px solid var(--hpBorder) !important;
+
+  /* 픽셀 프레임 느낌(안쪽 하이라이트/그림자) */
+  box-shadow:
+    inset 0 1px 0 var(--hpFrame),
+    inset 0 -1px 0 rgba(0,0,0,.55);
+}
+
+/* 바 채움(세그먼트 + 픽셀 결) */
+.enemyHPFill{
+  height: 100% !important;
+  border-radius: 0 !important;
+  transition: none !important; /* 픽셀 느낌엔 즉시 반영이 더 어울림 */
+
+  /* 세그먼트(칸칸이) */
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255,255,255,.18) 0,
+      rgba(255,255,255,.18) 1px,
+      rgba(0,0,0,0) 1px,
+      rgba(0,0,0,0) var(--hpSeg)
+    ),
+    linear-gradient(180deg, rgba(255,255,255,.12), rgba(0,0,0,.20));
+  background-size: auto 100%, 100% 100%;
+  background-blend-mode: overlay;
+}
+.enemyHPOuter{
+  image-rendering: pixelated;
+}
+
+/* HP(기본 enemyHPFill) = 붉은 톤 */
+.enemyHPFill{
+  background-color: #7f241d !important; /* 붉게 */
+}
+
+/* 블록은 코드에서 blFill에 inline background를 주고 있어서,
+   그걸 CSS로 덮어씁니다. */
+.playerHudBox .enemyHPOuter:nth-of-type(4) .enemyHPFill,
+.playerHudBox .enemyHPOuter + .enemyHPOuter .enemyHPFill{
+  background-color: #224b8d !important; /* 파랗게 */
+}
+
+/* (공통) HP 라벨/이름 + 수치: 한 줄로 정렬 */
+.enemyChipTop{
+  display: flex !important;
+  align-items: baseline !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  white-space: nowrap !important;
+}
+
+/* 내부 div가 줄바꿈/전체폭 먹지 않게 */
+.enemyChipTop > div{
+  display: inline-block !important;
+  min-width: 0; /* 긴 이름이 있을 때 레이아웃 깨짐 방지 */
+}
+
+/* 왼쪽(이름/라벨) */
+.enemyChipTop > div:first-child{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 오른쪽(수치) */
+.enemyChipTop > div:last-child{
+  font-weight: 900;
+  letter-spacing: .2px;
+}
+
+.enemyChip{
+  width: 360px;
+  max-width: 360px;
+  flex: 0 0 360px; 
+}
+
+.handCardsRow{
+  box-sizing: border-box;
+}
+
+/* ✅ 전열-후열 구분선: 후열 상단에 그리기 */
+.cardSection.back{
+  position: relative;
+  padding-top: 14px; /* 선/기호 공간 */
+  margin-top: 10px;
+  border-top: 0 !important;  /* 기존 border는 끔 */
+}
+
+
+
+.cardSection.back::after{
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: -17px;                      /* 후열의 맨 위 */
+  height: 1px;
+  background: rgba(110, 70, 35, .55);
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* 섹션이 pseudo-element를 올릴 수 있도록 */
+.cardSection{ position: relative; overflow: visible !important; }
+
+/* 기호가 양피지보다 위로 확실히 */
+.cardSection.back::before{
+  z-index: 5;
+  position: absolute;
+}
+
+/* 혹시 카드 내부가 잘라먹으면 */
+.card, .cardBody{ overflow: visible !important; }
+
+.card.isDraggingSource{
+  opacity: 0.4;      /* 취향: 0.10~0.30 */
+  filter: saturate(.8);
+}
+
+
+.stageCornerHud{
   position: fixed;
-  top: calc(var(--hudH) + 8px);
-  right: var(--edgePad);
+  z-index: 10;
+  pointer-events: none;
 
-  bottom: auto !important;                 /* ✅ 기존 bottom 무력화 */
-  height: min(46vh, 420px);                /* ✅ 원하는 크기: vh+픽셀 중 작은 값 */
-  width: var(--logW);
+  transform: none;
+  text-align: center;
+  white-space: nowrap;
 
-  z-index: 900;
+  font-size: 19px;
+  line-height: 1.05;
+
+  padding: 6px 10px;
+
+  /* ✅ 픽셀 플레이트 */
+  background: rgba(0,0,0,0.9);
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 2px;                 /* 거의 각 */
+  box-shadow:
+    0 2px 0 rgba(0,0,0,.55),
+    inset 0 1px 0 rgba(255,255,255,.10),
+    inset 0 -1px 0 rgba(0,0,0,.45);
+
+  color: rgba(235,240,255,.96);
+  text-shadow:
+    2px 2px 0 rgba(0,0,0,.90),
+    -2px 2px 0 rgba(0,0,0,.90),
+    2px -2px 0 rgba(0,0,0,.90),
+    -2px -2px 0 rgba(0,0,0,.90);
+}
+
+/*여기부터 노드*/
+
+.nodeCard{
+  width: min(720px, 92%);
+  margin: 140px auto 0;
+  padding: 16px 16px 14px;
+  background: transparent !important;  /* ✅ 검은 배경 제거 */
+  border: 0 !important;                /* ✅ 흰 테두리 제거(원하면 유지 가능) */
+  box-shadow: none !important;         /* ✅ 드랍섀도 제거 */
+}
+
+.nodeCardTitle{
+  font-size: 22px;
+  font-weight: 900;
+  text-align: center;
+  margin: 0 0 8px;
+}
+
+.nodeCardSub{
+  opacity: 1;
+  font-size: 14px;
+  line-height: 1.25;
+  margin: 0 0 12px;
+  text-align: center;
+}
+
+.nodeChoiceRow{
   display: flex;
-  flex-direction: column;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 12px;
 }
 
-@media (max-width: 900px){
-  /* 플레이어/적 카드 세로 압축 */
-  .enemyChip{
-    padding: 10px 10px;
-    border-radius: 14px;
-  }
-  .enemyChipTop{ margin-bottom: 2px; }
-  .enemyBadges{
-    min-height: 0;
-    gap: 4px;
-  }
-  .enemyIntent{
-    margin-top: 6px;
-    font-size: 12px;
-  }
-
-  /* 플레이어 HUD도 압축 */
-  .playerHudLeft{
-    margin: 6px var(--edgePad) 0 var(--edgePad);
-  }
-  .statBarTop{ font-size: 11px; }
-  .barOuter{ height: 7px; }
-  .playerStatsRow{ gap: 6px; margin-top: 6px; }
-  .chip{ padding: 6px 9px; font-size: 11px; }
+.nodeChoiceBtn{
+  flex: 0 0 auto;
+  width: min(320px, 44vw);
+  padding: 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,1);
+  background: rgba(0,0,0,1);
+  color: rgba(255,255,255,1);
+  cursor: pointer;
+  text-align: left;
 }
 
-@media (max-width: 900px){
-  :root{
-    --slotW: 108px;     /* ✅ 모바일 슬롯 폭 */
-    --slotGapX: 10px;
-    --slotGapY: 8px;
+.nodeChoiceBtn:hover{
+  background: rgba(255,255,255,1);
+  color: rgba(0,0,0,1);
+}
+
+.nodeChoiceLabel{
+  font-weight: 900;
+  font-size: 16px;
+  line-height: 1.1;
+}
+
+.nodeChoiceHint{
+  opacity: 1;
+  font-size: 13px;
+  margin-top: 6px;
+  line-height: 1.2;
+}
+
+/*===*/
+
+.choice-illustSlot{
+  image-rendering: pixelated;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+.choice-illustSlot{
+  width: min(240px, 52vw);
+  aspect-ratio: 1 / 1;
+  height: auto;
+
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(0,0,0,1);
+  box-shadow: none;
+}
+
+pre.choice-detail,
+.choice-panel pre.choice-detail{
+  font-family: "Mulmaru", ui-sans-serif, system-ui, -apple-system,
+               "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif !important;
+  font-size: 13px;         /* 취향대로 */
+  line-height: 1.35;       /* 취향대로 */
+  letter-spacing: -0.2px;  /* 취향대로 */
+}
+
+@media (max-width: 860px){
+  .overlayContentRow{
+    grid-template-columns: 1fr !important;
+  }
+  .overlayIllustSlot{
+    justify-self: center !important;
+  }
+}
+
+.pileView, .pileGrid { min-width: 0; }
+.pileGrid { overflow-x: hidden; }
+.pileGrid { grid-auto-flow: row; } /* 혹시 모를 자동 배치 꼬임 방지 */
+
+/* 덱/버림 오버레이 우측 설명(큰 카드 아래 pre) */
+pre.pileSideDetail,
+.pileSideDetail{
+  font-family: "Mulmaru", ui-sans-serif, system-ui, -apple-system,
+               "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif !important;
+}
+
+pre.overlayItemDetail,
+.overlayItemDetail{
+  font-family: "Mulmaru", ui-sans-serif, system-ui, -apple-system,
+               "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif !important;
+}
+
+.enemyHeaderRow{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.enemyHp{
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.enemyName{
+  flex: 0 0 auto; /* normalizeEnemyNameWidth가 width를 박아주기 때문에 auto 고정 */
+}
+
+.enemyRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* ✅ 항상 동일 3등분 */
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden; /* ✅ 스크롤 금지 */
+}
+
+.enemyBanner {
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;         /* ✅ 내부가 삐져나오면 잘라버림 */
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(0,0,0,.55);
+}
+
+.enemyTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;             /* ✅ 중요: flex 자식이 줄어들 수 있게 */
+}
+
+.enemyName {
+  flex: 1 1 auto;
+  min-width: 0;             /* ✅ 중요 */
+  overflow: hidden;
+  text-overflow: ellipsis;  /* ✅ 길면 ... */
+  white-space: nowrap;      /* ✅ 이름은 한 줄로 깔끔 */
+}
+
+.enemyHpText {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.enemySub {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: normal;        /* ✅ 줄바꿈 허용(여기가 nowrap이면 터집니다) */
+  overflow-wrap: anywhere;    /* ✅ 긴 단어도 강제 줄바꿈 */
+}
+
+/* =========================
+   HUD: 상태이상 때문에 세로 튀는 것 방지
+   ========================= */
+
+/* 의도(공격/패턴 라벨)도 비어있을 때 높이 0이 되면 레이아웃이 흔들릴 수 있어서 예약 */
+.enemyIntent{
+  min-height: 18px;          /* 취향: 16~20px */
+  display: block;
+}
+
+/* 상태이상 배지 영역: 비어있어도 한 줄 높이 예약 */
+.enemyBadges{
+  min-height: 22px;          /* 배지 한 줄 높이 */
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* 배지가 0개일 때도 높이 유지(최소 높이만으로도 보통 충분하지만, 브라우저별 안전장치) */
+.enemyBadges:empty::before{
+  content: "";
+  display: block;
+  height: 22px;
+}
+
+/* 모바일 플레이어 상태이상 줄도 항상 한 줄 높이 예약 */
+.mobileStatusLine{
+  min-height: 22px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.mobileStatusLine:empty::before{
+  content: "";
+  display: block;
+  height: 22px;
+}
+
+/* 기존: .cardMeta, .badge { all: unset !important; }  <- 이건 제거/주석 */
+
+/* 메타는 원하면 텍스트처럼만 */
+.cardMeta{
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  color: inherit !important;
+  font: inherit !important;
+}
+
+/* ✅ 배지(= 렌더코스트 배지 포함)는 “한 블록”으로 유지 */
+.badge{
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+
+  /* 핵심: 아이콘~텍스트가 쪼개져 줄바꿈되지 않게 */
+  white-space: nowrap !important;
+
+  /* 장식 제거(원하던 담백함 유지) */
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+
+  color: inherit !important;
+  font: inherit !important;
+}
+
+/* 아이콘이 svg/img여도 줄에서 안 밀리게 */
+.badge svg, .badge img{
+  flex: 0 0 auto !important;
+}
+
+.kwBadge{
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  white-space: nowrap;   /* ✅ 핵심 */
+}
+.topHud { position: relative; z-index: 20000; }
+.topHudRight, .enemyHudCenter { position: relative; z-index: 20001; }
+
+
+
+.bgLayer::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  /* UI가 있는 가운데를 조금 더 어둡게 */
+  background: radial-gradient(ellipse at center,
+    rgba(0,0,0,0.28) 0%,
+    rgba(0,0,0,0.38) 55%,
+    rgba(0,0,0,0.55) 100%);
+}
+
+.boardArea, .handDock, .playerHudLeft, .enemyHudCenter{
+  filter: drop-shadow(0 16px 40px rgba(0,0,0,.55));
+}
+.combatControls{
+  position: fixed;
+  z-index: 22000;
+  bottom: calc(var(--dockH) + -16px); /* 손패 도크 위쪽 */
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.combatControls .stepBtn{
+  padding: 6px 10px;      /* 10px 14px -> 약간 축소 */
+  border-radius: 12px;    /* 14px -> 12px */
+  font-size: 13px;        /* 기본보다 살짝 작게 */
+  line-height: 1.1;
+}
+
+.combatControls .stepBtn.primary{
+  font-weight: 600;       /* 너무 두꺼우면 700으로 */
+}
+
+/* ===== Phase banner ===== */
+.phaseBanner{
+  position: fixed;
+  left: 50%;
+  top: calc(env(safe-area-inset-top, 0px) + 64px);
+  transform: translateX(-50%);
+  z-index: 26000;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(0,0,0,.80);
+  color: #fff;
+  font-weight: 900;
+  letter-spacing: .2px;
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+  animation: phaseInOut 420ms ease both;
+}
+@keyframes phaseInOut{
+  0%   { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+  20%  { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+}
+
+/* ===== Floating numbers ===== */
+.floatFxLayer{
+  position: fixed;
+  inset: 0;
+  z-index: 26010;
+  pointer-events: none;
+}
+.floatNum{
+  position: absolute;
+  font-weight: 900;
+  font-size: 16px;
+  text-shadow: 0 2px 0 rgba(0,0,0,.65);
+  animation: floatUp 650ms ease-out both;
+  white-space: nowrap;
+}
+.floatNum.dmg{ color: #ff5a5a; }
+.floatNum.heal{ color: #73ff8b; }
+.floatNum.block{ color: #64b5ff; }
+
+@keyframes floatUp{
+  0%   { opacity: 0; transform: translate(-50%, 6px) scale(.96); }
+  15%  { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -22px) scale(1.02); }
+}
+
+/* ===== Flash highlight ===== */
+.fxFlash{
+  animation: fxFlash 220ms ease-out;
+}
+@keyframes fxFlash{
+  0%   { filter: brightness(1.0); }
+  40%  { filter: brightness(1.35); }
+  100% { filter: brightness(1.0); }
+}
+
+/* ===== Shake ===== */
+
+.topHud { position: relative; z-index: 30000; }
+.choice-overlay { z-index: 22000; }
+
+.newRunBtn {
+  position: fixed;      /* 화면 기준으로 고정 */
+  top: 8px;
+  right: 8px;
+  z-index: 99999;
+}
+
+/* ===== 아트 ===== */
+
+.event-art {
+  width: 128px;          /* 16 * 8 */
+  height: 128px;
+  image-rendering: crisp-edges;
+}
+
+
+/* === Desktop: enemy banners center-fixed + remove wrapper "background box" === */
+@media (min-width: 901px) {
+  /* topHud 자체를 기준으로 삼지 말고, viewport 기준으로 박아버리기 */
+  .enemyHudCenter {
+
+    top: 8px !important;                 /* 원하시면 0~16px 조절 */
+
+    z-index: 50 !important;
+
+    /* ✅ “바탕 박스” 흔적 제거 */
+    background: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    height: auto !important;
+
+    pointer-events: none; /* 배너만 클릭 */
   }
 
-  /* ✅ 전열/후열은 3칸 유지 */
-  .grid6{
-    grid-template-columns: repeat(3, var(--slotW)) !important;
+  /* mover는 transform/배경/패딩 등 전부 무력화 */
+  .enemyHudCenterMover {
+    transform: none !important;
+    background: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+
+    pointer-events: none;
+  }
+
+  /* ✅ wrapper 자체를 "박스"로 만들지 않기: display:contents */
+  /* (브라우저 지원 괜찮고, 레이아웃/이벤트는 배너에서 처리하니 적합) */
+  .enemyHud {
+    display: contents !important;
+    background: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* 실제 배너들을 감싸는 flex 컨테이너가 필요하므로,
+     enemyHud가 contents가 되면 자식(enemyChip)들이 바로 center 아래로 옵니다.
+     이때 배너들을 가로로 배치하려면 enemyHudCenterMover 또는 enemyHudCenter에 flex를 줍니다. */
+
+  .enemyHudCenterMover {
+    display: flex !important;
+    gap: 14px;
+    align-items: stretch;
     justify-content: center;
+    flex-wrap: nowrap;
   }
 
-  .slot{
-    padding: 8px;
-    border-radius: 14px;
+  /* 배너 카드(고정 폭) */
+  .enemyHudCenterMover .enemyChip {
+    width: clamp(300px, 28vw, 420px);
+    flex: 0 0 auto;
+
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,.14);
+    background: rgba(0,0,0,.68);
+    box-shadow: 0 18px 50px rgba(0,0,0,.35);
+
+    padding: 10px 12px;
+    box-sizing: border-box;
+
+    pointer-events: auto; /* 클릭 가능 */
+    overflow: hidden;
   }
 
-  /* 슬롯 내부 카드 텍스트 더 줄이기 */
-  .card.inSlot{
-    inset: 22px 8px 8px 8px;
-    padding: 6px;
-  }
-  .card.inSlot .cardText{
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    font-size: 11px;
-  }
-}
-
-@media (max-width: 900px){
-  .hudCollapsed .playerBars,
-  .hudCollapsed .enemyBadges{
-    display: none;
-  }
-  .hudCollapsed .enemyChip{
-    padding: 8px 10px;
-  }
-  .hudCollapsed .enemyIntent{
+  /* 텍스트 과다 시 말줄임 */
+  .enemyHudCenterMover .enemyChip .enemyChipTop > :first-child,
+  .enemyHudCenterMover .enemyChip .enemyIntent {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 }
+@media (min-width: 901px) {
+  .enemyHudCenter {
+    transform: translateX(calc(-50% + var(--enemyHudDx, 0px))) !important;
 
-@media (max-width: 900px){
-  .mainPanel{
-    padding-bottom: calc(var(--dockH) + 24px) !important;
-  }
-}
-/* ✅ 모바일 적 스트립: 가로 스크롤 */
-.enemyStrip{
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 4px 2px;
-  scroll-snap-type: x mandatory;
-}
-.enemyStrip .enemyChip{
-  flex: 0 0 auto;
-  width: 220px;           /* ✅ 모바일 폭 */
-  scroll-snap-align: start;
-}
-@media (max-width: 900px){
-  .enemyStrip .enemyChip{
-    width: 200px;
-    padding: 10px;
-  }
-  .enemyIntent{
-    font-size: 12px;
-  }
-  .enemyBadges{
-    min-height: 0;
-  }
-}
-@media (max-width: 900px){
-  .playerHudBox{
-    padding: 10px !important;
-  }
-}
-@media (max-width: 900px){
-  .mobilePlayerHeader{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    padding:10px 12px;
-    border-radius:16px;
+    background: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    z-index: 50 !important;
   }
 
-  .mobileHpText{
-    font-weight:800;
-    font-size:14px;
-    white-space:nowrap;
-  }
+  /* mover에는 transform 절대 주지 마세요(여기서 틀어짐 발생) */
+  .enemyHudCenterMover {
+    transform: none !important;
+    background: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
 
-  .mobileTopBtns{
-    display:flex;
-    gap:8px;
-    flex-wrap:nowrap;
-  }
-
-  .mobileTopBtns button{
-    padding:8px 10px;
-    border-radius:999px;
-    font-size:13px;
+    display: flex !important;
+    gap: 12px;
+    justify-content: center;
+    pointer-events: none;
   }
 }
-@media (max-width: 900px){
-  .topHudRight{ display:none !important; }   /* ✅ 우상단 버튼 제거 */
-}
-@media (max-width: 900px){
-  :root{
-    --handCardW: 148px;   /* ✅ 더 크게 */
-    --handCardH: 210px;
-    --dockH: 250px;       /* ✅ 도크 높이 늘리기 */
-  }
-
-  .handDock .card{ width: var(--handCardW) !important; height: var(--handCardH) !important; }
-  .handCardsRow{ gap: 12px; }
-
-  .handDock .card .cardText{
-    font-size: 13px;
-    line-height: 1.35;
-    -webkit-line-clamp: 8;
-    line-clamp: 8;
-  }
-
-  .card.inSlot .cardText{
-    font-size: 12.5px;
-    -webkit-line-clamp: 4;
-    line-clamp: 4;
-  }
-}
-@media (max-width: 900px){
-  #app{ display:flex; flex-direction:column; height:100vh; }
-
-  .topHud{ flex: 0 0 auto; }
-  .mainRow{ flex: 1 1 auto; height:auto !important; }  /* ✅ calc 제거 */
-  .handDock{ flex: 0 0 auto; }
-}
-@media (max-width: 900px){
-  .topRightControls { display:none !important; } /* battleTitleRow 쪽 컨트롤이라면 */
-}
-@media (max-width: 900px){
-  .mobileChipsRow{
-    display:flex;
-    gap:8px;
-    overflow-x:auto;
-    padding: 8px 2px 2px 2px;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-  .mobileChipsRow::-webkit-scrollbar{ display:none; }
-  .mobileChipsRow .chip{ flex:0 0 auto; }
-}
-@media (max-width: 900px){
-  .card{
-    background: rgba(15,18,22,.92) !important;
-    border-color: rgba(255,255,255,.14) !important;
-  }
-  .cardText{
-    opacity: 1 !important;
-    -webkit-line-clamp: 8;
-    line-clamp: 8;
-    font-size: 13px;
-    line-height: 1.35;
-  }
-}
-@media (max-width: 900px){
-  :root{ --dockH: 150px; } /* 180 -> 150 같은 식 */
-  .handDock{ padding-bottom: 6px; }
-}
-@media (max-width: 900px){
-  /* ✅ 모바일 손패 카드: 카드 크기/패딩/글자 전용 */
-  :root{
-    --handCardW: 118px;   /* 필요하면 110~130 사이로 */
-    --handCardH: 156px;
-  }
-
-  .handDock .card{
-    width: var(--handCardW) !important;
-    height: var(--handCardH) !important;
-    padding: 8px 8px 6px 8px !important;
-    border-radius: 14px;
-  }
-
-  .handDock .cardTitle{
-    font-size: 12px !important;
-    margin-bottom: 4px !important;
-  }
-
-  .handDock .badge{
-    font-size: 10px !important;
-    padding: 2px 6px !important;
-    height: 16px !important;
-    line-height: 16px !important;
-  }
-
-  .handDock .cardSectionTitle{
-    font-size: 10px !important;
-    margin-bottom: 2px !important;
-    opacity: .8;
-  }
-
-  .handDock .cardText{
-    font-size: 11px !important;
-    line-height: 1.15 !important;
-    -webkit-line-clamp: 7 !important; /* ✅ 텍스트 더 보여주기 */
-    line-clamp: 7 !important;
-  }
-
-  /* ✅ 슬롯(전열/후열) 카드도 같이 축소 */
-  .slot .card.inSlot{
-    padding: 6px !important;
-  }
-  .slot .card.inSlot .cardTitle{
-    font-size: 12px !important;
-    margin-bottom: 3px !important;
-  }
-  .slot .card.inSlot .cardText{
-    font-size: 11px !important;
-    line-height: 1.12 !important;
-    -webkit-line-clamp: 4 !important;
-    line-clamp: 4 !important;
-  }
-}
-@media (max-width: 900px){
-  .topHud{ overflow: visible !important; }
-  .enemyHudCenter{ overflow: visible !important; }
-}
-/* 전체 높이: 100vh 말고 100dvh */
-#app, body {
-  height: 100dvh;
-}
-
-/* 하단 도크가 홈 인디케이터에 안 먹히게 */
-.handDock {
-  padding-bottom: calc(10px + env(safe-area-inset-bottom));
-}
-.mobileTopLine{
-  display:flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  margin-top: 6px;
-}
-
-.mobileStatusLine{
-  display:flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
-  opacity: .85;      /* “살짝” 느낌 */
-  transform: scale(.96);
-  transform-origin: left top;
-}
-@media (max-width: 520px){
-  .chip{
-    font-size: 12px;     /* 폰트는 1~2px만 */
-    padding: 4px 8px;    /* ✅ 이게 핵심 */
-    border-radius: 999px;
-    line-height: 1.1;    /* ✅ 높이 줄이기 */
-  }
-}
-.mobileStatusLine{
-  display:flex;
-  flex-wrap: nowrap;
-  gap: 6px;
-  overflow: hidden;
-  white-space: nowrap;
-  opacity:.85;
-  margin-top: 4px;
-}
-.mobileStatusLine .badge{
-  font-size: 11px;
-  padding: 3px 7px;
-  line-height: 1.1;
-}
-@media (max-width: 520px){
-  .enemyChip{
-    padding: 10px;          /* 기존보다 줄이기 */
-    border-radius: 16px;
-  }
-  .enemyIntent{ font-size: 12px; }
-  .enemyBadges .badge{ font-size: 11px; padding: 3px 7px; }
-}
-@media (max-width: 520px){
-  .enemyStrip{
-    display: flex;
-    flex-wrap: nowrap;
-    gap: 10px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 4px;
-  }
-  .enemyStrip::-webkit-scrollbar{ display:none; }
-
-  .enemyStrip .enemyChip{
+@media (min-width: 901px) {
+  .enemyHudCenterMover .enemyChip {
+    width: 360px;          /* ✅ 고정 폭(원하시면 320~400 사이 추천) */
     flex: 0 0 auto;
-    min-width: 320px; /* ✅ 길게 */
+
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,.14);
+    background: rgba(0,0,0,.68);
+    box-shadow: 0 18px 50px rgba(0,0,0,.35);
+
+    padding: 10px 12px;
+    box-sizing: border-box;
+
+    pointer-events: auto;
+    overflow: hidden;
   }
 
-  .enemyIntent{
-    white-space: nowrap;   /* ✅ 의도 한 줄 */
-    overflow: visible;     /* ✅ 잘리지 않게 */
-    text-overflow: clip;
-  }
-}
-
-@media (max-width: 520px){
-  .enemyStrip .enemyChip{ overflow: visible; }
-}
-.zoomedCard{
-  transform: scale(1.05);
-  transform-origin: center;
-}
-@media (max-width: 520px){
-  .handDock{
-    bottom: calc(env(safe-area-inset-bottom) + 64px); /* ✅ 이 값으로 “올리는 정도” 조절 */
-  }
-}
-html, body, #app{
-  height: 100dvh;
-}
-.handDock{
-  padding-bottom: calc(10px + env(safe-area-inset-bottom));
-}
-@media (max-width: 520px){
-  .handDock{
-    height: auto;
-    max-height: none;           /* ✅ 도크 자체 제한 해제 */
-    overflow: visible;          /* ✅ 바깥은 자르지 않기 */
-  }
-
-  .hand{
-    max-height: none;           /* ✅ hand 영역 제한 해제 */
-    overflow: visible;
-  }
-
-  /* 카드 줄(가로 스크롤 줄)은 스크롤만 담당 */
-  .handCardsRow{
-    overflow-x: auto;
-    overflow-y: visible;        /* ✅ 세로로 자르지 않기 */
-    -webkit-overflow-scrolling: touch;
-  }
-}
-@media (max-width: 520px){
-  .handDock{ max-height:none; height:auto; overflow:visible; }
-  .hand{ max-height:none; overflow:visible; }
-  .handCardsRow{ overflow-x:auto; overflow-y:visible; }
-}
-:root{
-  --dock-lift: 0px; /* ✅ 기본 0, 필요하면 12px/18px 정도로만 */
-}
-
-@media (max-width: 520px){
-  .handDock{
-    bottom: calc(env(safe-area-inset-bottom) + var(--dock-lift));
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-}
-@media (max-width: 520px){
-  .hand{
-    overflow: hidden;          /* ✅ 바깥은 잘라주고 */
-  }
-
-  .handCardsRow{
+  /* 제목/HP 라인 */
+  .enemyHudCenterMover .enemyChip .enemyChipTop {
     display: flex;
-    flex-wrap: nowrap;         /* ✅ 줄바꿈 금지 */
     gap: 10px;
-    overflow-x: auto;          /* ✅ 가로 스크롤 */
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    padding: 0 12px 8px 12px;
-    touch-action: pan-x;       /* ✅ iOS에서 스와이프 스크롤 잘 되게 */
+    align-items: baseline;
   }
 
-  .handCardsRow > .card{
-    flex: 0 0 auto;            /* ✅ 카드가 줄어들지 않게(스크롤 유도) */
+  /* 왼쪽(이름) 말줄임 */
+  .enemyHudCenterMover .enemyChip .enemyChipTop > :first-child {
+    min-width: 0;
+    flex: 1 1 auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* 의도 텍스트도 한 줄 말줄임 */
+  .enemyHudCenterMover .enemyChip .enemyIntent {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: .92;
   }
 }
 
-/* 손패 가로 스크롤 강제 (모바일 포함) */
-.hand{
-  overflow-x: auto !important;
-  overflow-y: hidden !important;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-x;
-}
-
-.handCardsRow{
-  display: flex !important;
-  flex-wrap: nowrap !important;
-  gap: 10px;
-  align-items: flex-end;
-  min-width: max-content !important;
-}
-
-.handCardsRow > .card{
-  flex: 0 0 auto !important;
-}
-.hand{
-  overscroll-behavior-x: contain;
-}
-.cardPeekOverlay{ touch-action: manipulation; }
-.cardPeekPanel .card{ width: 100% !important; }
-.cardPeekPanel .card{
-  width: var(--handCardW) !important;
-  height: var(--handCardH) !important;
-}
-:root{
-  --slotGapXBase: 22;
-  --slotGapYBase: 6;
-  --battleChromeHBase: 140;
-}
-/* 드래그 원본 카드 */
-.card.isDraggingSource {
-  opacity: 0.35;
-  filter: saturate(1.15) contrast(1.05);
-}
-
-/* 드래그 프리뷰 컨테이너(추가 연출 원하면 여기서) */
-.dragCardPreview {
-  border-radius: 16px;
+/* enemyHudCenter가 레이아웃 영향을 받지 않게 */
+.enemyHudCenter {
+  position: fixed;
+  z-index: 50000;
   pointer-events: none;
-}
-.card.isDraggingSource { opacity: 0.35; filter: saturate(1.15) contrast(1.05); }
-.dragCardPreview { border-radius: 16px; pointer-events: none; }
-
-.hand {
-  overflow-x: auto;
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
 }
 
-.handCardsRow {
-  display: inline-flex;      /* ✅ 내용폭 기반 */
+/* 가로로 1~3개 */
+.enemyHudCenter .enemyHudCenterMover,
+.enemyHudCenter .enemyHud,
+.enemyHudCenter .enemyStrip {
+  display: flex;
+  flex-direction: row;
   gap: 12px;
-  justify-content: center;
   align-items: stretch;
-  padding: 0 12px;
-  margin: 0 auto;            /* ✅ 남는 공간에서 가운데 */
-}
-.card {
-  background: #0f1216;              /* ✅ 불투명 배경 */
-  border: 1px solid rgba(255,255,255,.14);
-  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+  justify-content: center;
+  flex-wrap: nowrap;
+  background: none !important;
 }
 
-/* 혹시 기존에 이런 게 있으면 제거/덮어쓰기 */
-.card { opacity: 1; }
-.mainPanel { overflow-anchor: none; }
-.combatRoot { overflow-anchor: none; }
+/* 적 배너(고정 폭) */
+.enemyHudCenter .enemyChip {
+  width: 360px;          /* 필요하면 320~400 */
+  flex: 0 0 auto;
+  pointer-events: auto;
+
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(0,0,0,.68);
+  box-shadow: 0 18px 50px rgba(0,0,0,.35);
+
+  overflow: hidden;
+}
+
+/* 텍스트가 배너에서 줄바꿈/세로로 커지지 않게 */
+.enemyHudCenter .enemyChipTop,
+.enemyHudCenter .enemyIntent {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+:root { --enemyBannerW: 360px; --enemyHudDx: -20px; } /* 320~400 사이 추천 */
+.enemyHudCenter { background: none !important; }
+.enemyBanner { flex: 0 0 var(--enemyBannerW); width: var(--enemyBannerW); }
+
+@media (min-width: 901px){
+  .stageCornerHud{
+    left: 48.8% !important;
+    top: 160px !important;
+    transform: translateX(-50%) !important;
+  }
+}
+.enemyHudCenter{ pointer-events: none !important; }
+.enemyHudCenter .enemyHudCenterMover{ pointer-events: none !important; }
+
+/* 실제 클릭 가능한 카드/배너만 켬 */
+.enemyHudCenter .enemyChip,
+.enemyHudCenter .enemyBanner{
+  pointer-events: auto !important;
+}
+
+.floatFxLayer{ pointer-events: none !important; }
+
+/* enemyHudCenter는 클릭 막되, 실제 배너(.enemyBanner)는 클릭 허용 */
+.enemyHudCenter { pointer-events: none !important; }
+
+/* ✅ 실제 클릭 타겟 */
+.enemyHudCenter .enemyBanner,
+.enemyHudCenter .enemyBanner.targetable{
+  pointer-events: auto !important;
+  cursor: pointer;
+}
+
+.floatFxLayer{ pointer-events: none !important; }
+.choice-overlay{ pointer-events: none !important; } /* 대상선택 중에만이라면 조건부가 더 좋음 */
+
+.topHud{
+  pointer-events: none !important;
+}
+
+/* 1) topHud는 클릭을 통과시킴(적 클릭 살리기) */
+.topHud{
+  pointer-events: none !important;
+}
+
+/* 2) 하지만 topHud 안에서 클릭해야 하는 것들은 예외로 다시 켬 */
+.topHudRight,
+.topHudRight *,
+.newRunBtn,
+.newRunBtn *{
+  pointer-events: auto !important;
+}
+
+/* ✅ 플레이어 HUD(리소스/툴팁/클릭 등) 예외 처리 */
+.playerHudLeft,
+.playerHudLeft *{
+  pointer-events: auto !important;
+}
+
+/* (혹시 다른 이름을 쓰는 경우까지 안전망) */
+.playerHud,
+.playerHud *,
+.playerHudBox,
+.playerHudBox *,
+.resourceHud,
+.resourceHud *{
+  pointer-events: auto !important;
+}
+
+/* 3) 적 배너는 클릭 가능 보장 */
+.enemyHudCenter,
+.enemyHudCenter *{
+  pointer-events: auto !important;
+}
+
+.choice-overlay{
+  transform: translateY(-40px);
+}

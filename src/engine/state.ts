@@ -31,11 +31,13 @@ export function createInitialState(content: Content): GameState {
       battleCount: 0,
       enemyLastSeenBattle: {},
 
-      nextBossTime: 30,
+      nextBossTime: 40,
       forcedNext: null,
       bossOmenText: null,
 
       deckSizeAtTreasure: null,
+
+      ominousProphecySeen: false
 
     },
 
@@ -84,7 +86,7 @@ export function createInitialState(content: Content): GameState {
 
   g.run.branchOffer = rollBranchOffer(g);
   makeBasicDeck(g);
-  logMsg(g, "새 런 시작. 다음 인카운터를 선택하세요.");
+  logMsg(g, "새 런 시작.");
 
   return g;
 }

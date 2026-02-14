@@ -35,7 +35,6 @@ function enqueueTargetSelectStatus(ctx: ResolveCtx, key: "vuln" | "weak" | "blee
   if (g.pendingTarget == null) g.pendingTarget = req;
   else g.pendingTargetQueue.push(req);
 
-  const remaining = (g.pendingTarget ? 1 : 0) + g.pendingTargetQueue.length;
   logMsg(g, `대상 선택 필요: 적을 클릭하세요.`);
 }
 
@@ -44,7 +43,7 @@ function enemyWillAttackThisTurn(g: GameState, en: EnemyState): boolean {
 
   const def = g.content.enemiesById[en.id];
   const intent = def.intents[en.intentIndex % def.intents.length];
-  return intent.acts.some((a) => a.op === "damagePlayer" || a.op === "damagePlayerFormula");
+  return intent.acts.some((a) => a.op === "damagePlayer" || a.op === "damagePlayerFormula" || a.op === "damagePlayerByDeckSize");
 }
 
 export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
