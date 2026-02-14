@@ -59,8 +59,8 @@ const RULEBOOK_TEXT = `# Deck Rogue Prototype — 룰북 (플레이어용)
 
 
 import { setDevConsoleCtx, renderDevConsole, toggleDevConsole, isDevConsoleOpen } from "./dev_console";
-import { loadNineSlice, drawNineSlice } from "./nineslice";
-import type { GameState, PileKind, NodeOffer, Side, PendingTarget, CardData  } from "../engine/types";
+import { drawNineSlice } from "./nineslice";
+import type { GameState, PileKind, NodeOffer, Side } from "../engine/types";
 import {
   spawnEncounter,
   startCombat,
@@ -76,12 +76,12 @@ import {
   currentTotalDeckLikeSize,
   escapeRequiredNodePicks,
 } from "../engine/combat";
-import { logMsg, rollBranchOffer, advanceBranchOffer, madnessP, rollMad } from "../engine/rules";
+import { logMsg, rollBranchOffer, advanceBranchOffer, madnessP, } from "../engine/rules";
 import { createInitialState } from "../engine/state";
 
 import type { EventOutcome } from "../content/events";
-import { pickEventByMadness, pickRandomEvent, getEventById } from "../content/events";
-import { removeCardByUid, addCardToDeck, offerRewardPair, offerRewardsByFatigue, canUpgradeUid, upgradeCardByUid, obtainTreasure } from "../content/rewards";
+import { pickEventByMadness, getEventById } from "../content/events";
+import { removeCardByUid, addCardToDeck, offerRewardsByFatigue, canUpgradeUid, upgradeCardByUid, obtainTreasure } from "../content/rewards";
 import { getCardDefByIdWithUpgrade } from "../content/cards";
 
 import { saveGame, hasSave, loadGame, clearSave } from "../persist";
@@ -118,10 +118,6 @@ let floatingNewRunHandler: null | (() => void) = null;
 let phaseBannerText: string | null = null;
 let phaseBannerUntil = 0;
 
-function showPhaseBanner(text: string, ms = 420) {
-  phaseBannerText = text;
-  phaseBannerUntil = performance.now() + ms;
-}
 
 function pushFloatFx(kind: FloatFx["kind"], text: string, x: number, y: number) {
   floatFx.push({ id: fxIdSeq++, kind, text, x, y, born: performance.now() });
@@ -346,7 +342,6 @@ export function createOrLoadGame(content: any) {
 let frameImgsPromise: Promise<any> | null = null;
 let frameCanvas: HTMLCanvasElement | null = null;
 let frameCtx: CanvasRenderingContext2D | null = null;
-const DEBUG_FRAME = false; // 필요할 때만 true
 
 function ensureFrameCanvas(): CanvasRenderingContext2D {
   if (frameCanvas && frameCtx) return frameCtx;
@@ -374,26 +369,6 @@ function ensureBgLayer() {
   document.body.appendChild(bg);
 }
 
-
-
-function setBattleBgEnabled(g: GameState) {
-  ensureBgLayer();
-  const bg = document.querySelector<HTMLElement>(".bgLayer");
-  if (!bg) return;
-
-  // 전투 중 판정: 적이 있고, NODE가 아니고, 런 종료가 아님
-  const inCombat = !g.run.finished && g.enemies.length > 0 && g.phase !== "NODE";
-
-  // 석판 이미지는 전투 중에만
-  bg.classList.toggle("battleBg", inCombat);
-}
-
-function ensureFrameImgs() {
-  if (!frameImgsPromise) {
-    frameImgsPromise = loadNineSlice("ui/frame_9slice", "frame");
-  }
-  return frameImgsPromise;
-}
 
 function resizeFrameCanvasToViewport() {
   if (!frameCanvas) return;
@@ -748,36 +723,6 @@ let showLogOverlay = false;
 
 // 카드 렌더
 
-function renderCardPreviewByUid(g: GameState, cardUid: string) {
-
-  const c = g.cards[cardUid];
-  const def = getCardDefByIdWithUpgrade(g.content, c.defId, c.upgrade ?? 0);
-
-  const d = div("card");
-  d.classList.add("choiceCard");
-
-  if (def.tags?.includes("EXHAUST")) d.classList.add("exhaust");
-  if (def.tags?.includes("VANISH")) d.classList.add("vanish");
-
-  d.appendChild(divText("cardTitle", displayNameForUid(g, cardUid)));
-
-  const meta = div("cardMeta");
-  if (def.tags?.includes("EXHAUST")) meta.appendChild(badge("소모"));
-  if (def.tags?.includes("VANISH")) meta.appendChild(badge("소실"));
-  d.appendChild(meta);
-
-  const sec1 = div("cardSection");
-  sec1.classList.add("front");
-  sec1.appendChild(divText("cardText", def.frontText));
-  d.appendChild(sec1);
-
-  const sec2 = div("cardSection");
-  sec2.appendChild(divText("cardSectionTitle", "🕯 후열"));
-  sec2.classList.add("back");  sec2.appendChild(divText("cardText", def.backText));
-  d.appendChild(sec2);
-
-  return d;
-}
 
 function renderCardPreviewByUidWithUpgrade(g: GameState, uid: string, upgrade: number): HTMLElement {
   const c = g.cards[uid];
@@ -982,34 +927,6 @@ type ChoiceKind = "EVENT" | "REWARD" | "PICK_CARD" | "VIEW_PILE" | "UPGRADE_PICK
 
 
 
-
-function getMainPanel(): HTMLElement {
-  const el = document.querySelector<HTMLElement>(".mainPanel");
-  if (!el) throw new Error("mainPanel not found");
-  return el;
-}
-
-function ensurePanelOverlayRoot(): HTMLElement {
-  const main = getMainPanel();
-  main.classList.add("overlayOpen");
-
-  let root = main.querySelector<HTMLElement>(":scope > .panelOverlay");
-  if (!root) {
-    root = document.createElement("div");
-    root.className = "panelOverlay";
-    main.appendChild(root);
-  }
-  root.innerHTML = "";
-  return root;
-}
-
-function clearPanelOverlayRoot() {
-  const main = document.querySelector<HTMLElement>(".mainPanel");
-  if (!main) return;
-  main.classList.remove("overlayOpen");
-  const root = main.querySelector<HTMLElement>(":scope > .panelOverlay");
-  if (root) root.remove();
-}
 
 
 export function makeUIActions(g0: GameState, setGame: (next: GameState) => void) {
@@ -2151,7 +2068,7 @@ function renderStageCornerResourceHud(g: GameState) {
 
   const r = anchor.getBoundingClientRect();
 
-  const padTop = -12;
+  const padTop = -56;
 
   const centerX = (r.left + r.right) / 2;
 
@@ -2881,22 +2798,6 @@ function buildResourceText(g: GameState): string {
   return parts.join(" ");
 }
 
-function ensureResourceHudHost(): HTMLElement {
-  // 보드 안에 붙일 거면 boardArea / mainPanel 중 하나를 host로
-  const host = document.querySelector<HTMLElement>(".mainPanel")!;
-  let el = host.querySelector<HTMLElement>(".resourceHud");
-  if (!el) {
-    el = document.createElement("div");
-    el.className = "stageCornerHud resourceHud";
-    host.appendChild(el);
-  }
-  return el;
-}
-
-function renderResourceText(g: GameState){
-  const el = ensureResourceHudHost();
-  el.textContent = buildResourceText(g);
-}
 
 
 function chipEl(text: string, extraClass = "") {
@@ -2930,13 +2831,13 @@ function renderBattleTitleRow(g: GameState) {
 
   const warn = divText("targetHintInline", "");
   warn.style.cssText =
-    "padding:6px 8px; border-radius:10px;" +
-    "border:1px solid rgb(0, 0, 0);" +
+    "padding:5px 10px; border-radius:12px; border:1px solid rgba(0,0,0,.55);"+
     "background: rgb(255, 0, 0);" +
     "opacity:.82;" +
-    "font-weight:700; font-size:12px; line-height:1.2;" +
+    "font-weight:400; font-size:12px; line-height:1.2;" +
     "white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" +
-    "max-width: 520px;" + 
+    "width: min(400px, 92vw);" + 
+    "max-width: none;" +
     "pointer-events:auto;";
 
   if (hintText) {
@@ -2968,8 +2869,8 @@ function renderBattleTitleRow(g: GameState) {
 
   warn.style.position = "absolute";
   warn.style.right = "207px";
-  warn.style.top = "100%";
-  warn.style.marginTop = "4px";
+  warn.style.top = "calc(100% - 8px)"; // 아래로 내리는 대신 살짝 끌어올림
+  warn.style.marginTop = "0px";
   warn.style.zIndex = "5";
   warn.style.pointerEvents = hintText ? "auto" : "none";
   row.appendChild(warn); 
@@ -3200,19 +3101,6 @@ function enableHorizontalWheelScroll(el: HTMLElement) {
   );
 }
 
-function getBoardAnchorEl(): HTMLElement | null {
-  return (
-    document.querySelector<HTMLElement>(`.slot[data-slot-side="front"][data-slot-index="1"]`)
-    ?? document.querySelector<HTMLElement>(".stageInner")
-  );
-}
-
-function getBoardAnchorCenterX(): number | null {
-  const el = getBoardAnchorEl();
-  if (!el) return null;
-  const r = el.getBoundingClientRect();
-  return r.left + r.width / 2;
-}
 
 
 function alignEnemyHudToViewportCenter() {
@@ -3284,8 +3172,6 @@ function alignHandToBoardAnchor(_g: GameState) {
   if (!anchorRect) return;
 
   const anchorX = anchorRect.left + anchorRect.width / 2;
-  const handRect = hand.getBoundingClientRect();
-  const anchorLocal = anchorX - handRect.left; // hand 내부 좌표
 
   const cards = Array.from(row.querySelectorAll<HTMLElement>(".card"));
   if (cards.length === 0) return;
@@ -3784,14 +3670,6 @@ function renderDragOverlay(_app: HTMLElement, g: GameState) {
 
 // Helpers / UI primitives
 
-function pushPendingTarget(g: GameState, t: PendingTarget) {
-  if (!g.pendingTarget) {
-    g.pendingTarget = t;
-    return;
-  }
-  if (!g.pendingTargetQueue) g.pendingTargetQueue = [];
-  g.pendingTargetQueue.push(t);
-}
 
 
 function getCardDefByUid(g: GameState, uid: string) {
@@ -3819,24 +3697,6 @@ function cardDisplayNameByUid(g: GameState, uid: string) {
 
 // Cards
 
-function getUpgradedPreviewDefByIndex(
-  base: CardData,
-  upgradeIdx: number
-): CardData {
-  const up = base.upgrades?.[upgradeIdx];
-  if (!up) return base;
-
-  // NOTE: upgrades는 "부분 덮어쓰기" 구조라 가정
-  // base의 나머지 필드는 유지하고, up에 있는 것만 교체
-  const merged: CardData = {
-    ...base,
-    ...up,
-    // 안전: upgrades 자체는 원본 유지(프리뷰에서 또 덮어쓰기 반복 방지)
-    upgrades: base.upgrades,
-  };
-
-  return merged;
-}
 
 function renderCard(
   g: GameState,
@@ -4009,22 +3869,6 @@ function badgeHtml(kw: string, n?: string, punc?: string) {
   return `<span class="kwBadge"><span class="kwIcon">${icon}</span> <span class="kwLabel">${label}</span><span class="kwPunc">${tail}</span></span>`;
 }
 
-function badgeIconText(icon: string, text: string, extraClass = "") {
-  const s = document.createElement("span");
-  s.className = "badge kw" + (extraClass ? ` ${extraClass}` : "");
-
-  const i = document.createElement("span");
-  i.className = "badgeIcon";
-  i.textContent = icon;
-
-  const t = document.createElement("span");
-  t.className = "badgeText";
-  t.textContent = text;
-
-  s.appendChild(i);
-  s.appendChild(t);
-  return s;
-}
 
 const PUNC = "[,，、]";
 
