@@ -96,7 +96,7 @@ body{
 .bgLayer{
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: 0;
   background: url("ui/background/dungeon_bg.png") center / cover no-repeat;
   image-rendering: pixelated;
 }
@@ -225,6 +225,7 @@ body{
   background-size: 110% 110%;   /* 118% → 108~112%부터 맞추기 */
   background-position: 50% 10%; /* 50%보다 위로: 아래를 더 잘라냄 */
   transform: translateY(-40px);
+  z-index: 1;
 }
 
 /* mainPanel 안 실제 UI는 보드 위로 */
@@ -445,7 +446,7 @@ body{ background-color: #000; /* 또는 bgLayer가 제대로 깔려 있으면 �
 
 /* 전투 중: 석판을 보드에만 깔기 */
 .boardArea.slabOn{
-  background-image: url("ui/battle_board.png"); /* 석판 */
+  background-image: url("ui/boards/battle_board.png"); /* 석판 */
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -1921,3 +1922,9 @@ pre.overlayItemDetail,
 .choice-overlay{
   transform: translateY(-40px);
 }
+
+.boardArea{
+  background: transparent !important;
+}
+
+/* ✅ slabOn일 때는 다시 켜주기 (important로 역전) */
