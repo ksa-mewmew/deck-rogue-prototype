@@ -9,6 +9,17 @@
    0) THEME + TOKENS
    ========================= */
 :root{
+
+  --uiScale: 1;
+  --uiScaleDesktop: 1;
+  --uiScaleMobile: 1;
+}
+
+html{
+  font-size: calc(16px * var(--uiScale));
+}
+
+:root{
   /* Base colors */
   --bg0:#060708;
   --bg1:#0b0d10;
@@ -21,17 +32,17 @@
 
   /* Layout */
   --edgePad: 14px;
-  --logW: 360px;
+  --logW:  calc(360px * var(--uiScale));
   --logGap: 14px;
 
-  --hudH: 100px;      /* top HUD reserved height (desktop) */
-  --dockH: 185px;     /* hand dock height */
+  --hudH:  calc(100px * var(--uiScale));    /* top HUD reserved height (desktop) */
+  --dockH: calc(185px * var(--uiScale));    /* hand dock height */
 
-  --stageMaxW: 800px;
+  --stageMaxW: calc(800px * var(--uiScale));
   --boardAR: 1200/922; /* board aspect */
 
   /* Cards + slots */
-  --cardW: 118px;
+  --cardW: calc(118px * var(--uiScale));
   --cardH: calc(var(--cardW) * 7 / 5);
   --handCardW: var(--cardW);
   --handCardH: var(--cardH);
@@ -68,12 +79,43 @@
   --cardUrl: url("ui/cards/card_parchment.png");
 
   /* Enemy banner */
-  --enemyBannerW: 360px;
+  --enemyBannerW: calc(360px * var(--uiScale));
   --enemyHudDx: 0px; /* center nudge */
 
   /* Misc */
   --dockDrop: 10px;
   --dockContentDrop: 10px;
+
+  --hpH: 10px;
+  --hpSeg: 6px;
+  --hpBorder: rgba(0,0,0,.65);
+  --hpFrame: rgba(255,255,255,.18);
+
+  --hudTop: 150px;
+  --hudBarH: 60px;
+  --hintGap: 20px;
+}
+
+.settingsOverlay{
+  position: fixed;
+  inset: 0;
+  z-index: 40000;              /* choice-overlay보다 위로 */
+  background: rgba(0,0,0,0.92); /* 불투명에 가깝게 */
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.settingsPanel{
+  width: min(760px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(10,12,14,1);
+  padding: 16px;
 }
 
 /* =========================
@@ -179,9 +221,9 @@ body{
    ========================= */
 .playerHudLeft{
   position: fixed;
-  left: calc(var(--edgePad) + 30px);
-  top: calc(var(--hudH) + 157px);
-  width: 360px;
+  left: calc((var(--edgePad) + 30px) * var(--uiScale));
+  top:  calc((var(--hudH) + 157px) * var(--uiScale));
+  width: calc(360px * var(--uiScale));
   z-index: 1200;
 
   padding: 12px;
@@ -232,7 +274,6 @@ body{
   position: relative;
   width: 100%;
   height: 100%;
-  overflow: hidden;
   box-sizing: border-box;
   padding: 10px 16px 16px 16px;
 
@@ -308,13 +349,7 @@ body{
 }
 
 /* slabOn mode (if you prefer boardArea background instead of mainPanel::before) */
-.boardArea.slabOn{
-  background-image: var(--boardUrl);
-  background-repeat: no-repeat;
-  background-size: 112% 125% !important;
-  background-position: 50% 45% !important;
-  border-radius: 18px;
-}
+
 
 /* slot rows */
 .grid6{
@@ -476,9 +511,11 @@ body{
 
 /* back section separator */
 .cardSection.back{
-  padding-top: 14px;
-  margin-top: 10px;
+  padding-top: 10px;
+  margin-top: 8px;
+  position: relative;
 }
+
 .cardSection.back::after{
   content: "";
   position: absolute;
@@ -488,6 +525,24 @@ body{
   background: rgba(110, 70, 35, .55);
   z-index: 4;
   pointer-events: none;
+}
+
+.cardSection.front{
+  position: relative;
+  padding-bottom: 10px;
+  margin-bottom: 8px;
+}
+
+.cardSection.front::after{
+  content:"";
+  position:absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 0;
+  height: 1px;
+  background: rgba(90,60,30,.45);
+  opacity: .55;
+  pointer-events:none;
 }
 
 /* selection */
@@ -544,7 +599,7 @@ body{
   right: 0;
   bottom: calc(-1 * var(--dockDrop));
   height: var(--dockH);
-  padding: 6px 14px calc(10px + env(safe-area-inset-bottom)) 14px !important;
+  padding: 6px 14px 10px 14px !important;
   background: linear-gradient(180deg, rgba(0,0,0,.00), rgba(0,0,0,.65));
   pointer-events: none;
   margin: 0 auto;          /* ✅ 행 자체를 중앙으로 */
@@ -756,6 +811,18 @@ body{
   align-items:center;
   flex-wrap: wrap;
 }
+
+.deltaInline{
+  margin-left: 4px;
+  font-weight: 900;
+  letter-spacing: .1px;
+  white-space: nowrap;
+  opacity: .95;
+}
+
+.deltaInline.plus{ color: #ff6b6b; }
+.deltaInline.minus{ color: #64b5ff; }
+
 .enemyBadges:empty::before{ content:""; display:block; height:22px; }
 
 .mobileStatusLine{
@@ -770,12 +837,7 @@ body{
 /* =========================
    14) PLAYER/ENEMY HP PIXEL BARS
    ========================= */
-:root{
-  --hpH: 10px;
-  --hpSeg: 6px;
-  --hpBorder: rgba(0,0,0,.65);
-  --hpFrame: rgba(255,255,255,.18);
-}
+
 .enemyHPOuter{
   height: var(--hpH) !important;
   border-radius: 2px !important;
@@ -831,7 +893,7 @@ body{
 .phaseBanner{
   position: fixed;
   left: 50%;
-  top: calc(env(safe-area-inset-top, 0px) + 64px);
+  top: 64px;
   transform: translateX(-50%);
   z-index: 26000;
   padding: 10px 14px;
@@ -894,9 +956,11 @@ body{
   font-size: 19px;
   line-height: 1.05;
 
-  padding: 6px 10px;
+  padding: calc(6px * var(--uiScale)) calc(10px * var(--uiScale));
   background: rgba(0,0,0,0.9);
   border: 1px solid rgba(255,255,255,.18);
+  border-width: calc(1px * var(--uiScale));
+  font-size: calc(19px * var(--uiScale));
   border-radius: 2px;
   box-shadow:
     0 2px 0 rgba(0,0,0,.55),
@@ -920,11 +984,7 @@ body{
 }
 
 /* target hint near HUD */
-:root{
-  --hudTop: 150px;
-  --hudBarH: 60px;
-  --hintGap: 20px;
-}
+
 .stageCornerHud{
   top: var(--hudTop) !important;
   left: 50% !important;
@@ -1046,47 +1106,6 @@ pre.overlayItemDetail,
 .overlayItemDetail{
   font-family: "Mulmaru", ui-sans-serif, system-ui, -apple-system,
                "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif !important;
-}
-
-/* =========================
-   18) MOBILE (minimal)
-   ========================= */
-@media (max-width: 900px) and (pointer: coarse){
-  :root{
-    --edgePad: 10px;
-    --dockH: 180px;
-    --slotXGap: 10px;
-    --slotRowGap: 18px;
-
-    /* smaller slots on mobile */
-    --cardW: 108px;
-  }
-
-  .topHud{
-    height: auto;
-    grid-template-columns: 1fr;
-  }
-  .topHudRight{ display:none !important; }
-
-  .mainRow{
-    height: calc(100vh - var(--dockH));
-    padding: 0 var(--edgePad) 0 var(--edgePad) !important;
-  }
-
-  .stage{ justify-content: stretch; }
-  .stageInner{
-    width: 100%;
-    max-width: 100%;
-    aspect-ratio: var(--boardAR);
-  }
-
-  .logPanel{
-    position: static !important;
-    width: 100% !important;
-    height: auto !important;
-    margin-top: 10px;
-  }
-  .logPanel .log{ max-height: 28vh; }
 }
 
 /* safety: avoid white backgrounds */

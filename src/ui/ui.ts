@@ -111,6 +111,19 @@ type FloatFx = {
   born: number;
 };
 
+let postLayoutScheduled = false;
+
+function schedulePostLayout(g: GameState) {
+  if (postLayoutScheduled) return;
+  postLayoutScheduled = true;
+  requestAnimationFrame(() => {
+    postLayoutScheduled = false;
+    normalizeEnemyNameWidth();
+    alignHandToBoardAnchor(g);
+    alignEnemyHudToViewportCenter();
+  });
+}
+
 let fxIdSeq = 1;
 let floatFx: FloatFx[] = [];
 
@@ -207,6 +220,70 @@ function emitEnemyDelta(i: number, dhp: number) {
   el.classList.add("fxFlash");
   setTimeout(() => el.classList.remove("fxFlash"), 240);
 }
+
+// 스케일
+
+
+let uiScale = 1;
+
+function loadUiScale() {
+  try {
+    const v = localStorage.getItem("deckrogue_uiScale");
+    if (!v) return;
+    const n = Number(v);
+    if (Number.isFinite(n)) uiScale = Math.min(1.25, Math.max(0.75, n));
+  } catch {}
+}
+
+function saveUiScale() {
+  try {
+    localStorage.setItem("deckrogue_uiScale", String(uiScale));
+  } catch {}
+}
+
+function applyUiScaleToRoot() {
+  document.documentElement.style.setProperty("--uiScale", String(uiScale));
+}
+
+
+type UiSettings = {
+  uiScaleDesktop: number; // 0.8 ~ 1.4
+  uiScaleMobile: number;  // 0.8 ~ 1.4
+};
+
+const UISET_KEY = "deckrogue_uiSettings_v1";
+
+function clamp(n: number, a: number, b: number) {
+  return Math.max(a, Math.min(b, n));
+}
+
+function loadUiSettings(): UiSettings {
+  try {
+    const raw = localStorage.getItem(UISET_KEY);
+    if (!raw) return { uiScaleDesktop: 1.0, uiScaleMobile: 1.0 };
+    const j = JSON.parse(raw);
+    return {
+      uiScaleDesktop: clamp(Number(j.uiScaleDesktop ?? 1.0) || 1.0, 0.75, 1.5),
+      uiScaleMobile:  clamp(Number(j.uiScaleMobile  ?? 1.0) || 1.0, 0.75, 1.5),
+    };
+  } catch {
+    return { uiScaleDesktop: 1.0, uiScaleMobile: 1.0 };
+  }
+}
+
+function saveUiSettings(s: UiSettings) {
+  try { localStorage.setItem(UISET_KEY, JSON.stringify(s)); } catch {}
+}
+
+let uiSettings: UiSettings = loadUiSettings();
+
+
+//모바일
+
+function isMobileUiNow() {
+  return window.matchMedia("(max-width: 900px) and (pointer: coarse)").matches;
+}
+
 
 let logCollapsed = false;
 
@@ -399,8 +476,6 @@ function drawFramesOnPanels(imgs: any) {
 
   const mr = main.getBoundingClientRect();
   const lr = log.getBoundingClientRect();
-  console.log("[frame] rect main", mr.width, mr.height, mr.left, mr.top);
-  console.log("[frame] rect log ", lr.width, lr.height, lr.left, lr.top);
 
   const rects = [mr, lr];
 
@@ -435,248 +510,7 @@ let lastMainPanelScrollTop = 0;
 let lastMainPanelScrollLeft = 0;
 let currentG: GameState | null = null;
 
-// 모바일 카드 확대
 
-function openCardZoom(g: GameState, uid: string) {
-  closeCardZoom();
-
-  const layer = div("cardZoomLayer");
-  layer.style.cssText = `
-    position:fixed; inset:0; z-index:7000;
-    background: rgba(0,0,0,.55);
-    backdrop-filter: blur(6px);
-    display:flex; align-items:center; justify-content:center;
-    padding: 14px;
-  `;
-
-  const panel = div("cardZoomPanel");
-  panel.style.cssText = `
-    width: min(420px, 92vw);
-    max-height: 82vh;
-    overflow: auto;
-  `;
-
-  const big = renderRealCardForOverlay(g, uid);
-  big.classList.add("zoomedCard");
-  panel.appendChild(big);
-
-  layer.onclick = () => closeCardZoom();
-  panel.onclick = (e) => e.stopPropagation();
-
-  layer.appendChild(panel);
-  document.body.appendChild(layer);
-}
-
-function attachLongPress(el: HTMLElement, opts: {
-  delayMs: number;
-  moveTolerancePx?: number; // 기본 6px
-  onFire: (ev: PointerEvent) => void;
-  onTap?: (ev: PointerEvent) => void; // 롱프레스 아니면 탭 처리
-  shouldIgnore?: (ev: PointerEvent) => boolean;
-}) {
-  let timer: number | null = null;
-  let fired = false;
-  let startX = 0;
-  let startY = 0;
-
-  const tol = opts.moveTolerancePx ?? 6;
-
-  const clear = () => {
-    if (timer != null) window.clearTimeout(timer);
-    timer = null;
-    fired = false;
-  };
-
-  el.onpointerdown = (ev) => {
-    if (opts.shouldIgnore?.(ev as any)) return;
-
-    fired = false;
-    startX = ev.clientX;
-    startY = ev.clientY;
-
-    if (timer != null) window.clearTimeout(timer);
-    timer = window.setTimeout(() => {
-      fired = true;
-      timer = null;
-      opts.onFire(ev as any);
-    }, opts.delayMs);
-  };
-
-  el.onpointermove = (ev) => {
-    if (timer == null) return;
-    const dx = ev.clientX - startX;
-    const dy = ev.clientY - startY;
-    if (dx * dx + dy * dy > tol * tol) {
-      clear();
-    }
-  };
-
-  el.onpointerup = (ev) => {
-    const wasFired = fired;
-    clear();
-    if (!wasFired && opts.onTap) opts.onTap(ev as any);
-  };
-
-  el.onpointercancel = () => clear();
-}
-
-
-function closeCardZoom() {
-  document.querySelector(".cardZoomLayer")?.remove();
-}
-
-function renderCardInSlotCompact(g: GameState, uid: string) {
-  const c = g.cards[uid];
-  const def = getCardDefByIdWithUpgrade(g.content, c.defId, c.upgrade ?? 0);
-
-  const d = div("card");
-  d.classList.add("inSlot");
-  d.appendChild(divText("cardTitle", displayNameForUid(g, uid)));
-
-  const meta = div("cardMeta");
-  if (def.tags?.includes("EXHAUST")) meta.appendChild(badge("소모"));
-  if (def.tags?.includes("VANISH")) meta.appendChild(badge("소실"));
-  d.appendChild(meta);
-
-  return d;
-}
-
-function openCardPeek(g: GameState, cardUid: string) {
-  document.querySelector(".cardPeekOverlay")?.remove();
-
-  const layer = div("cardPeekOverlay");
-  layer.style.cssText =
-    "position:fixed; inset:0; z-index:7000; background:rgba(0,0,0,.60);" +
-    "backdrop-filter: blur(6px); display:flex; align-items:center; justify-content:center;" +
-    "padding:18px; box-sizing:border-box;";
-
-  const panel = div("panel");
-  panel.classList.add("cardPeekPanel");
-  panel.style.cssText =
-    "width: fit-content; max-width: 92vw; max-height: 92vh;" +
-    "overflow: visible; padding: 12px; border-radius: 16px;";
-
-  const card = renderRealCardForOverlay(g, cardUid);
-
-  (card as HTMLElement).style.width = "var(--handCardW)";
-  (card as HTMLElement).style.height = "var(--handCardH)";
-  (card as HTMLElement).style.boxSizing = "border-box";
-
-  panel.appendChild(card);
-  layer.appendChild(panel);
-
-  layer.onclick = () => layer.remove();
-  panel.onclick = (e) => e.stopPropagation();
-
-  document.body.appendChild(layer);
-}
-
-function renderMobileQuickMenu(g: GameState, actions: UIActions) {
-  document.querySelector(".mobileQuickMenuBtn")?.remove();
-  document.querySelector(".mobileQuickMenuSheet")?.remove();
-
-  const mobile = isMobileUI();
-  if (!mobile) return;
-
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "mobileQuickMenuBtn";
-  btn.textContent = "≡";
-  btn.style.cssText = `
-    position: fixed;
-    top: calc(env(safe-area-inset-top, 0px) + 10px);
-    right: calc(env(safe-area-inset-right, 0px) + 10px);
-    z-index: 9999;
-    width: 44px;
-    height: 44px;
-    border-radius: 14px;
-    border: 1px solid rgba(255,255,255,.18);
-    background: rgba(15,18,22,.88);
-    color: #fff;
-    font-weight: 900;
-    backdrop-filter: blur(6px);
-  `;
-
-  btn.onclick = () => openSheet();
-  document.body.appendChild(btn);
-
-  const openSheet = () => {
-    document.querySelector(".mobileQuickMenuSheet")?.remove();
-
-    // 1) 플로팅 '새로운 런' 버튼 (항상 최상단)
-    // 2) 아래는 기존 시트 로직 그대로
-    const layer = document.createElement("div");
-    layer.className = "mobileQuickMenuSheet";
-    layer.style.cssText = `
-      position: fixed; inset: 0;
-      z-index: 9998;
-      background: rgba(0,0,0,.55);
-      backdrop-filter: blur(6px);
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      padding: 12px;
-      box-sizing: border-box;
-    `;
-
-    const sheet = document.createElement("div");
-    sheet.style.cssText = `
-      width: min(520px, 100%);
-      border-radius: 18px;
-      padding: 12px;
-      border: 1px solid rgba(255,255,255,.12);
-      background: rgba(15,18,22,.92);
-      box-shadow: 0 18px 60px rgba(0,0,0,.45);
-    `;
-
-    const row1 = document.createElement("div");
-    row1.style.cssText = "display:flex; gap:10px; flex-wrap:wrap;";
-
-    const mk = (label: string, fn: () => void) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.textContent = label;
-      b.style.cssText = `
-        padding: 10px 12px;
-        border-radius: 14px;
-        border: 1px solid rgba(255,255,255,.14);
-        background: rgba(255,255,255,.06);
-        color: #fff;
-        font-weight: 700;
-      `;
-      b.onclick = () => {
-        layer.remove();
-        fn();
-      };
-      return b;
-    };
-
-    row1.appendChild(mk("룰북", () => actions.onViewRulebook()));
-    row1.appendChild(mk("로그", () => actions.onToggleLogOverlay()));
-
-    const hr = document.createElement("div");
-    hr.style.cssText = "height:1px; margin:12px 0; background: rgba(255,255,255,.10);";
-
-    const row2 = document.createElement("div");
-    row2.style.cssText = "display:flex; gap:10px; flex-wrap:wrap;";
-
-    row2.appendChild(mk("덱", () => actions.onViewPile("deck")));
-    row2.appendChild(mk("버림", () => actions.onViewPile("discard")));
-    row2.appendChild(mk("손패", () => actions.onViewPile("hand")));
-    row2.appendChild(mk("소모", () => actions.onViewPile("exhausted")));
-    row2.appendChild(mk("소실", () => actions.onViewPile("vanished")));
-
-    sheet.appendChild(row1);
-    sheet.appendChild(hr);
-    sheet.appendChild(row2);
-
-    layer.onclick = () => layer.remove();
-    sheet.onclick = (e) => e.stopPropagation();
-
-    layer.appendChild(sheet);
-    document.body.appendChild(layer);
-  };
-}
 
 
 // UI Actions
@@ -713,7 +547,8 @@ type SlotDrop = { side: Side; idx: number };
 
 type Overlay =
   | { kind: "RULEBOOK" }
-  | { kind: "PILE"; pile: PileKind };
+  | { kind: "PILE"; pile: PileKind }
+  | { kind: "SETTINGS" };
 
 let overlay: Overlay | null = null;
 let uiMounted = false;
@@ -1070,6 +905,12 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       render(g, actions);
     },
 
+    onViewSettings: () => {
+      const g = getG();
+      overlay = { kind: "SETTINGS" };
+      render(g, actions);
+    },
+
     onReturnSlotToHand: (fromSide: Side, fromIdx: number) => {
       const g = getG()
       if (g.run.finished) return;
@@ -1190,7 +1031,6 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
 
       const nextIndex = g.run.nodePickCount + 1;
       g.run.nodePickCount = nextIndex;
-      g.time = (g.time ?? 0) + extra;
 
       runAny.nodeExtra01 = null;
 
@@ -1949,6 +1789,12 @@ export function ensureFloatingNewRunButton() {
 
 export function render(g: GameState, actions: UIActions) {
 
+  if (!(render as any)._uiScaleInitDone) {
+    (render as any)._uiScaleInitDone = true;
+    loadUiScale();
+    applyUiScaleToRoot();
+    applyUiScaleVars();
+  }
   currentG = g;
 
   setDevConsoleCtx({
@@ -1987,6 +1833,8 @@ export function render(g: GameState, actions: UIActions) {
         normalizeEnemyNameWidth();
         alignHandToBoardAnchor(currentG);
         alignEnemyHudToViewportCenter();
+        positionPlayerHudByStage();
+        applyUiScaleVars();
       }
     });
     bindGlobalInput(() => currentG ?? g, actions);
@@ -2041,16 +1889,17 @@ export function render(g: GameState, actions: UIActions) {
   renderHandDock(g, actions, isTargeting(g));
   alignHandToBoardAnchor(g);
   alignEnemyHudToViewportCenter();
+  positionPlayerHudByStage();
   renderDragOverlay(app, g);
 
   renderOverlayLayer(g, actions);
   renderChoiceLayer(g, actions);
   renderLogOverlay(g, actions);
-  renderMobileQuickMenu(g, actions);
   detectAndEmitDeltas(g);
   renderPhaseBanner();
   renderFloatFxLayer();
   scheduleSave(g);
+  schedulePostLayout(g);
 }
 
 
@@ -2136,6 +1985,114 @@ function renderLogOverlay(g: GameState, actions: UIActions) {
   document.body.appendChild(layer);
 }
 
+function renderSettingsPanel(onChange: () => void, actions: UIActions) {
+  const wrap = div("settingsPanel");
+  wrap.style.cssText =
+    "display:flex; flex-direction:column; gap:12px;";
+
+  const row = div("settingsRow");
+  row.style.cssText =
+    "display:flex; align-items:center; gap:12px; flex-wrap:wrap;";
+
+  const label = divText("", "UI 스케일");
+  label.style.cssText = "font-weight:800;";
+
+  const val = divText("", `${Math.round(uiScale * 100)}%`);
+  val.style.cssText = "opacity:.9; min-width:64px; text-align:right;";
+
+  const slider = document.createElement("input");
+  slider.type = "range";
+  slider.min = "0.75";
+  slider.max = "1.25";
+  slider.step = "0.01";
+  slider.value = String(uiScale);
+  slider.style.cssText = "flex:1 1 260px;";
+
+  slider.oninput = () => {
+    uiScale = Number(slider.value);
+    val.textContent = `${Math.round(uiScale * 100)}%`;
+    onChange();
+  };
+
+  row.appendChild(label);
+  row.appendChild(slider);
+  row.appendChild(val);
+  wrap.appendChild(row);
+
+  // 프리셋 버튼들
+  const presets = div("settingsPresets");
+  presets.style.cssText = "display:flex; gap:8px; flex-wrap:wrap;";
+
+  const makePreset = (txt: string, v: number) => {
+    const b = mkButton(txt, () => {
+      uiScale = v;
+      slider.value = String(v);
+      val.textContent = `${Math.round(uiScale * 100)}%`;
+      onChange();
+    });
+    b.style.cssText =
+      "padding:8px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.16);" +
+      "background:rgba(255,255,255,.06); color:#fff; cursor:pointer;";
+    return b;
+  };
+
+  presets.appendChild(makePreset("작게 90%", 0.90));
+  presets.appendChild(makePreset("기본 100%", 1.00));
+  presets.appendChild(makePreset("크게 110%", 1.10));
+  presets.appendChild(makePreset("더 크게 120%", 1.20));
+  wrap.appendChild(presets);
+
+  // 초기화
+  const resetRow = div("settingsResetRow");
+  resetRow.style.cssText = "display:flex; justify-content:flex-end; margin-top:6px;";
+  const reset = mkButton("초기화", () => {
+    uiScale = 1.0;
+    slider.value = "1";
+    val.textContent = "100%";
+    onChange();
+  });
+  reset.style.cssText =
+    "padding:8px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.16);" +
+    "background:rgba(255,255,255,.06); color:#fff; cursor:pointer;";
+  resetRow.appendChild(reset);
+  wrap.appendChild(resetRow);
+
+  return wrap;
+}
+
+function positionPlayerHudByStage() {
+  const hud = document.querySelector<HTMLElement>(".playerHudLeft");
+  const stage = document.querySelector<HTMLElement>(".stageInner");
+  if (!hud || !stage) return;
+
+  const r = stage.getBoundingClientRect();
+
+
+  const uiScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--uiScale")) || 1;
+
+  const gap = 18 * uiScale;
+  const hudW = 360 * uiScale;
+
+  const x = Math.round(r.left - gap - hudW);
+  const y = Math.round(r.top + r.height * 0.18);
+
+  hud.style.left = `${x}px`;
+  hud.style.top  = `${y}px`;
+}
+
+function applyUiScaleVars() {
+  const root = document.documentElement;
+
+  const scale = isMobileUiNow()
+    ? uiSettings.uiScaleMobile
+    : uiSettings.uiScaleDesktop;
+
+  root.style.setProperty("--uiScale", String(scale));
+  root.style.setProperty("--uiScaleDesktop", String(uiSettings.uiScaleDesktop));
+  root.style.setProperty("--uiScaleMobile", String(uiSettings.uiScaleMobile));
+}
+
+
 function renderOverlayLayer(
   g: GameState,
   actions: UIActions & { onCloseOverlay: () => void }
@@ -2144,23 +2101,37 @@ function renderOverlayLayer(
 
   if (!overlay) return;
 
+  const isFull = overlay.kind === "SETTINGS";
+
   const layer = div("overlay-layer");
-  layer.style.cssText =
-    "position:fixed; inset:0; z-index:30000; background:rgba(0,0,0,.55); display:flex; justify-content:center; align-items:center;";
+  layer.style.cssText = isFull
+    ? "position:fixed; inset:0; z-index:30000;" +
+      "background:rgba(0,0,0,1);" +          // 불투명
+      "display:flex; justify-content:center; align-items:flex-start;" +
+      "padding:24px; box-sizing:border-box;"
+    : "position:fixed; inset:0; z-index:30000;" +
+      "background:rgba(0,0,0,.55);" +
+      "display:flex; justify-content:center; align-items:center;";
+
 
   layer.onclick = (e) => {
     if (e.target === layer) actions.onCloseOverlay();
   };
 
   const panel = div("overlay-panel");
-  panel.style.cssText =
-    "width:min(980px, 92vw); max-height:80vh; overflow:auto; padding:16px; border:1px solid rgba(255,255,255,.12); border-radius:16px; background:rgba(15,18,22,.92); box-shadow:0 18px 60px rgba(0,0,0,.45);";
-
+  panel.style.cssText = isFull
+    ? "width:min(860px, 96vw); max-height:calc(100vh - 48px); overflow:auto;" +
+      "padding:16px; border:1px solid rgba(255,255,255,.12); border-radius:16px;" +
+      "background:rgba(15,18,22,1); box-shadow:0 18px 60px rgba(0,0,0,.45);"
+    : "width:min(980px, 92vw); max-height:80vh; overflow:auto; padding:16px;" +
+      "border:1px solid rgba(255,255,255,.12); border-radius:16px;" +
+      "background:rgba(15,18,22,.92); box-shadow:0 18px 60px rgba(0,0,0,.45);";
   panel.onclick = (e) => e.stopPropagation();
 
   const title =
     overlay.kind === "RULEBOOK"
       ? "룰북"
+      : overlay.kind === "SETTINGS" ? "설정"
       : overlay.pile === "deck"
       ? "덱"
       : overlay.pile === "discard"
@@ -2187,6 +2158,9 @@ function renderOverlayLayer(
   header.appendChild(closeBtn);
   panel.appendChild(header);
 
+
+
+
   if (overlay.kind === "RULEBOOK") {
     const pre = document.createElement("pre");
     pre.className = "rulebook";
@@ -2194,6 +2168,18 @@ function renderOverlayLayer(
     pre.style.cssText =
       "white-space:pre-wrap; line-height:1.45; font-size:13px; margin:0; padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,.10); background:rgba(0,0,0,.18);";
     panel.appendChild(pre);
+  } else if (overlay.kind === "SETTINGS") {
+    panel.appendChild(renderSettingsPanel(() => {
+      // 값 바뀌면 즉시 반영
+      applyUiScaleToRoot();
+      saveUiScale();
+      // 레이아웃 재정렬이 필요하면
+      if (currentG) {
+        normalizeEnemyNameWidth();
+        alignHandToBoardAnchor(currentG);
+        alignEnemyHudToViewportCenter();
+      }
+    }, actions));
   } else {
 
     const uids =
@@ -2357,9 +2343,6 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
   overlayEl.style.setProperty("pointer-events", "auto", "important");
   
 
-  overlayEl.onclick = (e) => {
-    if (e.target === overlayEl) actions.onChooseChoice("close");
-  };
 
   const panel = div("choice-panel");
   panel.style.cssText =
@@ -2562,159 +2545,99 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
 
 
 // Top HUD (Player left + Enemies center + Top-right controls)
-function isMobileUI() {
-  const narrow = window.matchMedia?.("(max-width: 900px)").matches ?? false;
-  const coarse = window.matchMedia?.("(pointer: coarse)").matches ?? false; // 터치 위주 기기
-  return narrow && coarse;
-}
 function renderTopHud(g: GameState, actions: UIActions) {
-
-
-
   document.querySelectorAll(".topHud").forEach((el) => el.remove());
   document.querySelectorAll(".enemyHudCenter").forEach((el) => el.remove());
 
-
   const top = div("topHud");
-
-  const mobile = isMobileUI();
-
-  if (!mobile) top.appendChild(div("topHudLeftSpacer"));
-
-
-  // (A) LEFT: player (compact on mobile)
+  top.appendChild(div("topHudLeftSpacer"));
 
   const left = div("playerHudLeft");
 
-  
+  const titleRow = div("playerTitleRow");
+  titleRow.appendChild(divText("playerHudTitle", "플레이어"));
 
-  if (mobile) {
-    // 상단 한 줄: HP / 블록 / S F / 탐험 / 덱
-    const topLine = div("mobileTopLine"); // 새 클래스
-    topLine.appendChild(chipEl(`HP ${g.player.hp}/${g.player.maxHp}`));
-    topLine.appendChild(chipEl(`블록 ${g.player.block}`));
+  const piles = div("pileButtons");
+  piles.appendChild(mkButton("덱", () => actions.onViewPile("deck")));
+  piles.appendChild(mkButton("버림", () => actions.onViewPile("discard")));
+  piles.appendChild(mkButton("손패", () => actions.onViewPile("hand")));
+  piles.appendChild(mkButton("소모", () => actions.onViewPile("exhausted")));
+  piles.appendChild(mkButton("소실", () => actions.onViewPile("vanished")));
+  titleRow.appendChild(piles);
 
-    topLine.appendChild(chipEl(`S ${g.player.supplies} |`, g.player.supplies === 0 ? "warn" : ""));
-    topLine.appendChild(chipEl(`F ${g.player.fatigue}`));
+  left.appendChild(titleRow);
 
-    topLine.appendChild(chipEl(`| 시간 ${Math.max(1, totalTime(g))}`));
-    topLine.appendChild(chipEl(`| 덱 ${g.deck.length}`));
+  const pbox = div("enemyChip");
+  pbox.classList.add("playerHudBox");
 
-    left.appendChild(topLine);
+  const hpTop = div("enemyChipTop");
+  hpTop.appendChild(divText("", "HP"));
+  hpTop.appendChild(divText("", `${g.player.hp}/${g.player.maxHp}`));
+  pbox.appendChild(hpTop);
 
-    const stLine = div("mobileStatusLine");
+  const hpOuter = div("enemyHPOuter");
+  const hpFill = div("enemyHPFill");
+  hpFill.style.width = `${Math.max(0, Math.min(100, (g.player.hp / Math.max(1, g.player.maxHp)) * 100))}%`;
+  hpOuter.appendChild(hpFill);
+  pbox.appendChild(hpOuter);
 
-    const pst = g.player.status;
-    const list: string[] = [];
-    if ((pst.vuln ?? 0) > 0) list.push(`취약 ${pst.vuln}`);
-    if ((pst.weak ?? 0) > 0) list.push(`약화 ${pst.weak}`);
-    if ((pst.bleed ?? 0) > 0) list.push(`출혈 ${pst.bleed}`);
-    if ((pst.disrupt ?? 0) > 0) list.push(`교란 ${pst.disrupt}`);
+  const blTop = div("enemyChipTop");
+  blTop.appendChild(divText("", "블록"));
+  blTop.appendChild(divText("", `${g.player.block}`));
+  pbox.appendChild(blTop);
 
-    const shown = list.slice(0, 4);
-    for (const t of shown) stLine.appendChild(badge(t));
-    if (list.length > shown.length) stLine.appendChild(badge(`+${list.length - shown.length}`));
+  const blOuter = div("enemyHPOuter");
+  const blFill = div("enemyHPFill");
+  blFill.style.background = "linear-gradient(90deg, #64b5ff, #2a7cff)";
+  blFill.style.width = `${Math.max(0, Math.min(100, (g.player.block / Math.max(1, g.player.maxHp)) * 100))}%`;
+  blOuter.appendChild(blFill);
+  pbox.appendChild(blOuter);
 
-    left.appendChild(stLine);
+  const pst = g.player.status;
+  const pBadges = div("enemyBadges");
+  pbox.appendChild(pBadges);
 
-  } else {
-    // 데스크톱: 기존 바 유지
-    const titleRow = div("playerTitleRow");
-    titleRow.appendChild(divText("playerHudTitle", "플레이어"));
+  const pBadgeList: string[] = [];
+  if ((pst.vuln ?? 0) > 0) pBadgeList.push(`취약 ${pst.vuln}`);
+  if ((pst.weak ?? 0) > 0) pBadgeList.push(`약화 ${pst.weak}`);
+  if ((pst.bleed ?? 0) > 0) pBadgeList.push(`출혈 ${pst.bleed}`);
+  if ((pst.disrupt ?? 0) > 0) pBadgeList.push(`교란 ${pst.disrupt}`);
 
-    const piles = div("pileButtons");
-    piles.appendChild(mkButton("덱", () => actions.onViewPile("deck")));
-    piles.appendChild(mkButton("버림", () => actions.onViewPile("discard")));
-    piles.appendChild(mkButton("손패", () => actions.onViewPile("hand")));
-    piles.appendChild(mkButton("소모", () => actions.onViewPile("exhausted")));
-    piles.appendChild(mkButton("소실", () => actions.onViewPile("vanished")));
-    titleRow.appendChild(piles);
+  for (const t of pBadgeList) pBadges.appendChild(badge(t));
 
-    left.appendChild(titleRow);
+  left.appendChild(pbox);
 
-    const pbox = div("enemyChip");
-    pbox.classList.add("playerHudBox");
-
-    const hpTop = div("enemyChipTop");
-    hpTop.appendChild(divText("", "HP"));
-    hpTop.appendChild(divText("", `${g.player.hp}/${g.player.maxHp}`));
-    pbox.appendChild(hpTop);
-
-    const hpOuter = div("enemyHPOuter");
-    const hpFill = div("enemyHPFill");
-    hpFill.style.width = `${Math.max(0, Math.min(100, (g.player.hp / Math.max(1, g.player.maxHp)) * 100))}%`;
-    hpOuter.appendChild(hpFill);
-    pbox.appendChild(hpOuter);
-
-    const blTop = div("enemyChipTop");
-    blTop.appendChild(divText("", "블록"));
-    blTop.appendChild(divText("", `${g.player.block}`));
-    pbox.appendChild(blTop);
-
-    const blOuter = div("enemyHPOuter");
-    const blFill = div("enemyHPFill");
-    blFill.style.background = "linear-gradient(90deg, #64b5ff, #2a7cff)";
-    blFill.style.width = `${Math.max(0, Math.min(100, (g.player.block / Math.max(1, g.player.maxHp)) * 100))}%`;
-    blOuter.appendChild(blFill);
-    pbox.appendChild(blOuter);
-
-    const pst = g.player.status;
-    const pBadges = div("enemyBadges");
-    pbox.appendChild(pBadges);
-
-    const pBadgeList: string[] = [];
-    if ((pst.vuln ?? 0) > 0) pBadgeList.push(`취약 ${pst.vuln}`);
-    if ((pst.weak ?? 0) > 0) pBadgeList.push(`약화 ${pst.weak}`);
-    if ((pst.bleed ?? 0) > 0) pBadgeList.push(`출혈 ${pst.bleed}`);
-    if ((pst.disrupt ?? 0) > 0) pBadgeList.push(`교란 ${pst.disrupt}`);
-
-    const shown = mobile ? pBadgeList.slice(0, 3) : pBadgeList;
-    for (const t of shown) pBadges.appendChild(badge(t));
-    if (mobile && pBadgeList.length > shown.length) pBadges.appendChild(badge(`+${pBadgeList.length - shown.length}`));
-
-    left.appendChild(pbox);
-  }
-
-// (B) CENTER: enemies
   const inCombat = !g.run.finished && g.enemies.length > 0 && g.phase !== "NODE";
-
   if (inCombat) {
     const center = div("enemyHudCenter");
     const mover = div("enemyHudCenterMover");
-    const enemiesWrap = div(mobile ? "enemyStrip" : "enemyHud");
-    
-    if (!mobile) {
-      enemiesWrap.style.cssText = `
-        display: flex;
-        flex-direction: row;
-        flex-wrap: nowrap;          /* ✅ 줄바꿈 금지 */
-        justify-content: center;    /* ✅ 묶음 자체 중앙 */
-        align-items: stretch;
-        gap: 14px;
-        overflow: visible;          /* ✅ 스크롤바/잘림 방지 */
-        white-space: nowrap;
-      `;
-    }
+    const enemiesWrap = div("enemyHud");
+
+    enemiesWrap.style.cssText = `
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      justify-content: center;
+      align-items: stretch;
+      gap: 14px;
+      overflow: visible;
+      white-space: nowrap;
+    `;
     center.style.overflow = "visible";
     mover.style.overflow = "visible";
     mover.style.width = "max-content";
 
     const targeting = isTargeting(g);
 
-    // 구조: center > mover > enemiesWrap
     mover.appendChild(enemiesWrap);
-
-    document.querySelectorAll(".enemyHudCenter").forEach((el) => el.remove());
     center.appendChild(mover);
-
     document.body.appendChild(center);
-
 
     for (let i = 0; i < g.enemies.length; i++) {
       const e = g.enemies[i];
       const banner = div("enemyBanner");
       banner.style.cssText = `
-        flex: 0 0 var(--enemyBannerW, 520px);  /* 고정 폭 */
+        flex: 0 0 var(--enemyBannerW, 520px);
         width: var(--enemyBannerW, 520px);
         max-width: min(var(--enemyBannerW, 520px), 92vw);
         border-radius: 16px;
@@ -2730,13 +2653,11 @@ function renderTopHud(g: GameState, actions: UIActions) {
       topRow.appendChild(divText("", `${e.hp}/${e.maxHp}`));
       banner.appendChild(topRow);
 
-      if (!mobile) {
-        const outer = div("enemyHPOuter");
-        const fill = div("enemyHPFill");
-        fill.style.width = `${Math.max(0, Math.min(100, (e.hp / Math.max(1, e.maxHp)) * 100))}%`;
-        outer.appendChild(fill);
-        banner.appendChild(outer);
-      }
+      const outer = div("enemyHPOuter");
+      const fill = div("enemyHPFill");
+      fill.style.width = `${Math.max(0, Math.min(100, (e.hp / Math.max(1, e.maxHp)) * 100))}%`;
+      outer.appendChild(fill);
+      banner.appendChild(outer);
 
       const def = g.content.enemiesById[e.id];
       const intent = def.intents[e.intentIndex % def.intents.length];
@@ -2747,37 +2668,82 @@ function renderTopHud(g: GameState, actions: UIActions) {
       const badges = div("enemyBadges");
       banner.appendChild(badges);
 
+      function badgeWithDelta(text: string): HTMLElement {
+        const el = document.createElement("span");
+        el.className = "badge";
+
+        const m = text.match(/\s*\[\[d:([+-]?\d+)\]\]\s*$/);
+        if (!m) {
+          el.textContent = text;
+          return el;
+        }
+
+        const deltaStr = m[1];
+        const baseText = text.replace(/\s*\[\[d:[+-]?\d+\]\]\s*$/, "");
+
+        if (baseText.trim().length > 0) el.appendChild(document.createTextNode(baseText + " "));
+
+        const d = document.createElement("span");
+        const deltaNum = Number(deltaStr);
+        d.className = `deltaInline ${deltaNum > 0 ? "plus" : "minus"}`;
+        d.textContent = `(${deltaNum > 0 ? "+" : ""}${deltaNum} / 단타)`;
+        el.appendChild(d);
+        return el;
+      }
+
+      const playerVuln = g.player.status?.vuln ?? 0;
+      const enemyWeak = e.status?.weak ?? 0;
+      const deltaPerHit = playerVuln - enemyWeak;
+
+      function formatDeltaShort(delta: number) {
+        if (delta === 0) return "";
+        return delta > 0 ? `+${delta}` : `${delta}`;
+      }
+
       const eBadgeList: string[] = [];
+
       if ((st.vuln ?? 0) > 0) eBadgeList.push(`취약 ${st.vuln}`);
-      if ((st.weak ?? 0) > 0) eBadgeList.push(`약화 ${st.weak}`);
+
+      if ((st.weak ?? 0) > 0) {
+        if (playerVuln !== 0 || enemyWeak !== 0) {
+          const d = formatDeltaShort(deltaPerHit);
+          if (d) eBadgeList.push(`약화 ${st.weak} [[d:${d}]]`);
+          else eBadgeList.push(`약화 ${st.weak}`);
+        } else {
+          eBadgeList.push(`약화 ${st.weak}`);
+        }
+      } else {
+        if (playerVuln !== 0 || enemyWeak !== 0) {
+          const d = formatDeltaShort(deltaPerHit);
+          if (d) eBadgeList.push(`[[d:${d}]]`);
+        }
+      }
+
       if ((st.bleed ?? 0) > 0) eBadgeList.push(`출혈 ${st.bleed}`);
       if ((st.disrupt ?? 0) > 0) eBadgeList.push(`교란 ${st.disrupt}`);
       if (e.immuneThisTurn) eBadgeList.push("면역");
 
-      const eShown = mobile ? eBadgeList.slice(0, 2) : eBadgeList;
-      for (const t of eShown) badges.appendChild(badge(t));
-      if (mobile && eBadgeList.length > eShown.length) {
-        badges.appendChild(badge(`+${eBadgeList.length - eShown.length}`));
-      }
+      for (const t of eBadgeList) badges.appendChild(badgeWithDelta(t));
 
       banner.onclick = () => actions.onSelectEnemy(i);
       enemiesWrap.appendChild(banner);
     }
   }
 
-  // (C) RIGHT: buttons
   top.appendChild(left);
-  if (!mobile) {
-    const right = div("topHudRight");
 
-    right.appendChild(mkButton("룰북", () => actions.onViewRulebook()));
-    right.appendChild(mkButton("로그", () => actions.onToggleLogOverlay()));
+  const right = div("topHudRight");
 
-    top.appendChild(right);
-  }
+  right.appendChild(mkButton("룰북", () => actions.onViewRulebook()));
+  right.appendChild(mkButton("로그", () => actions.onToggleLogOverlay()));
+  right.appendChild(mkButton("⚙️", () => {
+    overlay = { kind: "SETTINGS" };
+    render(g, actions);
+  }));
+  top.appendChild(right);
+
   return top;
 }
-
 
 function buildResourceText(g: GameState): string {
   const inCombat = g.enemies.length > 0 && g.phase !== "NODE";
@@ -2809,34 +2775,25 @@ function chipEl(text: string, extraClass = "") {
 
 
 function renderBattleTitleRow(g: GameState) {
-  const mobile = isMobileUI();
-  if (mobile) {
-    const row = div("battleTitleRow");
-    row.style.display = "none";
-    return row;
-  }
-
   const row = div("battleTitleRow");
   row.style.display = "flex";
   row.style.alignItems = "center";
   row.style.gap = "12px";
 
-  // (1) 왼쪽: 타이틀
   const title = document.createElement("h2");
   title.textContent = "";
   row.appendChild(title);
 
-  // (2) 가운데: 대상 선택 배너 (폭 제한)
   const hintText = getTargetHintText(g);
 
   const warn = divText("targetHintInline", "");
   warn.style.cssText =
-    "padding:5px 10px; border-radius:12px; border:1px solid rgba(0,0,0,.55);"+
+    "padding:5px 10px; border-radius:12px; border:1px solid rgba(0,0,0,.55);" +
     "background: rgb(255, 0, 0);" +
     "opacity:.82;" +
     "font-weight:400; font-size:12px; line-height:1.2;" +
     "white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" +
-    "width: min(400px, 92vw);" + 
+    "width: min(400px, 92vw);" +
     "max-width: none;" +
     "pointer-events:auto;";
 
@@ -2845,12 +2802,11 @@ function renderBattleTitleRow(g: GameState) {
     warn.style.visibility = "visible";
     warn.style.pointerEvents = "auto";
   } else {
-    warn.textContent = "대상 선택 필요"; // 더미(숨김)
-    warn.style.visibility = "hidden";    // 공간 유지
+    warn.textContent = "대상 선택 필요";
+    warn.style.visibility = "hidden";
     warn.style.pointerEvents = "none";
   }
 
-  // (3) 오른쪽: (나중에 S/F/시간/덱 들어갈 자리)
   const right = div("battleTitleRight");
   right.style.cssText =
     "margin-left:auto;" +
@@ -2860,20 +2816,18 @@ function renderBattleTitleRow(g: GameState) {
     "position:relative;";
 
   const res = div("resourceRow inline");
-
   res.appendChild(chipEl(``));
   res.appendChild(chipEl(``));
   res.appendChild(chipEl(``));
-
   right.appendChild(res);
 
   warn.style.position = "absolute";
   warn.style.right = "207px";
-  warn.style.top = "calc(100% - 8px)"; // 아래로 내리는 대신 살짝 끌어올림
+  warn.style.top = "calc(100% - 8px)";
   warn.style.marginTop = "0px";
   warn.style.zIndex = "5";
   warn.style.pointerEvents = hintText ? "auto" : "none";
-  row.appendChild(warn); 
+  row.appendChild(warn);
 
   row.appendChild(right);
 
@@ -2945,34 +2899,12 @@ function renderCombat(root: HTMLElement, g: GameState, actions: UIActions) {
   const inCombat = !g.run.finished && g.enemies.length > 0 && g.phase !== "NODE";
   board.classList.toggle("slabOn", inCombat);
 
-
-  
-  if (isMobileUI()) {
-    const hintSlot = div("targetHintSlot");
-    hintSlot.style.cssText =
-      "height: 54px;" +
-      "margin: 0 0 3px 0;" +
-      "display:flex; align-items:center;";
-    wrap.appendChild(hintSlot);
-
-    const hintText = getTargetHintText(g);
-    if (hintText) {
-      const hint = div("targetHint");
-      hint.textContent = hintText;
-      hintSlot.appendChild(hint);
-    } else {
-      hintSlot.style.visibility = "hidden";
-      hintSlot.textContent = ".";
-    }
-  }
-
   board.appendChild(renderSlotsGrid(g, actions, "front"));
   board.appendChild(renderSlotsGrid(g, actions, "back"));
 
   wrap.appendChild(board);
   root.appendChild(wrap);
 }
-
 
 
 
@@ -3011,7 +2943,6 @@ function computeNextStep(g: GameState, actions: UIActions, targeting: boolean) {
 
   return { label: "다음", fn: null, disabled: true, activePhase: g.phase };
 }
-
 
 
 function renderHandDock(g: GameState, actions: UIActions, targeting: boolean) {
@@ -3053,13 +2984,11 @@ function renderHandDock(g: GameState, actions: UIActions, targeting: boolean) {
       controls.style.left = `${Math.round(centerX)}px`;
     }
 
-    // Enter 처리 유지
     setEnterAction(() => actions.onAutoAdvance(), nextTurnBtn.disabled);
   } else {
     setEnterAction(null, true);
   }
 
-  // ---- 아래는 기존 손패 렌더 그대로 ----
   const hand = div("hand");
   hand.dataset.dropHand = "1";
   const row = div("handCardsRow");
@@ -3070,36 +2999,31 @@ function renderHandDock(g: GameState, actions: UIActions, targeting: boolean) {
     hint.textContent = "";
     row.appendChild(hint);
   } else {
-    const draggable = !isMobileUI();
-    for (const uid of g.hand) row.appendChild(renderCard(g, uid, true, actions.onSelectHandCard, { draggable }));
+    for (const uid of g.hand) row.appendChild(renderCard(g, uid, true, actions.onSelectHandCard, { draggable: true }));
   }
 
   dock.appendChild(hand);
   document.body.appendChild(dock);
 
-  if (!isMobileUI()) enableHorizontalWheelScroll(hand);
+  enableHorizontalWheelScroll(hand);
 }
-
-//손패 UI
 
 function enableHorizontalWheelScroll(el: HTMLElement) {
   if ((el as any).dataset?.wheelX === "1") return;
   (el as any).dataset.wheelX = "1";
-
   el.addEventListener(
-    "wheel",
-    (e) => {
+    "wheel", (e) => {
       // shift+휠은 원래대로(세로 스크롤)
       if (e.shiftKey) return;
-
       const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
       el.scrollLeft += dx;
-
       e.preventDefault();
     },
     { passive: false }
   );
 }
+
+//손패 UI
 
 
 
@@ -3210,8 +3134,6 @@ function renderSlotsGrid(g: GameState, actions: UIActions, side: Side) {
   const hasSelected = !!g.selectedHandCardUid;
   const slots = side === "front" ? g.frontSlots : g.backSlots;
 
-  const touchUI = isMobileUI();
-
   for (let i = 0; i < 3; i++) {
     const disabled = side === "back" ? !!g.backSlotDisabled?.[i] : false;
 
@@ -3222,47 +3144,20 @@ function renderSlotsGrid(g: GameState, actions: UIActions, side: Side) {
     if (hoverSlot && hoverSlot.side === side && hoverSlot.idx === i) s.classList.add("dropHover");
     if (hasSelected && !disabled) s.classList.add("placeable");
 
-
     const uid = slots[i];
     if (uid) {
-      const cardEl = isMobileUI()
-        ? renderCardInSlotCompact(g, uid)
-        : (renderCard(g, uid, false) as HTMLElement);
+      const cardEl = renderCard(g, uid, false) as HTMLElement;
       cardEl.classList.add("inSlot");
       s.appendChild(cardEl);
 
-      if (!touchUI) {
-        cardEl.onpointerdown = (ev) => {
-          if (isMobileUI()) return;
-          if ((ev as any).button !== 0 && (ev as any).pointerType === "mouse") return;
-          if (isTargeting(g)) return;
-          if (g.phase !== "PLACE") return;
-          beginDrag(ev as any, { kind: "slot", cardUid: uid, fromSide: side, fromIdx: i });
-        };
+      cardEl.onpointerdown = (ev) => {
+        if ((ev as any).button !== 0 && (ev as any).pointerType === "mouse") return;
+        if (isTargeting(g)) return;
+        if (g.phase !== "PLACE") return;
+        beginDrag(ev as any, { kind: "slot", cardUid: uid, fromSide: side, fromIdx: i });
+      };
 
-        // 더블클릭 회수 유지
-        cardEl.ondblclick = () => actions.onReturnSlotToHand(side, i);
-      } else {
-        attachLongPress(cardEl, {
-          delayMs: 420,
-          moveTolerancePx: 8,
-          shouldIgnore: () => {
-            if (disabled) return true;
-            if (isTargeting(g)) return true;
-            if (g.phase !== "PLACE") return true;
-            return false;
-          },
-          onFire: (ev) => {
-            ev.stopPropagation();
-            actions.onReturnSlotToHand(side, i);
-          },
-          onTap: (ev) => {
-            ev.stopPropagation();
-            openCardPeek(g, uid);
-          },
-        });
-      }
-
+      cardEl.ondblclick = () => actions.onReturnSlotToHand(side, i);
     }
 
     s.onclick = () => {
@@ -3272,13 +3167,11 @@ function renderSlotsGrid(g: GameState, actions: UIActions, side: Side) {
 
       const uidHere = slots[i];
 
-      // 선택이 없고, 슬롯에 카드가 있으면 회수
       if (!g.selectedHandCardUid && uidHere) {
         actions.onReturnSlotToHand(side, i);
         return;
       }
 
-      // 선택된 손패가 있으면 배치
       actions.onPlaceSelected(side, i);
     };
 
@@ -3286,7 +3179,6 @@ function renderSlotsGrid(g: GameState, actions: UIActions, side: Side) {
   }
   return grid;
 }
-
 
 
 // Drag + Keyboard
@@ -3302,8 +3194,14 @@ function updateSlotHoverUI() {
   if (el) el.classList.add("dropHover");
 }
 
+let inputBound = false;
+
 function bindGlobalInput(getG: () => GameState, actions: UIActions) {
-  window.onpointermove = (ev) => {
+  if (inputBound) return;
+  inputBound = true;
+
+
+  window.addEventListener("pointermove", (ev) => {
     const g = getG();
     if (g.choice || overlay) return;
     if (!drag || ev.pointerId !== drag.pointerId) return;
@@ -3318,11 +3216,9 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
 
 
     renderDragOverlay(document.querySelector("#app") as HTMLElement, g);
-    updateSlotHoverUI();
+    updateSlotHoverUI();}, { passive: true });
 
-  };
-
-  window.onpointerup = (ev) => {
+  window.addEventListener("pointerup", (ev) => {
     const g = getG();
     if (g.choice || overlay) return;
     if (!drag || ev.pointerId !== drag.pointerId) return;
@@ -3395,7 +3291,7 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
     drag = null;
     hoverSlot = null;
     render(g, actions);
-  };
+  });
 
   window.addEventListener("keydown", (ev) => {
     const t = ev.target as HTMLElement | null;
@@ -3615,10 +3511,6 @@ function closestWithDatasetKeys(el: HTMLElement, keys: string[]): HTMLElement | 
   return null;
 }
 function renderDragOverlay(_app: HTMLElement, g: GameState) {
-  if (isMobileUI()) {
-    document.querySelector(".dragLayer")?.remove();
-    return;
-  }
 
   if (!drag || !drag.dragging) {
     document.querySelector(".dragLayer")?.remove();
@@ -3747,26 +3639,16 @@ function renderCard(
 
   if (clickable) {
     d.onpointerdown = (ev) => {
-      if (!isMobileUI()) {
-        if ((ev as any).button !== 0 && (ev as any).pointerType === "mouse") return;
-        if (isTargeting(g)) return;
-        if (g.phase !== "PLACE") return;
-        if (!draggable) return;
+      if ((ev as any).button !== 0 && (ev as any).pointerType === "mouse") return;
+      if (isTargeting(g)) return;
+      if (g.phase !== "PLACE") return;
+      if (!draggable) return;
 
-        const idx = g.hand.indexOf(cardUid);
-        beginDrag(ev as any, { kind: "hand", cardUid, fromHandIndex: idx });
-      }
+      const idx = g.hand.indexOf(cardUid);
+      beginDrag(ev as any, { kind: "hand", cardUid, fromHandIndex: idx });
     };
 
-    if (isMobileUI()) {
-      attachLongPress(d, {
-        delayMs: 280,
-        moveTolerancePx: 6,
-        shouldIgnore: () => isTargeting(g),
-        onFire: () => openCardZoom(g, cardUid),
-        onTap: () => { if (onClick) onClick(cardUid); },
-      });
-    }
+
   }
 
   return d;
@@ -3873,14 +3755,17 @@ function badgeHtml(kw: string, n?: string, punc?: string) {
 const PUNC = "[,，、]";
 
 const reNum  = new RegExp(`(취약|약화|출혈|교란|면역|S|F|드로우|피해|방어|블록|회복|소모|소실)\\s*([+-]?\\d+)\\s*(${PUNC})?`, "g");
-const reBare = new RegExp(`\\b(소모|소실|피해)\\b\\s*(${PUNC})?`, "g");
+const reBare = new RegExp(
+  `(^|[^가-힣A-Za-z0-9_])(소모|소실)\\s*(${PUNC})?`,
+  "g"
+);
 
 function renderCardRichText(text: string): string {
-  // 1) 숫자 있는 키워드(+콤마)
   let out = text.replace(reNum, (_m, kw, n, punc) => badgeHtml(kw, n, punc));
 
-  // 2) 숫자 없는 키워드(+콤마)
-  out = out.replace(reBare, (_m, kw, punc) => badgeHtml(kw, undefined, punc));
+  out = out.replace(reBare, (_m, prefix, kw, punc) => {
+    return `${prefix}${badgeHtml(kw, undefined, punc)}`;
+  });
 
   out = out.replace(/\n/g, "<br>");
   return out;

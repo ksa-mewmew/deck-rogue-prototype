@@ -2,6 +2,7 @@
 import type { GameState, PileKind } from "../engine/types";
 import { addCardToDeck } from "../content";
 import { removeCardByUid } from "../content";
+import { checkEndConditions } from "../engine/combat";
 
 export type DevConsoleActions = {
   onNewRun: () => void;
@@ -347,10 +348,10 @@ function runDevCommand(raw: string) {
     if (!g.enemies || g.enemies.length === 0) { out("WARN: enemies=0"); return; }
     for (const e of g.enemies) e.hp = 0;
     g.enemies = [];
-    g.phase = "NODE";
     (g as any).pendingTarget = null;
     (g as any).pendingTargetQueue = [];
     (g as any).selectedEnemyIndex = null;
+    checkEndConditions(g)
 
     c.log?.("[DEV] win");
     c.rerender();

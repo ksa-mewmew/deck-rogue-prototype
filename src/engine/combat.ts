@@ -884,7 +884,7 @@ export function checkEndConditions(g: GameState) {
       const req = getEscapeReq(g);
       if (g.run.afterTreasureNodePicks >= req) {
         g.run.finished = true;
-        logMsg(g, `승리! 저주받은 보물을 얻은 후 ${req}턴 동안 살아남았습니다.`);
+        logMsg(g, `승리! 저주받은 보물을 얻은 후 ${req}번의 탐험 동안 살아남았습니다.`);
         return;
       }
     }
