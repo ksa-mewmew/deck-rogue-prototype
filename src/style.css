@@ -923,7 +923,7 @@ body{
 :root{
   --hudTop: 150px;
   --hudBarH: 60px;
-  --hintGap: 0px;
+  --hintGap: 20px;
 }
 .stageCornerHud{
   top: var(--hudTop) !important;
@@ -933,7 +933,7 @@ body{
 .targetHintInline{
   position: fixed;
   left: 50%;
-  top: calc(var(--hudTop) + var(--hudBarH) + var(--hintGap));
+  top: calc( 50px) !important;
   transform: translateX(-50%);
   z-index: 99998;
   pointer-events: none;
