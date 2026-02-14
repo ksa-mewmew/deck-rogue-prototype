@@ -557,7 +557,7 @@ html, body {
   --boardPadX: 56px;
   --boardPadY: 34px;
 
-  --slotCenterNudgeY: 0px;
+  --slotCenterNudgeY: -9px;
   
   --slotR: 7px; /* 슬롯 라운딩 통일 */
 }
@@ -1928,3 +1928,41 @@ pre.overlayItemDetail,
 }
 
 /* ✅ slabOn일 때는 다시 켜주기 (important로 역전) */
+
+.bgLayer{
+  background: var(--bgUrl) center / cover no-repeat;
+  image-rendering: pixelated;
+}
+
+.mainPanel.inCombat::before{
+  opacity: 1;
+  background: var(--boardUrl) center / cover no-repeat;
+  image-rendering: pixelated;
+}
+.boardArea.slabOn{
+  background-image: var(--boardUrl);
+  background-repeat: no-repeat;
+  background-size: 112% 125% !important;  /* 가로 살짝 + 세로 더 */
+  background-position: 50% 45% !important;
+}
+
+.card::before{
+  background: var(--cardUrl) center / 100% 100% no-repeat !important;
+  image-rendering: pixelated;
+}
+
+
+/* boardArea가 석판 영역을 더 많이 차지하도록 */
+.boardArea{
+  /* 기존 padding이 너무 크면 '빈 공간'처럼 보입니다 */
+  padding-top: 22px;
+  padding-bottom: 22px;
+
+  /* ✅ 세로로 더 넓게 차지 */
+  min-height: 78%;
+}
+
+/* 전투 중에만 더 공격적으로 */
+.mainPanel.inCombat .boardArea{
+  min-height: 86%;
+}
