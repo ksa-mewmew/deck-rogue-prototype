@@ -51,12 +51,14 @@ export const BOSS_OMEN_HINT: Record<string, string> = {
 
 // ===== 광기(악몽) 이벤트 풀 =====
 
+const base = import.meta.env.BASE_URL;
+
 export const MAD_EVENTS: EventDef[] = [
   {
     id: "mad_mirror",
     name: "거울에 잠긴 물",
     prompt: "물 속의 당신이 먼저 웃습니다.",
-    art: "assets/events/event_mad_mirror.png",
+    art: `${base}assets/events/event_mad_mirror.png`,
     options: (g) => [
       {
         key: "mad_mirror:take",
@@ -83,7 +85,7 @@ export const MAD_EVENTS: EventDef[] = [
     id: "mad_contract",
     name: "젖은 계약서",
     prompt: "곰팡이 냄새가 납니다.",
-    art: "assets/events/event_mad_contract.png",
+    art: `${base}assets/events/event_mad_contract.png`,
     options: (g) => [
       {
         key: "mad_contract:sign",
@@ -113,7 +115,7 @@ export const MAD_EVENTS: EventDef[] = [
     id: "mad_lullaby",
     name: "자장가",
     prompt: "잠들면 회복하지만, 깨어나면 잊습니다.",
-    art: "assets/events/event_mad_lullaby.png",
+    art: `${base}assets/events/event_mad_lullaby.png`,
     options: (g) => [
       {
         key: "mad_lullaby:sleep",
@@ -150,7 +152,7 @@ export const EVENTS: EventDef[] = [
     id: "drop_bag",
     name: "짐 버리기",
     prompt: "짐을 줄여 피로를 낮추자.",
-    art: "assets/events/event_drop_bag.png",
+    art: `${base}assets/events/event_drop_bag.png`,
     options: () => [
       {
         key: "drop",
@@ -176,7 +178,7 @@ export const EVENTS: EventDef[] = [
     id: "hide_from_monster",
     name: "몬스터로부터 숨기",
     prompt: "전투하거나, 대가를 치르고 숨을 수 있다.",
-    art: "assets/events/event_hide_from_monster.png",
+    art: `${base}assets/events/event_hide_from_monster.png`,
     options: () => [
       {
         key: "fight",
@@ -204,7 +206,7 @@ export const EVENTS: EventDef[] = [
     prompt:
       "고블린들이 보급을 약탈했다.\n" +
       "이번 전투는 보급(S) 5로 시작합니다.",
-    art: "assets/events/event_goblin_ambush_low_supplies.png",
+    art: `${base}assets/events/event_goblin_ambush_low_supplies.png`,
     options: () => [
       {
         key: "fight",
@@ -222,7 +224,7 @@ export const EVENTS: EventDef[] = [
     id: "find_adventurer",
     name: "다른 모험가 발견",
     prompt: "거래한다.",
-    art: "assets/events/event_find_adventurer.png",
+    art: `${base}assets/events/event_find_adventurer.png`,
     options: (g: GameState) => {
 
       if (g.run.treasureObtained) {
@@ -265,7 +267,7 @@ export const EVENTS: EventDef[] = [
     id: "edible_mushroom",
     name: "식용 버섯 발견",
     prompt: "기운이 난다. 다음 전투의 시작 보급이 늘어난다.",
-    art: "assets/events/event_edible_mushroom.png",
+    art: `${base}assets/events/event_edible_mushroom.png`,
     options: () => [
       {
         key: "eat",
@@ -284,7 +286,7 @@ export const EVENTS: EventDef[] = [
     id: "ominous_prophecy",
     name: "불길한 예언",
     prompt: "불길한 속삭임이 귓가를 맴돈다. 대가를 치르고 미래를 엿볼까?",
-    art: "assets/events/event_ominous_prophecy.png",
+    art: `${base}assets/events/event_ominous_prophecy.png`,
     options: (g: GameState) => [
       {
         key: "omen:listen",

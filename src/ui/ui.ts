@@ -3689,8 +3689,9 @@ function renderTopHud(g: GameState, actions: UIActions) {
       const artCard = div("enemyArtCard");
 
       // CSS var로 URL 주입
-      artWrap.style.setProperty("--frameImg", `url("assets/enemies/enemies_frame.png")`);
-      artWrap.style.setProperty("--artImg", `url("${enemyArtUrl(e.id)}")`);
+      const base = import.meta.env.BASE_URL; // "/<repo>/"
+      artWrap.style.setProperty("--frameImg", `url("${base}assets/enemies/enemies_frame.png")`);
+      artWrap.style.setProperty("--artImg", `url("${base}${enemyArtUrl(e.id)}")`);
       artWrap.appendChild(artCard);
 
       const mini = div("enemyMiniHud");
