@@ -140,6 +140,8 @@
   --choicePanelDx: 0px;
   --choicePanelDy: 40px;
 
+  --choicePanelMarginY: 24px;
+
   /* ---------- PLAYER HUD POSITION ---------- */
   --playerHudLeftX: calc(var(--edgePad) + calc(30px * var(--uiScale)));
   --playerHudTop:   calc(var(--hudH) + calc(157px * var(--uiScale)));
@@ -1312,7 +1314,6 @@ pre.choice-detail,
   display:flex;
   justify-content:center;
   align-items:flex-start;
-  padding: var(--choicePadTop) var(--choicePadR) var(--choicePadB) var(--choicePadL);
   box-sizing:border-box;
 }
 
@@ -1331,6 +1332,10 @@ pre.choice-detail,
   z-index: var(--zChoicePanel) !important;
   pointer-events: auto !important;
 
+  display: flex;
+  flex-direction: column;
+
+
   left: 50% !important;
   top: 50% !important;
 
@@ -1342,21 +1347,38 @@ pre.choice-detail,
       calc(var(--choicePanelDy) * var(--uiScale))
     ) !important;
 
-  width: min(
-    var(--choicePanelW),
-    calc(100vw - (var(--choicePadR) + var(--choicePadL) + calc(24px * var(--uiScale))))
-  );
-  max-height: calc(100vh - (var(--choicePadTop) + var(--choicePadB) + calc(24px * var(--uiScale))));
+  width: min(calc(800px * var(--uiScale)), 96vw);
+  max-height: calc(92vh - calc(var(--choicePanelMarginY) * var(--uiScale)) * 2);
+  padding: var(--choicePanelPad); /* 원래 패딩 복귀 권장 */
+  box-sizing: border-box;
   overflow: auto;
   overflow-x: hidden;
-
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: var(--choicePanelR);
   background: rgba(0,0,0,1);
   box-shadow: 0 calc(18px * var(--uiScale)) calc(60px * var(--uiScale)) rgba(0,0,0,1);
 }
 
+.choice-contentRow{
+  flex: 1 1 auto;
+  min-height: 0;  /* ✅ overflow 계산에 필수 */
+}
 
+/* 왼쪽 컬럼이 세로로 늘 수 있게 */
+.choice-leftCol{
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* 리스트가 남는 공간을 먹고, 넘치면 리스트만 스크롤 */
+.choice-list{
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding-right: calc(6px * var(--uiScale)); /* 스크롤바 여유(선택) */
+}
 /* =========================
    18) RELICS
    ========================= */
