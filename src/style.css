@@ -1,26 +1,41 @@
 /* =========================================================
-   CLEANED CSS (draft)
-   - duplicate :root merged
-   - conflicting selectors consolidated
-   - theme urls unified (--bgUrl, --boardUrl, --cardUrl)
+   FINAL CSS — UI SCALE + DESKTOP FOCUSED (mobile later)
+   - One :root (tokens)
+   - --uiScale is the single effective scale
+   - Choice/Event overlay fully CSS-driven (no inline sizing)
+   - Removes uiScale^2 traps
    ========================================================= */
 
+
 /* =========================
-   0) THEME + TOKENS
+   0) ROOT TOKENS (SINGLE SOURCE OF TRUTH)
    ========================= */
 :root{
-
+  /* ---------- UI SCALE ---------- */
   --uiScale: 1;
   --uiScaleDesktop: 1;
   --uiScaleMobile: 1;
-}
 
-html{
-  font-size: calc(16px * var(--uiScale));
-}
+  /* ---------- Z-LAYERS ---------- */
+  --zBg: -10;
+  --zStatus: 10;         /* status bar region (background 바로 위) */
+  --zMain: 1000;
+  --zHandDock: 2000;
 
-:root{
-  /* Base colors */
+  --zChrome: 60000;      /* always-clickable chrome */
+  --zChoiceBackdrop: 49000;
+  --zChoicePanel: 51000;
+  --zChoice: 52000;
+
+  --zRelicHud: 65000;
+  --zRelicModal: 70000;
+
+  --zRulebook: 71000;
+  --zLogOverlay: 79000;
+  --zSettings: 80000;
+  --zDevConsole: 100000;
+
+  /* ---------- THEME ---------- */
   --bg0:#060708;
   --bg1:#0b0d10;
   --panel:#0f1216cc;
@@ -30,93 +45,131 @@ html{
   --text:#e7e9ee;
   --muted:#b7bdc8;
 
-  /* Layout */
-  --edgePad: 14px;
-  --logW:  calc(360px * var(--uiScale));
-  --logGap: 14px;
+  /* ---------- LAYOUT (scale-aware) ---------- */
+  --edgePad: calc(14px * var(--uiScale));
+  --logW:   calc(360px * var(--uiScale));
+  --logGap: calc(14px * var(--uiScale));
 
-  --hudH:  calc(100px * var(--uiScale));    /* top HUD reserved height (desktop) */
-  --dockH: calc(185px * var(--uiScale));    /* hand dock height */
+  --hudH:   calc(100px * var(--uiScale));   /* reserved height */
+  --dockH:  calc(185px * var(--uiScale));   /* hand dock height */
 
-  --stageMaxW: calc(800px * var(--uiScale));
-  --boardAR: 1200/922; /* board aspect */
+  --stageMaxW: calc(720px * var(--uiScale));
+  --boardAR: 1200/922;
 
-  /* Cards + slots */
-  --cardW: calc(118px * var(--uiScale));
+  /* ---------- CARDS + SLOTS ---------- */
+  --cardW: calc(122px * var(--uiScale));
   --cardH: calc(var(--cardW) * 7 / 5);
   --handCardW: var(--cardW);
   --handCardH: var(--cardH);
 
-  --slotPad: 6px;
-  --slotW: calc(var(--cardW) + (var(--slotPad) * 2));
-  --slotH: calc(var(--cardH) + (var(--slotPad) * 2));
-  --slotXGap: 18px;
-  --slotRowGap: 10px;
+  --boardScale: 1;
 
-  --boardPadX: 56px;
-  --boardPadY: 34px;
-  --slotCenterNudgeY: 20px;
+  --boardImgZoom: 1.1;
+  --boardImgPosY: 36%;             /* 이미지 중심 Y */
+  --boardImgShiftY: calc(34px * var(--uiScale)); /* 레이어 전체 이동 */  
 
-  /* Radii / shadows */
-  --radius: 18px;
-  --selR: 8px;
-  --shadow: 0 18px 60px rgba(0,0,0,.65);
+  --slotCardW: calc(100px * var(--uiScale) * var(--boardScale));
+  --slotCardH: calc(var(--slotCardW) * 7 / 5);
+  
+  --slotPad: calc(6px * var(--uiScale));
+  --slotW: calc(var(--slotCardW) + (var(--slotPad) * 2));
+  --slotH: calc(var(--slotCardH) + (var(--slotPad) * 2));
+  --slotGap: calc(12px * var(--uiScale) * var(--boardScale));
+  --slotRowGap: calc(2px * var(--uiScale));
 
-  /* HUD panel look */
+  --boardPadX: calc(56px * var(--uiScale));
+  --boardPadY: calc(34px * var(--uiScale));
+  --slotCenterNudgeY: calc(14px * var(--uiScale));
+
+  /* ---------- RADII / SHADOW ---------- */
+  --radius: calc(18px * var(--uiScale));
+  --selR: calc(8px * var(--uiScale));
+  --shadow: 0 calc(18px * var(--uiScale)) calc(60px * var(--uiScale)) rgba(0,0,0,.65);
+
+  /* ---------- HUD PANEL LOOK ---------- */
   --hudPanelBg: rgba(10,12,14,1);
   --hudPanelLine: rgba(255,255,255,.14);
-  --hudPanelR: 18px;
+  --hudPanelR: calc(18px * var(--uiScale));
 
-  /* Logs */
+  /* ---------- LOGS ---------- */
   --logLine: rgba(255,255,255,.22);
   --logLineStrong: rgba(255,255,255,.32);
-  --logShadow: 0 18px 60px rgba(0,0,0,.70);
-  --logBg: rgba(0,0,0,.75); /* (기존에 var(--logBg) 있었는데 정의가 불명확해서 기본값 추가) */
+  --logShadow: 0 calc(18px * var(--uiScale)) calc(60px * var(--uiScale)) rgba(0,0,0,.70);
+  --logBg: rgba(0,0,0,.75);
 
-  /* Assets (single source of truth) */
+  /* ---------- ASSETS ---------- */
   --bgUrl: url("ui/background/dungeon_bg.png");
   --boardUrl: url("ui/boards/battle_board.png");
   --cardUrl: url("ui/cards/card_parchment.png");
 
-  /* Enemy banner */
+  /* ---------- ENEMY HUD ---------- */
   --enemyBannerW: calc(360px * var(--uiScale));
-  --enemyHudDx: 0px; /* center nudge */
+  --enemyHudDx: 0px;
 
-  /* Misc */
-  --dockDrop: 10px;
-  --dockContentDrop: 10px;
+  /* ---------- DOCK ---------- */
+  --dockDrop: calc(12px * var(--uiScale));
+  --dockContentDrop: calc(10px * var(--uiScale));
 
-  --hpH: 10px;
-  --hpSeg: 6px;
+  /* ---------- HP BARS ---------- */
+  --hpH: calc(10px * var(--uiScale));
+  --hpSeg: calc(6px * var(--uiScale));
   --hpBorder: rgba(0,0,0,.65);
   --hpFrame: rgba(255,255,255,.18);
 
-  --hudTop: 150px;
-  --hudBarH: 60px;
-  --hintGap: 20px;
+  /* ---------- STAGE CORNER / HINTS ---------- */
+  --hudTop: calc(150px * var(--uiScale));
+  --hintGap: calc(20px * var(--uiScale));
+  --targetHintTop: calc(56px * var(--uiScale));
+
+  /* ---------- CHOICE OVERLAY ---------- */
+  --choicePadTop: calc(180px * var(--uiScale));
+  --choicePadR:   calc(36px  * var(--uiScale));
+  --choicePadB:   calc(12px  * var(--uiScale));
+  --choicePadL:   calc(12px  * var(--uiScale));
+
+  --choicePanelW: calc(760px * var(--uiScale));
+  --choicePanelPad: calc(16px * var(--uiScale));
+  --choicePanelR: calc(16px * var(--uiScale));
+
+  --choiceRowGap: calc(18px * var(--uiScale));
+  --choiceListGap: calc(10px * var(--uiScale));
+
+  --choiceIlluSize: calc(260px * var(--uiScale));
+  --choiceIlluMin:  calc(200px * var(--uiScale));
+
+  --choicePanelDx: 0px;
+  --choicePanelDy: 40px;
+
+  /* ---------- PLAYER HUD POSITION ---------- */
+  --playerHudLeftX: calc(var(--edgePad) + calc(30px * var(--uiScale)));
+  --playerHudTop:   calc(var(--hudH) + calc(157px * var(--uiScale)));
+  --playerHudDropY: calc(196px * var(--uiScale));
+  --statusBarGap: calc(10px * var(--uiScale));
+
+  /* ---------- NODE UI ---------- */
+  --gap: calc(6px * var(--uiScale));
+  --colNow:   calc(70px * var(--uiScale));
+  --colArrow: calc(22px  * var(--uiScale));
+  --colNext:  calc(70px * var(--uiScale));
+  --colSlash: calc(18px  * var(--uiScale));
+
+  /* ---------- RELICS ---------- */
+  --relicIconSize: 64px;
+  --relicIconGap: 10px;
+  --relicImgZoom: 1.3;
+  --relicTrayRight: 14px;
+  --relicTrayBottom: 170px;
+
+  /* ---------- ENEMY CARDS ---------- */
+  --enemyCardW: calc(160px * var(--uiScale));
+  --enemyCardH: calc(var(--enemyCardW) * 7 / 5);
+  --enemyArtH:  calc(420px * var(--uiScale));
+  --enemyHudW: calc(208px * var(--uiScale));
 }
 
-.settingsOverlay{
-  position: fixed;
-  inset: 0;
-  z-index: 40000;              /* choice-overlay보다 위로 */
-  background: rgba(0,0,0,0.92); /* 불투명에 가깝게 */
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 24px;
-  box-sizing: border-box;
-}
+/* Optional: font scale */
+html{ font-size: calc(16px * var(--uiScale)); }
 
-.settingsPanel{
-  width: min(760px, 100%);
-  max-height: calc(100vh - 48px);
-  overflow: auto;
-  border-radius: 18px;
-  border: 1px solid rgba(255,255,255,.14);
-  background: rgba(10,12,14,1);
-  padding: 16px;
-}
 
 /* =========================
    1) FONTS
@@ -149,6 +202,7 @@ pre.log.log{
                "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif !important;
 }
 
+
 /* =========================
    2) BASE
    ========================= */
@@ -164,7 +218,20 @@ body{
   min-height:100vh;
   display:flex;
   flex-direction:column;
+  position: relative;
+  z-index: var(--zMain);
 }
+
+/* safety: avoid white backgrounds */
+html, body, #app,
+.mainRow, .stage, .stageInner,
+.combatRoot, .boardArea{
+  background: transparent !important;
+}
+
+/* final overflow safety */
+.battleTitleRow, .mainPanel, .stage, .stageInner{ overflow: visible !important; }
+
 
 /* =========================
    3) GLOBAL BACKGROUND
@@ -172,9 +239,10 @@ body{
 .bgLayer{
   position: fixed;
   inset: 0;
-  z-index: 0;
   background: var(--bgUrl) center / cover no-repeat;
   image-rendering: pixelated;
+  z-index: var(--zBg) !important;
+  pointer-events:none !important;
 }
 .bgLayer::after{
   content:"";
@@ -187,63 +255,101 @@ body{
     rgba(0,0,0,0.55) 100%);
 }
 
+
 /* =========================
-   4) TOP HUD (desktop)
+   4) TOP HUD + PLAYER HUD
    ========================= */
 .topHud{
   height: var(--hudH);
   display: grid;
   grid-template-columns: 1fr minmax(0, var(--stageMaxW)) 1fr;
   align-items: start;
-  gap: 12px;
-  padding: 8px var(--edgePad) 0 var(--edgePad);
+  gap: calc(12px * var(--uiScale));
+  padding: calc(8px * var(--uiScale)) var(--edgePad) 0 var(--edgePad);
   box-sizing: border-box;
   overflow: visible;
   position: relative;
-  z-index: 30000;
+  z-index: var(--zStatus) !important;
+  pointer-events: auto !important; /* ✅ 자식 클릭 살리기 */
 }
 
-.enemyHud{ display: flex; gap: 10px; flex-wrap: wrap; }
+/* 스테이터스바에서 클릭 통과시키고 싶은 영역만 none */
+.topHudLeftSpacer{ pointer-events: none !important; }
 
-/* right buttons area */
+/* 클릭되어야 하는 것들은 auto */
+.playerHudLeft,
+.topHudRight{ pointer-events: auto !important; }
+
+/* right buttons area (always clickable) */
 .topHudRight{
-  grid-column: 3;
-  justify-self: end;
-  align-self: start;
-  display: flex;
-  gap: 8px;
-  position: relative;
-  z-index: 30001;
+  position: fixed !important;
+  top: var(--edgePad);
+  right: var(--edgePad);
+  z-index: var(--zChrome) !important;
+  pointer-events: auto !important;
 }
+.topHudRight *{ pointer-events:auto !important; }
 
-/* =========================
-   5) PLAYER HUD (left fixed)
-   ========================= */
+.enemyHud{ display: flex; gap: calc(10px * var(--uiScale)); flex-wrap: wrap; }
+
+/* PLAYER HUD (left fixed) */
 .playerHudLeft{
   position: fixed;
-  left: calc((var(--edgePad) + 30px) * var(--uiScale));
-  top:  calc((var(--hudH) + 157px) * var(--uiScale));
+  left: var(--playerHudLeftX);
+  top:  calc(var(--playerHudTop) + var(--playerHudDropY));
   width: calc(360px * var(--uiScale));
-  z-index: 1200;
-
-  padding: 12px;
+  padding: calc(12px * var(--uiScale));
   background: var(--hudPanelBg);
   border: 1px solid var(--hudPanelLine);
   border-radius: var(--hudPanelR);
-  box-shadow: 0 14px 40px rgba(0,0,0,.40);
+  box-shadow: 0 calc(14px * var(--uiScale)) calc(40px * var(--uiScale)) rgba(0,0,0,.40);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
+  z-index: var(--zChrome) !important;
+  pointer-events: auto !important;
+}
+.playerHudLeft *{ pointer-events:auto !important; }
+
+.playerHudLeft .enemyBadges{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(4px * var(--uiScale));
+  min-height: calc(24px * var(--uiScale));
 }
 
+.playerTitleRow{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(10px * var(--uiScale));
+  margin-bottom: calc(10px * var(--uiScale));
+}
+
+.playerHudTitle{
+  font-weight: 900;
+  font-size: calc(16px * var(--uiScale));
+  white-space: nowrap;
+}
+
+/* 버튼 5개는 오른쪽으로 몰기 */
+.pileButtons{
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: calc(1px * var(--uiScale));
+  flex-wrap: nowrap;
+}
+
+
 /* =========================
-   6) MAIN AREA + STAGE
+   5) MAIN AREA + STAGE
    ========================= */
 .mainRow{
   position: relative;
   flex: 1;
   min-height: 0;
   height: calc(100vh - var(--hudH) - var(--dockH));
-
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -265,18 +371,19 @@ body{
   box-shadow: none !important;
   filter: none !important;
   overflow: visible !important;
+  transform: translateY(calc(60px * var(--uiScale)));
 }
 
+
 /* =========================
-   7) MAIN PANEL (board background)
+   6) MAIN PANEL (board background)
    ========================= */
 .mainPanel{
   position: relative;
   width: 100%;
   height: 100%;
   box-sizing: border-box;
-  padding: 10px 16px 16px 16px;
-
+  padding: calc(10px * var(--uiScale)) calc(16px * var(--uiScale)) calc(16px * var(--uiScale)) calc(16px * var(--uiScale));
   background: transparent !important;
   border: 0;
   box-shadow: none;
@@ -290,7 +397,6 @@ body{
   position:absolute;
   inset: 0;
   pointer-events:none;
-  z-index: 0;
   opacity: 0;
 }
 .mainPanel.inCombat::before{
@@ -299,24 +405,17 @@ body{
   image-rendering: pixelated;
   background-repeat: no-repeat;
 
-  /* crop/zoom tuning */
-  background-size: 110% 110%;
-  background-position: 50% 10%;
-  transform: translateY(-40px);
-  z-index: 1;
-
-  box-shadow: none !important;
-  filter: none !important;
+  background-size: calc(100% * var(--boardImgZoom)) calc(100% * var(--boardImgZoom));
+  background-position: 50% var(--boardImgPosY);
+  transform: translateY(calc(-4px * var(--uiScale)));
 }
 
 /* actual UI above board */
-.mainPanel > *{
-  position: relative;
-  z-index: 2;
-}
+.mainPanel > *{ position: relative; }
+
 
 /* =========================
-   8) BOARD AREA (slots center)
+   7) BOARD AREA (slots center)
    ========================= */
 .combatRoot,
 .boardArea{
@@ -325,43 +424,35 @@ body{
 
 .boardArea{
   position: relative;
-  z-index: 2;
-
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: var(--slotRowGap);
 
-  padding: var(--boardPadY) var(--boardPadX);
+  padding: calc(10px * var(--uiScale) * var(--boardScale));
+  border-radius: calc(18px * var(--uiScale) * var(--boardScale));
   box-sizing: border-box;
   transform: translateY(var(--slotCenterNudgeY));
 
-  /* board occupies more space */
-  padding-top: 22px;
-  padding-bottom: 22px;
+  padding-top: calc(22px * var(--uiScale));
+  padding-bottom: calc(22px * var(--uiScale));
   min-height: 78%;
 }
-
-/* combat extra */
-.mainPanel.inCombat .boardArea{
-  min-height: 86%;
-}
-
-/* slabOn mode (if you prefer boardArea background instead of mainPanel::before) */
-
+.mainPanel.inCombat .boardArea{ min-height: 86%; }
 
 /* slot rows */
 .grid6{
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: var(--slotXGap);
+  gap: var(--slotGap);
   width: 100%;
 }
 
+
 /* =========================
-   9) SLOTS
+   8) SLOTS
    ========================= */
 .slot{
   position: relative;
@@ -371,58 +462,105 @@ body{
   height: var(--slotH);
   border: 0 !important;
   background: transparent !important;
-  border-radius: 14px;
+  border-radius: calc(14px * var(--uiScale));
   overflow: hidden;
+  --slotTextScale: 0.78;
+}
+
+/* 슬롯 안에서 "정중앙"에 놓는 컨테이너 */
+.slotCardScaler{
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto; /* 슬롯 클릭/드래그 막지 않게 */
+}
+
+/* 기준 크기 박스 (여기에 scale만 걸림) */
+.slotCardInner{
+  width: var(--handCardW);
+  height: var(--handCardH);
+  transform-origin: 50% 50%;
+  transform: scale(var(--slotCardScale, 1));
+  pointer-events: auto; /* 카드에 이벤트 필요하면 다시 켜기 */
+}
+
+.slot .slotCardInner{
+  /* 텍스트는 카드 스케일보다 "조금 더" 줄어들게 */
+  --slotTextScale: calc(var(--slotCardScale, 1) * 0.92);
+}
+
+.slot .card{
+  font-size: calc(14px * var(--uiScale) * var(--slotTextScale));
+  line-height: 1.12;
+}
+/* 이제 내부는 em로만! (px 쓰지 마세요) */
+.slot .card .cardTitle{ font-size: 1.00em !important; line-height: 1.05 !important;}
+.slot .card .cardMeta,
+.slot .card .badge{ font-size: 0.80em; line-height: 1.05; }
+.slot .card .cardText{ font-size: 0.8em !important; line-height: 1.15 !important; }
+
+/* 슬롯에서 패딩도 em로 줄여서 더 “쏙” 들어가게 */
+.slot .card .cardHeader{ padding: 0.45em 0.55em; }
+.slot .card .cardBody{ padding: 0.45em 0.55em; }
+.slot .card .cardSection{ padding: 0.40em; }
+
+/* 카드가 기준 박스에 꽉 차도록 */
+.slotCardInner > .card{
+  width: 100%;
+  height: 100%;
 }
 
 /* slot recess */
 .slot::before{
   content:"";
   position:absolute;
-  inset: 6px;
-  border-radius: 4px;
+  inset: var(--slotPad);
+  border-radius: calc(4px * var(--uiScale));
   pointer-events:none;
-  z-index: 0;
-
   background: rgba(0,0,0,.50);
   box-shadow:
-    inset 0 12px 18px rgba(0,0,0,.65),
-    inset 0 -10px 16px rgba(255,255,255,.06),
+    inset 0 calc(12px * var(--uiScale)) calc(18px * var(--uiScale)) rgba(0,0,0,.65),
+    inset 0 calc(-10px * var(--uiScale)) calc(16px * var(--uiScale)) rgba(255,255,255,.06),
     inset 0 0 0 1px rgba(255,255,255,.08);
   opacity: .95;
 }
-
-.slot > *{ position: relative; z-index: 1; }
+.slot > *{ position: relative;}
 
 /* slot states */
 .slot.placeable::before{
   box-shadow:
-    inset 0 10px 18px rgba(0,0,0,.52),
+    inset 0 calc(10px * var(--uiScale)) calc(18px * var(--uiScale)) rgba(0,0,0,.52),
     inset 0 0 0 1px rgba(255,255,255,.16),
     0 0 0 1px rgba(255,255,255,.10);
 }
 .slot.dropHover::before{
   box-shadow:
-    inset 0 10px 18px rgba(0,0,0,.52),
+    inset 0 calc(10px * var(--uiScale)) calc(18px * var(--uiScale)) rgba(0,0,0,.52),
     inset 0 0 0 1px rgba(255,255,255,.22),
-    0 0 0 2px rgba(255,255,255,.18);
+    0 0 0 calc(2px * var(--uiScale)) rgba(255,255,255,.18);
 }
 
 /* force card size in slot */
 .slot > .card,
 .slot .card.inSlot{
-  width: var(--cardW) !important;
-  height: var(--cardH) !important;
+  width: var(--slotCardW) !important;
+  height: var(--slotCardH) !important;
+}
+
+.slot .card.slotNameOnly{
+  --slotTextScale: calc(var(--slotCardScale, 1) * 1.5);
 }
 
 /* =========================
-   10) CARDS (parchment-only)
+   9) CARDS (parchment-only)
    ========================= */
 .card{
   position: relative;
   width: var(--handCardW);
   height: var(--handCardH);
-  padding: 10px 12px;
+  padding: calc(10px * var(--uiScale)) calc(10px * var(--uiScale));
   box-sizing: border-box;
 
   display:flex;
@@ -443,23 +581,19 @@ body{
   content:"";
   position:absolute;
   inset:0;
-  border-radius: 16px;
+  border-radius: calc(16px * var(--uiScale));
   background: var(--cardUrl) center / 100% 100% no-repeat !important;
   image-rendering: pixelated;
   pointer-events:none;
-  z-index:0;
 }
-.card::after{
-  content:none !important;
-  display:none !important;
-}
-.card > *{ position: relative; z-index: 1; }
+.card::after{ content:none !important; display:none !important; }
+.card > *{ position: relative; }
 
 .cardHeader{
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
-  margin: 0 0 6px 0 !important;
+  margin: 0 0 calc(6px * var(--uiScale)) 0 !important;
   padding: 0 !important;
 }
 
@@ -467,10 +601,9 @@ body{
   text-align: center !important;
   font-family: "Mulmaru", serif !important;
   font-weight: 400 !important;
-  font-size: 13px !important;
+  font-size: calc(13px * var(--uiScale)) !important;
   line-height: 1.1 !important;
   letter-spacing: -0.2px !important;
-
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
@@ -486,7 +619,7 @@ body{
 }
 
 .cardSection{
-  flex: 1 1 0 !important;     /* 50:50 */
+  flex: 1 1 0 !important;
   min-height: 0 !important;
   background: transparent !important;
   border: 0 !important;
@@ -498,7 +631,7 @@ body{
 }
 
 .cardText{
-  font-size: 11px !important;
+  font-size: calc(11px * var(--uiScale)) !important;
   line-height: 1.25 !important;
   letter-spacing: -0.2px !important;
   margin: 0 !important;
@@ -509,35 +642,17 @@ body{
   word-break: keep-all !important;
 }
 
-/* back section separator */
-.cardSection.back{
-  padding-top: 10px;
-  margin-top: 8px;
-  position: relative;
-}
-
-.cardSection.back::after{
-  content: "";
-  position: absolute;
-  left: 8px; right: 8px;
-  top: -17px;
-  height: 1px;
-  background: rgba(110, 70, 35, .55);
-  z-index: 4;
-  pointer-events: none;
-}
-
+/* Front/Back separator */
 .cardSection.front{
   position: relative;
-  padding-bottom: 10px;
-  margin-bottom: 8px;
+  padding-bottom: calc(10px * var(--uiScale));
+  margin-bottom: calc(8px * var(--uiScale));
 }
-
 .cardSection.front::after{
   content:"";
   position:absolute;
-  left: 10px;
-  right: 10px;
+  left: calc(10px * var(--uiScale));
+  right: calc(10px * var(--uiScale));
   bottom: 0;
   height: 1px;
   background: rgba(90,60,30,.45);
@@ -545,22 +660,40 @@ body{
   pointer-events:none;
 }
 
+.cardSection.back{
+  padding-top: calc(10px * var(--uiScale));
+  margin-top: calc(8px * var(--uiScale));
+  position: relative;
+}
+
+/* Optional double-line feel */
+.cardSection.back::after{
+  content: "";
+  position: absolute;
+  left: calc(8px * var(--uiScale));
+  right: calc(8px * var(--uiScale));
+  top: calc(-17px * var(--uiScale));
+  height: 1px;
+  background: rgba(110, 70, 35, .55);
+  pointer-events: none;
+}
+
 /* selection */
 .card.selected{
   border-radius: var(--selR) !important;
   outline: none !important;
   box-shadow:
-    0 0 0 2px rgba(255,255,255,.60),
-    0 12px 22px rgba(0,0,0,.35) !important;
-  transform: translateY(-2px);
+    0 0 0 calc(2px * var(--uiScale)) rgba(255,255,255,.60),
+    0 calc(12px * var(--uiScale)) calc(22px * var(--uiScale)) rgba(0,0,0,.35) !important;
+  transform: translateY(calc(-2px * var(--uiScale)));
   animation: pickPulse .16s ease-out;
 }
 .card.selected .cardTitle{
-  text-shadow: 0 0 10px rgba(255,255,255,.28);
+  text-shadow: 0 0 calc(10px * var(--uiScale)) rgba(255,255,255,.28);
 }
 @keyframes pickPulse{
   0%{ transform: translateY(0); }
-  40%{ transform: translateY(-3px); }
+  40%{ transform: translateY(calc(-3px * var(--uiScale))); }
   100%{ transform: translateY(0); }
 }
 
@@ -568,9 +701,9 @@ body{
 .card.isDraggingSource{ opacity: 0.4; filter: saturate(.8); }
 .dragLayer .dragCardPreview{
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: calc(10px * var(--uiScale));
   background: transparent !important;
-  clip-path: inset(0 round 16px);
+  clip-path: inset(0 round calc(16px * var(--uiScale)));
   isolation: isolate;
 }
 .dragLayer .dragCardPreview *{
@@ -580,30 +713,98 @@ body{
   mix-blend-mode: normal !important;
 }
 
-/* keyword blocks (no wrap) */
+/* keyword blocks */
 .kwRun, .kwBadge{
   display: inline-flex;
   align-items: baseline;
-  gap: 2px;
+  gap: calc(2px * var(--uiScale));
   white-space: nowrap;
 }
 .kwRun *, .kwBadge *{ white-space: nowrap; }
 
+
+.card.slotNameOnly{
+  height: 100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding: calc(6px * var(--uiScale) * var(--boardScale));
+}
+.card.slotNameOnly .cardTitle{
+  font-size: calc(12px * var(--uiScale) * var(--boardScale));
+  font-weight: 900 !important;
+}
+.card.slotNameOnly .cardBody{ display:none !important; }
+
+
+.cardHoverPreview{
+  position: fixed;
+  right: calc(var(--edgePad) + calc(14px * var(--uiScale)));
+  top: calc(var(--hudH) + calc(110px * var(--uiScale)));
+  z-index: var(--zChrome);
+  width: calc(360px * var(--uiScale));
+  height: auto;
+
+  border-radius: calc(18px * var(--uiScale));
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(0,0,0,.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 calc(18px * var(--uiScale)) calc(60px * var(--uiScale)) rgba(0,0,0,.55);
+
+  padding: calc(14px * var(--uiScale));
+  display: none;
+  pointer-events: none; /* hover 유지로 꼬이는 거 방지 */
+}
+
+.cardHoverPreview.on{ display:block; }
+
+.cardHoverPreviewTitle{
+  font-weight: 900;
+  font-size: calc(18px * var(--uiScale));
+  margin-bottom: calc(10px * var(--uiScale));
+  opacity: .95;
+}
+
+.cardHoverPreviewRow{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: calc(12px * var(--uiScale));
+  align-items: start;
+}
+
+.cardHoverPreviewCard{
+  width: calc(220px * var(--uiScale));
+  margin: 0 auto;
+  transform: translateY(calc(4px * var(--uiScale)));
+}
+
+.cardHoverPreviewDetail{
+  border-radius: calc(14px * var(--uiScale));
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.03);
+  padding: calc(12px * var(--uiScale));
+  white-space: pre-wrap;
+  line-height: 1.4;
+  font-size: calc(13px * var(--uiScale));
+}
+
+
 /* =========================
-   11) HAND DOCK
+   10) HAND DOCK
    ========================= */
 .handDock{
-  z-index: 12000 !important;
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(-1 * var(--dockDrop));
+  bottom: calc(-3 * var(--dockDrop));
   height: var(--dockH);
-  padding: 6px 14px 10px 14px !important;
-  background: linear-gradient(180deg, rgba(0,0,0,.00), rgba(0,0,0,.65));
+  padding: calc(6px * var(--uiScale)) var(--edgePad) calc(10px * var(--uiScale)) var(--edgePad) !important;
+  background: linear-gradient(180deg, rgba(0,0,0,0.0), rgba(0,0,0,.85));
   pointer-events: none;
-  margin: 0 auto;          /* ✅ 행 자체를 중앙으로 */
-  justify-content: center; /* 유지 */
+  margin: 0 auto;
+  justify-content: center;
+  z-index: var(--zHandDock);
 }
 .handDock * { pointer-events: auto; }
 
@@ -613,7 +814,7 @@ body{
 }
 
 .hand{
-  height: calc(var(--handCardH) + 12px);
+  height: calc(var(--handCardH) + calc(12px * var(--uiScale)));
   overflow-x: auto;
   overflow-y: visible;
   -webkit-overflow-scrolling: touch;
@@ -622,46 +823,47 @@ body{
   display: flex;
   justify-content: center;
   flex-wrap: nowrap;
-  gap: 10px;
+  gap: calc(10px * var(--uiScale));
   align-items: flex-end;
   width: max-content;
   min-width: 100%;
-  padding: 6px 12px 0 12px;
+  padding: calc(6px * var(--uiScale)) calc(12px * var(--uiScale)) 0 calc(12px * var(--uiScale));
   box-sizing: border-box;
   overflow: visible !important;
 }
 
+
 /* =========================
-   12) LOG PANEL (desktop)
+   11) LOG PANEL + OVERLAY
    ========================= */
 .logPanel{
   position: fixed;
-  top: calc(var(--hudH) + 8px);
+  top: calc(var(--hudH) + calc(8px * var(--uiScale)));
   right: var(--edgePad);
   width: var(--logW);
-  height: min(46vh, 420px);
-  z-index: 20000;
-  padding: 14px;
+  height: min(46vh, calc(420px * var(--uiScale)));
+  padding: calc(14px * var(--uiScale));
   display:flex;
   flex-direction:column;
   box-sizing: border-box;
+  isolation: isolate;
 
   background: var(--logBg);
   border: 1px solid var(--logLine);
   box-shadow: var(--logShadow);
-  border-radius: 18px;
+  border-radius: calc(18px * var(--uiScale));
 }
 
 .logPanel .log{
   flex:1;
   min-height:0;
   margin:0;
-  padding: 10px;
-  border-radius: 12px;
+  padding: calc(10px * var(--uiScale));
+  border-radius: calc(12px * var(--uiScale));
   border:1px solid var(--line);
   background: rgba(0,0,0,.55);
   color: #cfd5e2;
-  font-size: 12px;
+  font-size: calc(12px * var(--uiScale));
   line-height: 1.45;
   overflow:auto;
   white-space: pre-wrap;
@@ -669,9 +871,9 @@ body{
 
 /* collapsed => button-only */
 .logPanel.collapsed{
-  width: 56px;
-  height: 56px;
-  padding: 10px;
+  width: calc(56px * var(--uiScale));
+  height: calc(56px * var(--uiScale));
+  padding: calc(10px * var(--uiScale));
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
@@ -686,37 +888,89 @@ body{
 .logPanel.collapsed .logHeaderRow{
   background: rgba(0,0,0,.92) !important;
   border: 1px solid rgba(255,255,255,.22) !important;
-  box-shadow: 0 10px 24px rgba(0,0,0,.55) !important;
+  box-shadow: 0 calc(10px * var(--uiScale)) calc(24px * var(--uiScale)) rgba(0,0,0,.55) !important;
 }
 
 .logHeaderRow{
   display:flex;
   align-items:center;
   justify-content:space-between;
-  gap: 8px;
+  gap: calc(8px * var(--uiScale));
   user-select:none;
   cursor:pointer;
-  padding: 8px 10px;
-  border-radius: 12px;
+  padding: calc(8px * var(--uiScale)) calc(10px * var(--uiScale));
+  border-radius: calc(12px * var(--uiScale));
   border: 1px solid var(--line);
   background: rgba(0,0,0,1);
-  margin-bottom: 10px;
+  margin-bottom: calc(10px * var(--uiScale));
 }
-.logHeaderRow h2{ margin:0; font-size: 14px; }
-.logHeaderRow .chev{ opacity:.85; font-size: 14px; }
+.logHeaderRow h2{ margin:0; font-size: calc(14px * var(--uiScale)); }
+.logHeaderRow .chev{ opacity:.85; font-size: calc(14px * var(--uiScale)); }
+
+.logOverlay,
+.logOverlayLayer{
+  position: fixed;
+  inset: 0;
+  z-index: var(--zLogOverlay) !important;
+  pointer-events: auto !important;
+}
+
+/* 로그 스크롤바 투명 */
+.logScroll{
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+}
+.logScroll::-webkit-scrollbar{ width: 0px; height: 0px; }
+.logScroll::-webkit-scrollbar-thumb{ background: transparent; }
+.logScroll::-webkit-scrollbar-track{ background: transparent; }
+
 
 /* =========================
-   13) ENEMY HUD CENTER (consolidated)
+   12) NODE PREVIEW
+   ========================= */
+.nodeIcon{
+  display:inline-block;
+  width:1.25em;
+  text-align:center;
+  line-height:1;
+  vertical-align:middle;
+  font-family:"Mulmaru","Segoe UI Symbol","Noto Sans Symbols 2","Noto Sans Symbols",sans-serif;
+  font-variant-emoji:text;
+}
+.nodeText{ margin-left:.15em; vertical-align:middle; }
+.nodeSep{ margin: 0 .25em; opacity: .8; }
+
+.nodePreviewRow{
+  display: grid;
+  grid-template-columns: var(--colNow) var(--colArrow) var(--colNext) var(--colSlash) var(--colNext);
+  column-gap: var(--gap);
+  align-items: center;
+
+  padding: calc(10px * var(--uiScale));
+  border-radius: calc(14px * var(--uiScale));
+  cursor: pointer;
+}
+.nodeCol{ min-width: 0; }
+.nodeSepArrow,
+.nodeSepSlash{
+  text-align: center;
+  opacity: .9;
+  user-select: none;
+  pointer-events: none;
+}
+
+
+/* =========================
+   13) ENEMY HUD CENTER
    ========================= */
 .enemyHudCenter{
   position: fixed;
-  top: 8px; /* tune */
+  top: calc(8px * var(--uiScale));
   left: 50%;
   transform: translateX(calc(-50% + var(--enemyHudDx)));
-  z-index: 50000;
 
   width: auto;
-  max-width: calc(100vw - 24px);
+  max-width: calc(100vw - calc(24px * var(--uiScale)));
   height: auto;
 
   background: none !important;
@@ -725,39 +979,42 @@ body{
   padding: 0 !important;
   margin: 0 !important;
 
-  pointer-events: none; /* enable only on banners */
+  z-index: var(--zChrome) !important;
+  pointer-events: auto !important;
 }
+.enemyHudCenter *{ pointer-events: auto !important; }
 
 .enemyHudCenter .enemyHudCenterMover,
 .enemyHudCenter .enemyHud,
 .enemyHudCenter .enemyStrip{
   display:flex;
   flex-direction: row;
-  gap: 12px;
+  gap: calc(12px * var(--uiScale));
   align-items: stretch;
   justify-content: center;
   flex-wrap: nowrap;
   background: none !important;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
-/* actual clickable banners */
+/* clickable banners */
 .enemyHudCenter .enemyChip,
 .enemyHudCenter .enemyBanner{
-  flex: 0 0 var(--enemyBannerW);
-  width: var(--enemyBannerW);
+  flex: 0 0 var(--enemyHudW) !important;
+  width: var(--enemyHudW) !important;
+  max-width: var(--enemyHudW) !important;
+
   pointer-events: auto !important;
   cursor: pointer;
 
-  border-radius: 18px;
+  border-radius: calc(18px * var(--uiScale));
   border: 1px solid rgba(255,255,255,.14);
   background: rgba(0,0,0,.68);
-  box-shadow: 0 18px 50px rgba(0,0,0,.35);
+  box-shadow: 0 calc(18px * var(--uiScale)) calc(50px * var(--uiScale)) rgba(0,0,0,.35);
   overflow: hidden;
   box-sizing: border-box;
 }
 
-/* prevent vertical growth by long lines */
 .enemyHudCenter .enemyChipTop,
 .enemyHudCenter .enemyIntent{
   white-space: nowrap;
@@ -765,82 +1022,21 @@ body{
   text-overflow: ellipsis;
 }
 
-/* enemy banners internal layout (from your later block) */
-.enemyRow{
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  width: 100%;
-  box-sizing: border-box;
-  overflow-x: hidden;
-}
-.enemyBanner{
-  padding: 10px 12px;
-  background: rgba(0,0,0,.55);
-  border: 1px solid rgba(255,255,255,.12);
-  border-radius: 12px;
-}
-.enemyTop{
+.enemyChipTop{
   display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between; /* 왼쪽: HP, 오른쪽: 10/10 */
+  gap: calc(8px * var(--uiScale));
+  white-space: nowrap;            /* ✅ 줄바꿈 금지 */
 }
-.enemyName{
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.enemyHpText{ flex: 0 0 auto; white-space: nowrap; }
-.enemySub{
-  margin-top: 6px;
-  font-size: 12px;
-  line-height: 1.3;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
-/* stable height reservations */
-.enemyIntent{ min-height: 18px; display:block; }
-.enemyBadges{
-  min-height: 22px;
-  display:flex;
-  gap: 6px;
-  align-items:center;
-  flex-wrap: wrap;
-}
-
-.deltaInline{
-  margin-left: 4px;
-  font-weight: 900;
-  letter-spacing: .1px;
-  white-space: nowrap;
-  opacity: .95;
-}
-
-.deltaInline.plus{ color: #ff6b6b; }
-.deltaInline.minus{ color: #64b5ff; }
-
-.enemyBadges:empty::before{ content:""; display:block; height:22px; }
-
-.mobileStatusLine{
-  min-height: 22px;
-  display:flex;
-  gap: 6px;
-  align-items:center;
-  flex-wrap: wrap;
-}
-.mobileStatusLine:empty::before{ content:""; display:block; height:22px; }
 
 /* =========================
-   14) PLAYER/ENEMY HP PIXEL BARS
+   14) HP PIXEL BARS
    ========================= */
-
 .enemyHPOuter{
   height: var(--hpH) !important;
-  border-radius: 2px !important;
+  border-radius: calc(2px * var(--uiScale)) !important;
   overflow: hidden !important;
   background: rgba(0,0,0,.35) !important;
   border: 1px solid var(--hpBorder) !important;
@@ -867,37 +1063,38 @@ body{
   background-color: #7f241d !important;
 }
 
-/* (NOTE) player block bar targeting via nth-of-type is fragile.
-   가능하면 .hpFill--block 같은 클래스로 분리하는 게 안전합니다. */
 
 /* =========================
-   15) CONTROLS / BANNERS / FX
+   15) FX / MISC HUD
    ========================= */
 .combatControls{
   position: fixed;
-  z-index: 22000;
-  bottom: calc(var(--dockH) + -16px);
+  bottom: calc(var(--dockH) + calc(-36px * var(--uiScale)));
   transform: translateX(-50%);
   display: flex;
-  gap: 10px;
+  gap: calc(10px * var(--uiScale));
+  z-index: var(--zChrome) !important;
   pointer-events: auto;
 }
-.combatControls .stepBtn{
-  padding: 6px 10px;
-  border-radius: 12px;
-  font-size: 13px;
+.combatControls *{ pointer-events: auto !important; }
+
+.combatControls .stepBtn,
+.combatControls .clearBtn{
+  padding: calc(6px * var(--uiScale)) calc(10px * var(--uiScale));
+  border-radius: calc(12px * var(--uiScale));
+  font-size: calc(13px * var(--uiScale));
   line-height: 1.1;
 }
-.combatControls .stepBtn.primary{ font-weight: 600; }
+.combatControls .stepBtn.primary,
+.combatControls .clearBtn.primary{ font-weight: 600; }
 
 .phaseBanner{
   position: fixed;
   left: 50%;
-  top: 64px;
+  top: calc(64px * var(--uiScale));
   transform: translateX(-50%);
-  z-index: 26000;
-  padding: 10px 14px;
-  border-radius: 14px;
+  padding: calc(10px * var(--uiScale)) calc(14px * var(--uiScale));
+  border-radius: calc(14px * var(--uiScale));
   border: 1px solid rgba(255,255,255,.18);
   background: rgba(0,0,0,.80);
   color: #fff;
@@ -908,66 +1105,36 @@ body{
   animation: phaseInOut 420ms ease both;
 }
 @keyframes phaseInOut{
-  0%   { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+  0%   { opacity: 0; transform: translateX(-50%) translateY(calc(-6px * var(--uiScale))); }
   20%  { opacity: 1; }
   70%  { opacity: 1; }
-  100% { opacity: 0; transform: translateX(-50%) translateY(-12px); }
-}
-
-.floatFxLayer{
-  position: fixed;
-  inset: 0;
-  z-index: 26010;
-  pointer-events: none !important;
-}
-.floatNum{
-  position: absolute;
-  font-weight: 900;
-  font-size: 16px;
-  text-shadow: 0 2px 0 rgba(0,0,0,.65);
-  animation: floatUp 650ms ease-out both;
-  white-space: nowrap;
-}
-.floatNum.dmg{ color: #ff5a5a; }
-.floatNum.heal{ color: #73ff8b; }
-.floatNum.block{ color: #64b5ff; }
-@keyframes floatUp{
-  0%   { opacity: 0; transform: translate(-50%, 6px) scale(.96); }
-  15%  { opacity: 1; transform: translate(-50%, 0) scale(1); }
-  100% { opacity: 0; transform: translate(-50%, -22px) scale(1.02); }
-}
-.fxFlash{ animation: fxFlash 220ms ease-out; }
-@keyframes fxFlash{
-  0%   { filter: brightness(1.0); }
-  40%  { filter: brightness(1.35); }
-  100% { filter: brightness(1.0); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(calc(-12px * var(--uiScale))); }
 }
 
 /* Stage corner HUD */
 .stageCornerHud{
   position: fixed;
-  z-index: 10;
   pointer-events: none;
+  left: var(--playerHudLeftX) !important;
+  transform: none !important;
 
-  transform: none;
-  text-align: center;
+  top: calc((var(--playerHudTop) + var(--playerHudDropY)) - var(--statusBarGap) - calc(34px * var(--uiScale))) !important;
+
+  text-align: left;
   white-space: nowrap;
-
-  font-size: 19px;
-  line-height: 1.05;
 
   padding: calc(6px * var(--uiScale)) calc(10px * var(--uiScale));
   background: rgba(0,0,0,0.9);
   border: 1px solid rgba(255,255,255,.18);
-  border-width: calc(1px * var(--uiScale));
-  font-size: calc(19px * var(--uiScale));
-  border-radius: 2px;
+  border-radius: calc(2px * var(--uiScale));
   box-shadow:
     0 2px 0 rgba(0,0,0,.55),
     inset 0 1px 0 rgba(255,255,255,.10),
     inset 0 -1px 0 rgba(0,0,0,.45);
 
   color: rgba(235,240,255,.96);
+  font-size: calc(19px * var(--uiScale));
+  line-height: 1.05;
   text-shadow:
     2px 2px 0 rgba(0,0,0,.90),
     -2px 2px 0 rgba(0,0,0,.90),
@@ -978,142 +1145,578 @@ body{
 /* new run fixed button */
 .newRunBtn{
   position: fixed;
-  top: 8px;
-  right: 8px;
-  z-index: 99999;
+  top: calc(8px * var(--uiScale));
+  right: calc(8px * var(--uiScale));
+  z-index: var(--zChrome) !important;
+  pointer-events: auto !important;
 }
+.newRunBtn *{ pointer-events:auto !important; }
 
 /* target hint near HUD */
-
-.stageCornerHud{
-  top: var(--hudTop) !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
-}
 .targetHintInline{
   position: fixed;
   left: 50%;
-  top: calc( 50px) !important;
+  top: calc(var(--targetHintTop) * var(--uiScale)) !important;
   transform: translateX(-50%);
-  z-index: 99998;
   pointer-events: none;
 
-  max-width: min(720px, calc(100vw - 24px));
-  padding: 6px 10px;
-  border-radius: 12px;
+  max-width: min(calc(720px * var(--uiScale)), calc(100vw - calc(24px * var(--uiScale))));
+  padding: calc(6px * var(--uiScale)) calc(10px * var(--uiScale));
+  border-radius: calc(12px * var(--uiScale));
 
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.floatFxLayer{
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: var(--zChrome);
+}
+
+.floatNum{
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-weight: 900;
+  font-size: calc(18px * var(--uiScale));
+  text-shadow: 0 2px 0 rgba(0,0,0,.55), 0 0 12px rgba(0,0,0,.45);
+  animation: floatUp 650ms ease-out both;
+  will-change: transform, opacity;
+}
+.floatNum.dmg{  color: #ff6b6b; }
+.floatNum.heal{ color: #6bff9e; }
+.floatNum.block{ color:#8cc7ff; }
+
+@keyframes floatUp{
+  0%   { opacity: 0; transform: translate(-50%, -50%) translateY(8px) scale(.96); }
+  15%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) translateY(-22px) scale(1.05); }
+}
+
+
 /* =========================
-   16) POINTER EVENTS POLICY (clean)
+   16) SETTINGS / RULEBOOK OVERLAYS
    ========================= */
-/* 기본: topHud는 클릭을 통과. 단, 필요한 영역은 다시 켬 */
-.topHud{ pointer-events: none !important; }
-.topHudRight, .topHudRight *,
-.newRunBtn, .newRunBtn *,
-.playerHudLeft, .playerHudLeft *{
+.overlay-layer{
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: var(--zRulebook) !important;
   pointer-events: auto !important;
 }
-/* enemy center is clickable on banners only (already set) */
-.enemyHudCenter{ pointer-events: none !important; }
-.enemyHudCenter .enemyChip,
-.enemyHudCenter .enemyBanner{ pointer-events: auto !important; }
+.overlay-panel{
+  z-index: calc(var(--zRulebook) + 1) !important;
+  pointer-events: auto !important;
+}
 
-/* overlays (주의: 이건 상황 따라 켜고 끄는 게 안전합니다) */
-/* .choice-overlay{ pointer-events: none !important; } */
+.settingsOverlay{
+  position: fixed;
+  inset: 0;
+  z-index: var(--zSettings) !important;
+
+  background: rgba(0,0,0,0.92);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: calc(24px * var(--uiScale));
+  box-sizing: border-box;
+
+  pointer-events: auto !important;
+}
+.settingsOverlay *{ pointer-events:auto !important; }
+
+.settingsPanel{
+  width: min(calc(760px * var(--uiScale)), 90%) !important;
+  max-width: none !important;
+  max-height: none !important;
+  overflow: visible;
+
+  border-radius: calc(18px * var(--uiScale));
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(10,12,14,1);
+  padding: calc(16px * var(--uiScale));
+}
+
 
 /* =========================
-   17) NODE / OVERLAY (kept, trimmed)
+   17) CHOICE / EVENT OVERLAY (KEY FIX)
    ========================= */
-.nodeCard{
-  width: min(720px, 92%);
-  margin: 140px auto 0;
-  padding: 16px 16px 14px;
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-}
-.nodeCardTitle{
-  font-size: 22px;
-  font-weight: 900;
-  text-align: center;
-  margin: 0 0 8px;
-}
-.nodeCardSub{
-  opacity: 1;
-  font-size: 14px;
-  line-height: 1.25;
-  margin: 0 0 12px;
-  text-align: center;
-}
-.nodeChoiceRow{
+.choice-contentRow{
   display:flex;
-  gap: 12px;
-  justify-content: center;
-  margin-top: 12px;
+  gap: var(--choiceRowGap);
+  margin-top: calc(12px * var(--uiScale));
+  justify-content:center;
+  align-items:stretch;
 }
-.nodeChoiceBtn{
-  flex: 0 0 auto;
-  width: min(320px, 44vw);
-  padding: 14px;
-  border-radius: 8px;
-  border: 1px solid rgba(255,255,255,1);
-  background: rgba(0,0,0,1);
-  color: rgba(255,255,255,1);
-  cursor: pointer;
-  text-align: left;
-}
-.nodeChoiceBtn:hover{
-  background: rgba(255,255,255,1);
-  color: rgba(0,0,0,1);
-}
-.nodeChoiceLabel{ font-weight: 900; font-size: 16px; line-height: 1.1; }
-.nodeChoiceHint{ opacity: 1; font-size: 13px; margin-top: 6px; line-height: 1.2; }
 
-.choice-illustSlot{
-  width: min(240px, 52vw);
+.choice-leftCol{
+  flex: 1 1 calc(640px * var(--uiScale));
+  max-width: calc(720px * var(--uiScale));
+  min-width: 0;
+}
+
+.choice-illuCol{
+  flex: 0 0 var(--choiceIlluSize);
+  min-width: var(--choiceIlluMin);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.choice-illuBox{
+  width: 100%;
   aspect-ratio: 1 / 1;
-  height: auto;
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,.18);
-  background: rgba(0,0,0,1);
-  box-shadow: none;
-  image-rendering: pixelated;
-  background-position: center;
-  background-size: cover;
-  background-repeat: no-repeat;
+  border-radius: calc(18px * var(--uiScale));
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(0,0,0,.35);
+  overflow: hidden;
+  position: relative;
 }
 
-/* overlay text */
+.choice-list{
+  display:flex;
+  flex-direction:column;
+  gap: var(--choiceListGap);
+}
+
+.choice-item{
+  display:flex;
+  gap: calc(12px * var(--uiScale));
+  align-items:flex-start;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius: calc(14px * var(--uiScale));
+  padding: calc(12px * var(--uiScale));
+  background: rgba(255,255,255,.03);
+  position:relative;
+}
+
 pre.choice-detail,
 .choice-panel pre.choice-detail{
-  font-family: "Mulmaru", ui-sans-serif, system-ui, -apple-system,
-               "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif !important;
-  font-size: 13px;
+  font-family: "Mulmaru", sans-serif !important;
+  font-size: calc(13px * var(--uiScale));
   line-height: 1.35;
   letter-spacing: -0.2px;
 }
 
-/* piles */
-.pileView, .pileGrid { min-width: 0; }
-.pileGrid { overflow-x: hidden; grid-auto-flow: row; }
-pre.pileSideDetail,
-.pileSideDetail,
-pre.overlayItemDetail,
-.overlayItemDetail{
-  font-family: "Mulmaru", ui-sans-serif, system-ui, -apple-system,
-               "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif !important;
-}
+.choice-overlay{
+  position: fixed;
+  inset: 0;
+  z-index: var(--zChoiceBackdrop) !important;
+  pointer-events: none !important;
 
-/* safety: avoid white backgrounds */
-html, body, #app,
-.mainRow, .stage, .stageInner,
-.combatRoot, .boardArea, .handDock{
   background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+
+  display:flex;
+  justify-content:center;
+  align-items:flex-start;
+  padding: var(--choicePadTop) var(--choicePadR) var(--choicePadB) var(--choicePadL);
+  box-sizing:border-box;
 }
 
-/* final overflow safety */
-.battleTitleRow, .mainPanel, .stage, .stageInner{ overflow: visible !important; }
+/* kill the backdrop */
+.choice-backdrop{
+  display: none !important;
+  pointer-events: none !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* panel (modal) */
+.choice-panel{
+  position: fixed !important;
+  z-index: var(--zChoicePanel) !important;
+  pointer-events: auto !important;
+
+  left: 50% !important;
+  top: 50% !important;
+
+  /* ✅ 중심(-50%,-50%)을 잡고, Dx/Dy를 uiScale 한 번만 먹여서 이동 */
+  transform:
+    translate(-50%, -50%)
+    translate(
+      calc(var(--choicePanelDx) * var(--uiScale)),
+      calc(var(--choicePanelDy) * var(--uiScale))
+    ) !important;
+
+  width: min(
+    var(--choicePanelW),
+    calc(100vw - (var(--choicePadR) + var(--choicePadL) + calc(24px * var(--uiScale))))
+  );
+  max-height: calc(100vh - (var(--choicePadTop) + var(--choicePadB) + calc(24px * var(--uiScale))));
+  overflow: auto;
+  overflow-x: hidden;
+
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--choicePanelR);
+  background: rgba(0,0,0,1);
+  box-shadow: 0 calc(18px * var(--uiScale)) calc(60px * var(--uiScale)) rgba(0,0,0,1);
+}
+
+
+/* =========================
+   18) RELICS
+   ========================= */
+.relicTray{
+  position: fixed;
+  right: var(--relicTrayRight);
+  bottom: var(--relicTrayBottom);
+  z-index: var(--zRelicHud);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+/* 4열, 3행까지만 보이고 그 이상 스크롤 */
+.relicTrayList{
+  display: grid;
+  grid-template-columns: repeat(4, var(--relicIconSize));
+  grid-auto-rows: var(--relicIconSize);
+  gap: var(--relicIconGap);
+
+  justify-content: end;
+  justify-items: stretch;
+  align-items: stretch;
+
+  max-height: calc(var(--relicIconSize) * 3 + var(--relicIconGap) * 2);
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  max-width: calc(var(--relicIconSize) * 4 + var(--relicIconGap) * 3);
+  padding: 8px;
+
+  scrollbar-gutter: stable;
+  scroll-snap-type: y mandatory;
+
+  transform: rotate(180deg);
+}
+.relicTrayList .relicIcon{ transform: rotate(180deg); }
+
+.relicIcon, .relicHoverTip, .relicModalPanel{ direction: ltr; }
+
+.relicTrayList::-webkit-scrollbar{ width: 10px; }
+.relicTrayList::-webkit-scrollbar-thumb{
+  background: rgba(255,255,255,0.18);
+  border-radius: 999px;
+}
+.relicTrayList::-webkit-scrollbar-track{
+  background: rgba(0,0,0,0.18);
+  border-radius: 999px;
+}
+
+.relicIcon{
+  width: var(--relicIconSize);
+  height: var(--relicIconSize);
+  border-radius: 14px;
+
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.92);
+
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+
+  overflow: hidden;
+  scroll-snap-align: start;
+}
+.relicIconImg{
+  width: 100%;
+  height: 100%;
+  display: block;
+
+  object-fit: cover;
+  object-position: center;
+  transform: scale(var(--relicImgZoom));
+  transform-origin: center;
+
+  image-rendering: pixelated;
+}
+
+.relicHoverTip{
+  display: none;
+  min-width: 220px;
+  max-width: 360px;
+  background: rgba(0, 0, 0, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+.relicTipTitle{ font-weight: 700; margin-bottom: 6px; }
+.relicTipBody{ font-size: 12.5px; line-height: 1.35; white-space: pre-wrap; }
+
+.relicModal{
+  position: fixed;
+  inset: 0;
+  z-index: var(--zRelicModal);
+  background: rgba(0, 0, 0, 0.55);
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.relicModalPanel{
+  width: min(720px, 96vw);
+  max-height: min(84vh, 900px);
+  overflow: auto;
+  background: rgba(18, 18, 18, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  transform: translateY(-60px);
+}
+
+.relicModalHeader{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+}
+.relicModalTitle{ font-weight: 800; }
+
+.relicModalBody{
+  padding: 16px;
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.relicModalArt{
+  width: 160px;
+  height: 160px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.28);
+}
+.relicModalArtImg{
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  transform: scale(1.15);
+  transform-origin: center;
+  image-rendering: pixelated;
+}
+.relicModalArtImg:empty{ background-image: none; }
+
+.relicModalText{
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+
+/* =========================
+   19) ENEMY CARDS
+   ========================= */
+
+.enemyBanner.enemyCardWrap{
+  position: relative;
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: visible !important;
+
+  --enemyUi: 0.94;
+}
+
+.enemyArtWrap{
+  position: relative;
+  overflow: visible;
+  width: calc(var(--enemyCardW)*1);
+  --artZoom: 1;
+  --framePad: 120;
+}
+
+/* 아트 카드(프레임+아트) */
+.enemyArtCard{
+  position: relative;
+  width: calc(100% * var(--enemyUi));
+  margin: calc(8px * var(--uiScale)) auto 0;
+  aspect-ratio: 5 / 7;
+  height: auto;
+  flex: 0 0 auto;
+  border-radius: 5px;
+  overflow: visible;
+  background: rgba(0,0,0,.22);
+  padding-bottom: 6px; /* 프레임 하단 숨통 */
+
+}
+.enemyArtCard::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background-image: var(--artImg);
+  background-size: calc(100% * var(--artZoom, 1.0)) auto;
+  background-position: 50% 35%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  opacity: 1;
+  z-index: 1;
+}
+.enemyArtWrap::after{
+  content:"";
+  position:absolute;
+  inset: calc(-1px * var(--framePad));  /* ✅ 프레임이 바깥으로 튀어나오는 정도 */
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background-image: var(--frameImg);
+  background-repeat:no-repeat;
+  background-position: 50% 23%;
+  background-size: 120% 160%;
+  image-rendering: pixelated;
+
+  pointer-events:none;
+  z-index: 5;
+}
+
+/* 하단 HUD 박스 */
+.enemyMiniHud{
+  width: 95%;
+  padding: calc(7px * var(--uiScale) * var(--enemyUi)) calc(9px * var(--uiScale) * var(--enemyUi));
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display:flex;
+  flex-direction:column;
+  gap: calc(5px * var(--uiScale) * var(--enemyUi));
+  border-radius: calc(12px * var(--uiScale));
+  margin-top: -10px;
+  z-index: 10;
+}
+
+.enemyIntentTopRow{
+  display:flex;
+  justify-content: center !important;
+  align-items:center;
+  gap: 8px;
+}
+
+.enemyIntentIcon{
+  font-size: calc(20px * var(--uiScale) * var(--enemyUi));
+  line-height: 1;
+}
+
+.enemyIntentDmg{
+  font-size: calc(20px * var(--uiScale) * var(--enemyUi));
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.enemyIntentLine{
+  font-size: calc(11px * var(--uiScale) * var(--enemyUi));
+  opacity: .92;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* HP 라인 */
+.enemyMiniHud .enemyHpLine{
+  display:flex;
+  flex-direction: row;
+  align-items:center;
+  gap: calc(8px * var(--uiScale) * var(--enemyUi));
+}
+.enemyMiniHud .enemyHpText{
+  font-size: calc(15px * var(--uiScale) * var(--enemyUi));
+  width: calc(78px * var(--uiScale) * var(--enemyUi));
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.enemyMiniHud .enemyHPOuter{
+  flex: 1 1 auto;
+  height: calc(7px * var(--uiScale) * var(--enemyUi));
+  border-radius: 999px;
+  overflow:hidden;
+}
+.enemyMiniHud .enemyHPFill{ height: 100%; }
+
+/* 상태 이모지 */
+.enemyStatusEmojiRow{
+  display:flex;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: calc(10px * var(--uiScale) * var(--enemyUi));
+  gap: calc(3px * var(--uiScale) * var(--enemyUi));
+  min-height: calc(16px * var(--uiScale) * var(--enemyUi));
+}
+.enemyStatusEmojiRow .stEmoji{
+  line-height: 1.1;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.04);
+  padding: calc(1px * var(--uiScale) * var(--enemyUi)) calc(3px * var(--uiScale) * var(--enemyUi));
+  border-radius: calc(7px * var(--uiScale) * var(--enemyUi));
+}
+
+/* hover 상세 */
+.enemyHoverDetail{
+  display:none;
+  position:absolute;
+  left: 10px; right: 10px;
+  bottom: 10px;
+  transform: translateY(-6px);
+  opacity: 0;
+  pointer-events: none;
+  white-space: pre-wrap;
+  font-size: calc(12px * var(--uiScale));
+  line-height: 1.35;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(0,0,0,.86);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+}
+
+.enemyBanner:hover .enemyHoverDetail{ display:block; }
+
+.enemyBanner.enemyCardWrap .enemyHoverDetail{
+  left: -18px;
+  right: -18px;
+
+  bottom: -14px;
+  transform: translateY(14px);
+
+  font-size: calc(14px * var(--uiScale));
+  padding: 14px 16px;
+  border-radius: 18px;
+
+  max-height: min(40vh, calc(260px * var(--uiScale)));
+  overflow: auto;
+
+  display: none;
+  opacity: 0;
+  pointer-events: none;
+
+  box-shadow: 0 22px 70px rgba(0,0,0,.60);
+}
+.enemyBanner.enemyCardWrap:hover .enemyHoverDetail{
+  display: block;
+  opacity: 1;
+  transform: translateY(calc(-30px * var(--uiScale)));
+}
+.enemyBanner.enemyCardWrap:hover .enemyMiniHud{ opacity: 0.18; }
+
+/* =========================
+   20) MOBILE (placeholder)
+   ========================= */
+/* keep empty for now */

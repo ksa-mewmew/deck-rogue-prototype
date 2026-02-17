@@ -3,6 +3,7 @@ import { aliveEnemies, logMsg, applyStatusTo, pickOne } from "./rules";
 import { addBlock, addFatigue, addSupplies, applyDamageToEnemy, healPlayer } from "./effects";
 import { drawCards } from "./combat";
 import { cardNameWithUpgrade, getCardDefFor } from "../content/cards";
+import { checkRelicUnlocks, getUnlockProgress } from "./relics";
 
 export type ResolveCtx = {
   game: GameState;
@@ -160,13 +161,23 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
           const alive = aliveEnemies(g);
           if (alive.length === 0) break;
           const en = pickOne(alive);
-          applyStatusTo(en, e.key, e.n);
+          applyStatusTo(en, e.key, e.n, g, "PLAYER");
           logMsg(g, `적(${en.name}) 상태: ${e.key} ${e.n >= 0 ? "+" : ""}${e.n}`);
+          if (e.key === "bleed" && e.n > 0) {
+            const up = getUnlockProgress(g);
+            up.bleedApplied += 1;
+            checkRelicUnlocks(g);
+          }
         } else if (e.target === "all") {
           const alive = aliveEnemies(g);
           if (alive.length === 0) break;
-          for (const en of alive) applyStatusTo(en, e.key, e.n);
+          for (const en of alive) applyStatusTo(en, e.key, e.n, g, "PLAYER");
           logMsg(g, `모든 적 상태: ${e.key} ${e.n >= 0 ? "+" : ""}${e.n}`);
+          if (e.key === "bleed" && e.n > 0) {
+            const up = getUnlockProgress(g);
+            up.bleedApplied += alive.length;
+            checkRelicUnlocks(g);
+          }
         } else {
           enqueueTargetSelectStatus(ctx, e.key, e.n);
         }

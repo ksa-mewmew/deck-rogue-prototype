@@ -3,6 +3,9 @@ import type { GameState, PileKind } from "../engine/types";
 import { addCardToDeck } from "../content";
 import { removeCardByUid } from "../content";
 import { checkEndConditions } from "../engine/combat";
+import { grantRelic, applyPendingRelicActivations } from "../engine/relics";
+import { listAllCardDefIds } from "../content";
+import { listAllRelicIds } from "../content/relicsContent";
 
 export type DevConsoleActions = {
   onNewRun: () => void;
@@ -24,6 +27,73 @@ let ctx: DevConsoleCtx | null = null;
 let lines: DevLine[] = [];
 let history: string[] = [];
 let histIdx = -1;
+
+
+type CmdSpec = {
+  name: string;
+  args?: string;    
+  desc?: string;     
+  suggest?: (g: GameState, parts: string[]) => string[];
+};
+
+function uniqSorted(xs: string[]) {
+  return Array.from(new Set(xs)).sort((a, b) => a.localeCompare(b));
+}
+
+function startsWithCI(s: string, pref: string) {
+  return s.toLowerCase().startsWith(pref.toLowerCase());
+}
+
+
+
+function getCmdSpecs(): CmdSpec[] {
+  return [
+    { name: "help", desc: "show commands" },
+    { name: "state", desc: "print game state" },
+    { name: "newrun", desc: "start new run" },
+
+    { name: "hp", args: "<n>", desc: "set current hp" },
+    { name: "maxhp", args: "<n>", desc: "set max hp" },
+    { name: "supplies", args: "<n>", desc: "set supplies" },
+    { name: "fatigue", args: "<n>", desc: "set fatigue" },
+
+    {
+      name: "phase",
+      args: "<PLACE|BACK|FRONT|ENEMY|UPKEEP|DRAW|NODE>",
+      desc: "set phase",
+      suggest: () => ["PLACE","BACK","FRONT","ENEMY","UPKEEP","DRAW","NODE"],
+    },
+
+    {
+      name: "addcard",
+      args: "<defId> [upgrade=0] [zone=deck|hand|discard]",
+      desc: "add card",
+      suggest: (_g, parts) => {
+        if (parts.length <= 2) return listAllCardDefIds();
+        if (parts.length === 4) return ["deck", "hand", "discard"];
+        return [];
+      },
+    },
+    { name: "removecard", args: "<uid>", desc: "remove card", suggest: (g) => uniqSorted(Object.keys(g.cards ?? {})) },
+
+    { name: "win", desc: "force victory" },
+    { name: "lose", desc: "force defeat" },
+
+    { name: "log", args: "<text...>", desc: "log message" },
+
+    {
+      name: "addrelic",
+      args: "<relicId> [now|locked|unlocked]",
+      desc: "grant relic",
+      suggest: (_g, parts) => {
+        if (parts.length <= 2) return listAllRelicIds();     // ✅ 전체 유물
+        if (parts.length === 3) return ["now","locked","unlocked"];
+        return [];
+      },
+    },
+    { name: "relicapply", desc: "apply pending relic activations" },
+  ];
+}
 
 function push(kind: DevLine["kind"], text: string) {
   lines.push({ t: Date.now(), kind, text });
@@ -152,6 +222,19 @@ export function renderDevConsole() {
     display:flex; gap:10px; align-items:center;
   `;
 
+  const hint = document.createElement("div");
+  hint.className = "devConsoleHint";
+  hint.style.cssText = `
+    margin-left: 10px;
+    max-width: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: rgba(255,255,255,.55);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+  `;
+
   const prompt = document.createElement("div");
   prompt.textContent = ">";
   prompt.style.cssText = "color:#fff; font-weight:900; opacity:.9;";
@@ -170,6 +253,57 @@ export function renderDevConsole() {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 13px;
   `;
+
+  const specs = getCmdSpecs();
+
+  let tabSession = {
+    base: "",          
+    items: [] as string[],
+    idx: -1,        
+    lastApplied: "", 
+  };
+
+  const computeSuggestions = (raw: string): string[] => {
+    const g = ctx?.getG();
+    if (!g) return [];
+
+    const parts = raw.split(/\s+/).filter(Boolean);
+    const endsWithSpace = /\s$/.test(raw);
+
+    if (parts.length === 0) return specs.map(s => s.name);
+    if (parts.length === 1 && !endsWithSpace) {
+      const pref = parts[0];
+      return specs.map(s => s.name).filter(x => startsWithCI(x, pref));
+    }
+
+    const cmd = (parts[0] ?? "").toLowerCase();
+    const spec = specs.find(s => s.name === cmd);
+    if (!spec?.suggest) return [];
+
+    const last = endsWithSpace ? "" : (parts[parts.length - 1] ?? "");
+    const candidates = spec.suggest(g, parts);
+
+    return candidates.filter(x => startsWithCI(x, last));
+  };
+
+  const applyCompletion = (raw: string, picked: string) => {
+    const endsWithSpace = /\s$/.test(raw);
+    if (!raw.trim()) return picked + " ";
+
+    const parts = raw.split(/\s+/);
+    if (endsWithSpace) return raw + picked + " ";
+
+    parts[parts.length - 1] = picked;
+    return parts.join(" ") + " ";
+  };
+
+  const refreshHint = () => {
+    const sug = computeSuggestions(input.value);
+    if (!sug.length) { hint.textContent = ""; return; }
+
+    const shown = sug.slice(0, 6);
+    hint.textContent = shown.join("  ");
+  };
 
   input.onkeydown = (e) => {
     if (e.key === "Escape") {
@@ -211,10 +345,59 @@ export function renderDevConsole() {
       input.value = histIdx >= 0 ? (history[histIdx] ?? "") : "";
       return;
     }
+    if (e.key === "Tab") {
+      e.preventDefault();
+
+      const backward = (e as any).shiftKey === true;
+      const rawNow = input.value;
+
+
+      const continuing =
+        tabSession.items.length > 0 &&
+        (rawNow === tabSession.lastApplied || rawNow === tabSession.base);
+
+      if (!continuing) {
+        const items = computeSuggestions(rawNow);
+
+        tabSession.base = rawNow;
+        tabSession.items = items;
+        tabSession.idx = -1;
+        tabSession.lastApplied = rawNow;
+      }
+
+      if (!tabSession.items.length) {
+        refreshHint();
+        return;
+      }
+
+      if (backward) {
+        tabSession.idx = (tabSession.idx - 1 + tabSession.items.length) % tabSession.items.length;
+      } else {
+        tabSession.idx = (tabSession.idx + 1) % tabSession.items.length;
+      }
+
+      const picked = tabSession.items[tabSession.idx];
+
+      const next = applyCompletion(tabSession.base, picked);
+
+      input.value = next;
+      tabSession.lastApplied = next;
+
+      refreshHint();
+      return;
+    }
+  };
+
+  input.oninput = () => {
+    tabSession.items = [];
+    tabSession.base = "";
+    tabSession.idx = 0;
+    refreshHint();
   };
 
   inputRow.appendChild(prompt);
   inputRow.appendChild(input);
+  inputRow.appendChild(hint);
 
   panel.appendChild(header);
   panel.appendChild(out);
@@ -225,6 +408,7 @@ export function renderDevConsole() {
   layer.appendChild(panel);
   document.body.appendChild(layer);
 
+  refreshHint();
   queueMicrotask(() => input.focus());
 }
 
@@ -252,6 +436,8 @@ function runDevCommand(raw: string) {
       "phase <PLACE|BACK|FRONT|ENEMY|UPKEEP|DRAW|NODE>",
       "addcard <defId> [upgrade=0] [zone=deck|hand|discard]",
       "removecard <uid>",
+      "addrelic <relicId> [now|locked|unlocked]",
+      "relicapply  (apply pending relic activations)",
       "win | lose",
       "log <text...>",
     ].join("\n"));
@@ -337,10 +523,72 @@ function runDevCommand(raw: string) {
     if (!uid) { out("ERR: removecard <uid>"); return; }
     if (!g.cards[uid]) { out(`ERR: uid not found: ${uid}`); return; }
 
+    const inDeck = g.deck.includes(uid);
+    const inHand = g.hand.includes(uid);
+    const inDiscard = g.discard.includes(uid);
+
+    if (!inDeck && !inHand && !inDiscard) {
+      out(`WARN: uid exists but not in piles (deck/hand/discard): ${uid} (zone=${(g.cards as any)[uid]?.zone ?? "?"})`);
+    }
+
     removeCardByUid(g, uid);
     c.log?.(`[DEV] removecard ${uid}`);
     c.rerender();
     out("OK: removecard");
+    return;
+  }
+
+  if (cmd === "addrelic") {
+    const id = a1;
+    const mode = (a2 ?? "").toLowerCase(); // now | locked | unlocked
+    if (!id) { out("ERR: addrelic <relicId> [now|locked|unlocked]"); return; }
+
+    grantRelic(g, id);
+
+    const runAny = g.run as any;
+    runAny.forceLockedRelics ??= {};
+    runAny.forceUnlockedRelics ??= {};
+
+    if (mode === "locked") {
+      runAny.forceLockedRelics[id] = true;
+      delete runAny.forceUnlockedRelics[id];
+
+      runAny.relicRuntime ??= {};
+      runAny.relicRuntime[id] ??= { active: false, pending: false, obtainedAtNode: g.run.nodePickCount };
+      runAny.relicRuntime[id].active = false;
+      runAny.relicRuntime[id].pending = false;
+
+      c.log?.(`[DEV] addrelic ${id} (locked)`);
+      c.rerender();
+      out(`OK: addrelic ${id} (locked)`);
+      return;
+    }
+
+    if (mode === "unlocked") {
+      runAny.forceUnlockedRelics[id] = true;
+      delete runAny.forceLockedRelics[id];
+
+      c.log?.(`[DEV] addrelic ${id} (unlocked)`);
+      c.rerender();
+      out(`OK: addrelic ${id} (unlocked)`);
+      return;
+    }
+
+    if (mode === "now") {
+      applyPendingRelicActivations(g);
+    }
+
+    c.log?.(`[DEV] addrelic ${id}${mode ? ` (${mode})` : ""}`);
+    c.rerender();
+    out(`OK: addrelic ${id}`);
+    return;
+  }
+
+  if (cmd === "relicapply") {
+    applyPendingRelicActivations(g);
+    c.log?.("[DEV] relicapply");
+    c.rerender();
+    out("OK: relicapply");
     return;
   }
 

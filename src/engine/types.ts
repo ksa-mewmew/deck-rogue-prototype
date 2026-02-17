@@ -1,21 +1,24 @@
+// engine/types.ts
+
 export type Zone = "deck" | "hand" | "discard" | "front" | "back" | "exhausted" | "vanished";
 export type Side = "front" | "back";
+
 export type StatusKey = "vuln" | "weak" | "bleed" | "disrupt";
 export type CardTag = "EXHAUST" | "VANISH";
+export type RelicId = string;
 
-export type NodeType = "BATTLE" | "REST" | "EVENT" | "TREASURE";
-
+export type NodeType = "BATTLE" | "ELITE" | "REST" | "TREASURE" | "EVENT";
 export type NodeOfferId = "A" | "B";
 
 export type NodeOffer = {
-  id: NodeOfferId;   // A/B 식별
+  id: NodeOfferId;
   type: NodeType;
 };
 
 export type BranchOffer = {
-  root: [NodeOffer, NodeOffer];      // 현재 A/B
-  nextIfA: [NodeOffer, NodeOffer];   // A 다음
-  nextIfB: [NodeOffer, NodeOffer];   // B 다음
+  root: [NodeOffer, NodeOffer];
+  nextIfA: [NodeOffer, NodeOffer];
+  nextIfB: [NodeOffer, NodeOffer];
 };
 
 export type PlayerDamageKind =
@@ -25,36 +28,24 @@ export type PlayerDamageKind =
   | "ZERO_SUPPLY"
   | "OTHER";
 
-
 export type ExhaustWhen = "FRONT" | "BACK" | "BOTH" | "NONE";
 
 export type ChoiceOption = {
   key: string;
   label: string;
   detail?: string;
-
   cardUid?: string;
 };
 
-
 export type ChoiceState = {
-  kind: "EVENT" | "REWARD" | "PICK_CARD" | "VIEW_PILE" | "UPGRADE_PICK";
+  kind: "EVENT" | "REWARD" | "PICK_CARD" | "VIEW_PILE" | "UPGRADE_PICK" | "RELIC";
   title: string;
   prompt?: string;
-  art?: string,
+  art?: string;
   options: ChoiceOption[];
 };
 
-export type CombatPhase =
-  | "REVEAL"
-  | "PLACE"
-  | "BACK"
-  | "FRONT"
-  | "ENEMY"
-  | "UPKEEP"
-  | "DRAW"
-  | "NODE";
-
+export type CombatPhase = "REVEAL" | "PLACE" | "BACK" | "FRONT" | "ENEMY" | "UPKEEP" | "DRAW" | "NODE";
 
 export type PileKind = "deck" | "discard" | "exhausted" | "vanished" | "hand";
 
@@ -69,12 +60,70 @@ export type CardData = {
   design?: string;
   exhaustWhen?: ExhaustWhen;
   vanishWhen?: ExhaustWhen;
-  upgrades?: Array<Partial<Pick<CardData,
-  "name"|"frontText"|"backText"|"front"|"back"|"tags"|"onWinWhileInBack"|"exhaustWhen"|"vanishWhen">>>;
+  upgrades?: Array<
+    Partial<
+      Pick<
+        CardData,
+        "name" | "frontText" | "backText" | "front" | "back" | "tags" | "onWinWhileInBack" | "exhaustWhen" | "vanishWhen"
+      >
+    >
+  >;
   onWinWhileInBack?: PlayerEffect[];
-  
-
 };
+
+
+export type IntentCategory =
+  | "ATTACK"
+  | "ATTACK_DEBUFF"
+  | "ATTACK_BUFF"
+  | "DEBUFF"
+  | "BUFF"
+  | "DEFEND"
+  | "OTHER";
+
+export type IntentApplyKind =
+  | "vuln"
+  | "weak"
+  | "bleed"
+  | "disrupt"
+  | "immune"
+  | "supplies"
+  | "fatigue"
+  | string;
+
+export type IntentApply = {
+  target: "player" | "enemy";
+  kind: IntentApplyKind;
+  amount: number;
+};
+
+export type IntentPreview = {
+  cat: IntentCategory;
+
+  baseDmg?: number;
+  dmgTotal?: number;
+  hits?: number;
+  perHit?: number; 
+  notes?: string[];
+
+  applies?: IntentApply[];
+
+  shortText?: string;
+};
+
+export type IntentMeta = {
+  cat?: IntentCategory;
+
+  hits?: number;
+  baseDmg?: number;
+
+  applies?: IntentApply[];
+
+  preview?: (g: any, e: any) => IntentPreview | null;
+};
+
+
+
 
 export type EnemyData = {
   id: string;
@@ -88,6 +137,7 @@ export type EnemyData = {
 export type EnemyIntentData = {
   label: string;
   acts: EnemyEffect[];
+  meta?: IntentMeta;
 };
 
 export type CardInstance = {
@@ -107,9 +157,9 @@ export type EnemyState = {
 
   immuneNextTurn: boolean;
   immuneThisTurn: boolean;
-  soulCastCount?: number;
 
-  soulWarnCount?: number;         // 3번 의도 경고 누적
+  soulCastCount?: number;
+  soulWarnCount?: number;
   soulArmed?: boolean;
   soulWillNukeThisTurn?: boolean;
 
@@ -138,21 +188,7 @@ export type PlayerEffect =
   | { op: "statusEnemiesAttackingThisTurn"; key: StatusKey; n: number }
   | { op: "maxHp"; n: number }
   | { op: "hp"; n: number }
-  | { op: "clearStatusSelf"; key: StatusKey }
-
-export type TargetMeta = {
-
-  reason?: "FRONT" | "BACK" | "ENEMY" | "EVENT" | "RELIC" | "OTHER";
-
-  sourceCardUid?: string;
-
-  sourceLabel?: string;
-
-  sourceOp?: string;
-
-  chainIndex?: number;
-  chainTotal?: number;
-};
+  | { op: "clearStatusSelf"; key: StatusKey };
 
 export type PendingTarget =
   | {
@@ -160,7 +196,7 @@ export type PendingTarget =
       amount: number;
       sourceCardUid?: string;
       sourceLabel?: string;
-      reason?: TargetMeta["reason"];
+      reason?: "FRONT" | "BACK" | "ENEMY" | "EVENT" | "RELIC" | "OTHER";
     }
   | {
       kind: "statusSelect";
@@ -168,10 +204,28 @@ export type PendingTarget =
       n: number;
       sourceCardUid?: string;
       sourceLabel?: string;
-      reason?: TargetMeta["reason"];
+      reason?: "FRONT" | "BACK" | "ENEMY" | "EVENT" | "RELIC" | "OTHER";
     };
 
+export type DamagePhase = "PRE_STATUS" | "POST_STATUS" | "PRE_BLOCK" | "POST_BLOCK" | "FINAL";
+export type DamageSource = "PLAYER_ATTACK" | "ENEMY_ATTACK" | "CARD_EFFECT" | "DOT" | "ENV" | "FATIGUE" | "OTHER";
+export type DamageTarget = "PLAYER" | "ENEMY";
 
+export type DamageContext = {
+  phase: DamagePhase;
+  target: DamageTarget;
+  source: DamageSource;
+  raw: number;
+  afterStatus?: number;
+  afterBlock?: number;
+  current: number;
+  reason?: string;
+  attackerWeak?: number;
+  targetVuln?: number;
+  enemyIndex?: number;
+  enemyId?: string;
+  turn?: number;
+};
 
 export type EnemyEffect =
   | { op: "damagePlayer"; n: number }
@@ -183,6 +237,25 @@ export type EnemyEffect =
   | { op: "enemyImmuneNextTurn" }
   | { op: "fatiguePlayer"; n: number }
   | { op: "damagePlayerByDeckSize"; base: number; per: number; div: number; cap?: number };
+
+
+export type UnlockProgress = {
+  rest: number;          // 휴식 횟수
+  eliteWins: number;     // 엘리트 승리
+  tookBigHit10: boolean; // 한 번에 10+ 피해
+  kills: number;         // 처치 횟수
+  endedTurnWeak: boolean;// 약화 상태로 턴 종료
+  eventPicks: number;    // 이벤트 선택 횟수
+  hpLeq15: boolean;      // HP<=15 경험
+  skippedTurn: boolean;  // 아무 행동도 안 하고 턴 종료
+  bleedApplied: number;  // 출혈 부여 횟수
+};
+
+export type RelicRuntime = {
+  active: boolean;      // 효과 적용 중
+  pending: boolean;     // 조건 달성했지만 다음 노드부터라 대기
+};
+
 
 export type PlayerState = {
   hp: number;
@@ -197,15 +270,16 @@ export type PlayerState = {
 };
 
 export type RunState = {
+
   encounterCount: number;
   treasureObtained: boolean;
   afterTreasureNodePicks: number;
-  
+
   nodeOfferQueue: NodeType[][];
 
   finished: boolean;
   nodePickCount: number;
-  nodePickByType: Record<"BATTLE" | "REST" | "EVENT" | "TREASURE", number>;
+  nodePickByType: Record<"BATTLE" | "ELITE" | "REST" | "EVENT" | "TREASURE", number>;
   currentNodeOffers: NodeType[] | null;
   nextBattleSuppliesBonus: number;
   bossPool: string[];
@@ -215,14 +289,22 @@ export type RunState = {
   enemyLastSeenBattle: Record<string, number>;
 
   nextBossId?: string | null;
-
   nextBossTime: number;
   forcedNext: "BOSS" | null;
   bossOmenText: string | null;
   deckSizeAtTreasure: number | null;
 
-  ominousProphecySeen: boolean
+  ominousProphecySeen: boolean;
 
+  relics: RelicId[];
+
+  pendingElite: boolean;
+  lastBattleWasElite: boolean;
+  eliteRelicOfferedThisBattle: boolean;
+
+  relicRuntime?: Record<RelicId, RelicRuntime>;
+  pendingRelicActivations?: RelicId[];
+  unlock?: UnlockProgress;
 };
 
 export type Content = {
@@ -230,22 +312,27 @@ export type Content = {
   enemiesById: Record<string, EnemyData>;
 };
 
-export type GameState = {
+export type ChoiceCtx =
+  | null
+  | { kind: "BATTLE_CARD_REWARD"; offers: Array<{ defId: string; upgrade: number }> }
+  | { kind: "ELITE_RELIC"; offerIds: string[] }
+  | { kind: "REST"; highF?: boolean }
+  | { kind: "EVENT"; eventId: string };
+  
+export type ChoiceFrame = { choice: ChoiceState; ctx: ChoiceCtx };
 
+export type GameState = {
   uidSeq: number;
 
   intentsRevealedThisTurn: boolean;
   disruptIndexThisTurn: number | null;
   attackedEnemyIndicesThisTurn: number[];
 
-  choiceStack: ChoiceState[];
-
   phase: CombatPhase;
   log: string[];
 
   run: RunState;
   player: PlayerState;
-
   content: Content;
 
   cards: Record<string, CardInstance>;
@@ -254,7 +341,6 @@ export type GameState = {
   discard: string[];
   exhausted: string[];
   vanished: string[];
-  choice: ChoiceState | null;
 
   frontSlots: (string | null)[];
   backSlots: (string | null)[];
@@ -262,11 +348,13 @@ export type GameState = {
 
   enemies: EnemyState[];
 
-  usedThisTurn: number; // 이번 턴에 배치한 카드 수
-  frontPlacedThisTurn: number; // 이번 턴 전열에 배치한 카드 수
+  usedThisTurn: number;
+  frontPlacedThisTurn: number;
   selectedHandCardUid: string | null;
+  selectedEnemyIndex: number | null;
 
   winHooksAppliedThisCombat: boolean;
+  victoryResolvedThisCombat: boolean;
 
   drawCountThisTurn: number;
 
@@ -275,9 +363,10 @@ export type GameState = {
 
   backUidsThisTurn: string[];
 
-  victoryResolvedThisCombat?: boolean;
+  time: number;
 
-  time: number
-
-
+  choiceQueue: ChoiceFrame[];
+  choiceStack: ChoiceFrame[];
+  choice: ChoiceState | null;
+  choiceCtx: ChoiceCtx;
 };

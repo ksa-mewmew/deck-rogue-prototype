@@ -51,7 +51,7 @@ export const REWARD_POOL: RewardEntry[] = [
  
   { id: "secret_strike", weight: 3 },
   { id: "fire_scroll", weight: 3 },
-  { id: "caltrops", weight: 20 },
+  { id: "caltrops", weight: 12 },
   { id: "emergency_rations", weight: 3 },
   { id: "painkiller", weight: 12 },
   { id: "field_experience", weight: 3 },
@@ -173,8 +173,6 @@ export function offerRewardsByFatigue(g: GameState): OfferedCard[] {
   const f = g.player?.fatigue ?? 0;
 
   const junk: OfferedCard = { defId: pickOne(JUNK_REWARD_POOL) as any, upgrade: 0 };
-  const basic: OfferedCard = { defId: pickOne(BASIC_REWARD_POOL) as any, upgrade: 0 };
-
   const pickNormalPair = (): readonly [OfferedCard, OfferedCard] => {
     if (f <= 3) return offerPairFromPool(g, REWARD_POOL);
     if (f <= 6) return offerPairFromPool(g, REWARD_POOL, { mult3: 0.25, mult12: 0.75, mult20: 1 });

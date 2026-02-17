@@ -9,7 +9,15 @@ function makePair(types: NodeType[]): [NodeOffer, NodeOffer] {
 
 export type HasStatus = { status: Record<StatusKey, number> };
 
-export function applyStatusTo(target: HasStatus, key: StatusKey, n: number) {
+export type StatusSource = "PLAYER" | "ENEMY" | "SYSTEM";
+
+export function applyStatusTo(target: HasStatus, key: StatusKey, n: number, g?: GameState, src: StatusSource = "SYSTEM") {
+  let amount = n;
+
+  if (g && src === "PLAYER" && key === "bleed") {
+    const bonus = Number((g as any)._bleedBonusPerApply ?? 0);
+    if (bonus) amount += bonus;
+  }
   target.status[key] = Math.max(0, (target.status[key] ?? 0) + n);
 }
 

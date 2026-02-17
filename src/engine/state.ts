@@ -1,51 +1,79 @@
-import type { GameState, Content, CardInstance } from "./types";
-import { shuffle, uid, logMsg, rollBranchOffer } from "./rules";
+import type { CardInstance, Content, GameState, RunState } from "./types";
+import { logMsg, shuffle } from "./rules";
+
+function nextUid(g: GameState): string {
+  g.uidSeq += 1;
+  return String(g.uidSeq);
+}
+
+export function createInitialRunState(): RunState {
+  return {
+    relicRuntime: {},
+    pendingRelicActivations: [],
+    unlock: {
+      rest: 0,
+      eliteWins: 0,
+      tookBigHit10: false,
+      kills: 0,
+      endedTurnWeak: false,
+      eventPicks: 0,
+      hpLeq15: false,
+      skippedTurn: false,
+      bleedApplied: 0,
+    },
+
+    encounterCount: 0,
+    treasureObtained: false,
+    afterTreasureNodePicks: 0,
+
+    nodeOfferQueue: [],
+
+    finished: false,
+    nodePickCount: 0,
+    nodePickByType: { BATTLE: 0, ELITE: 0, REST: 0, EVENT: 0, TREASURE: 0 },
+    currentNodeOffers: null,
+    nextBattleSuppliesBonus: 0,
+    bossPool: ["boss_gravity_master", "boss_cursed_wall", "boss_giant_orc", "boss_soul_stealer"],
+    branchOffer: null,
+
+    battleCount: 0,
+    enemyLastSeenBattle: {},
+
+    nextBossId: null,
+
+    nextBossTime: 40,
+    forcedNext: null,
+    bossOmenText: null,
+    deckSizeAtTreasure: null,
+
+    ominousProphecySeen: false,
+
+    relics: [],
+
+    lastBattleWasElite: false,
+    eliteRelicOfferedThisBattle: false,
+    pendingElite: false
+  };
+}
 
 export function createInitialState(content: Content): GameState {
   const g: GameState = {
-    phase: "NODE",
-    log: [],
-
     uidSeq: 0,
-    winHooksAppliedThisCombat: false,
 
     intentsRevealedThisTurn: false,
     disruptIndexThisTurn: null,
-    backUidsThisTurn: [],
-    run: {
-      encounterCount: 0,
-      treasureObtained: false,
-      afterTreasureNodePicks: 0,
-      finished: false,
-      nextBattleSuppliesBonus: 0,
-      nextBossId: null,
-      bossPool: ["boss_gravity_master","boss_cursed_wall", "boss_giant_orc", "boss_soul_stealer"],
-      nodePickCount: 0,
-      branchOffer: null,
+    attackedEnemyIndicesThisTurn: [],
 
-      nodeOfferQueue: [],
+    phase: "NODE",
+    log: [],
 
-      currentNodeOffers: null,
-      nodePickByType: { BATTLE: 0, REST: 0, EVENT: 0, TREASURE: 0 },
-
-      battleCount: 0,
-      enemyLastSeenBattle: {},
-
-      nextBossTime: 40,
-      forcedNext: null,
-      bossOmenText: null,
-
-      deckSizeAtTreasure: null,
-
-      ominousProphecySeen: false
-
-    },
+    run: createInitialRunState(),
 
     player: {
       hp: 40,
       maxHp: 40,
       block: 0,
-      supplies: 0,
+      supplies: 7,
       fatigue: 0,
       zeroSupplyTurns: 0,
       status: { vuln: 0, weak: 0, bleed: 0, disrupt: 0 },
@@ -61,8 +89,6 @@ export function createInitialState(content: Content): GameState {
     discard: [],
     exhausted: [],
     vanished: [],
-    choice: null,
-    choiceStack: [],
 
     frontSlots: [null, null, null],
     backSlots: [null, null, null],
@@ -70,21 +96,31 @@ export function createInitialState(content: Content): GameState {
 
     enemies: [],
 
-    attackedEnemyIndicesThisTurn: [],
-
     usedThisTurn: 0,
     frontPlacedThisTurn: 0,
     selectedHandCardUid: null,
-    pendingTargetQueue: [],
-    pendingTarget: null,
+
+    winHooksAppliedThisCombat: false,
 
     drawCountThisTurn: 0,
 
+    pendingTarget: null,
+    pendingTargetQueue: [],
+
+    backUidsThisTurn: [],
+
+    victoryResolvedThisCombat: false,
+
     time: 0,
 
+    choice: null,
+    choiceQueue: [],
+    choiceStack: [],
+    choiceCtx: null,
+
+    selectedEnemyIndex: null,
   };
 
-  g.run.branchOffer = rollBranchOffer(g);
   makeBasicDeck(g);
   logMsg(g, "새 런 시작.");
 
@@ -93,10 +129,10 @@ export function createInitialState(content: Content): GameState {
 
 function addToDeck(g: GameState, defId: string, n: number) {
   for (let i = 0; i < n; i++) {
-    const id = uid();
-    const inst: CardInstance = { uid: id, defId, zone: "deck", upgrade: 0 };
-    g.cards[id] = inst;
-    g.deck.push(id);
+    const uid = nextUid(g);
+    const inst: CardInstance = { uid, defId, zone: "deck", upgrade: 0 };
+    g.cards[uid] = inst;
+    g.deck.push(uid);
   }
 }
 

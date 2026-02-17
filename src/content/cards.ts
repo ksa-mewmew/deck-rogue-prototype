@@ -197,7 +197,7 @@ export const CARDS: CardData[] = [
     id: "arrow_rain",
     name: "화살의 비",
     exhaustWhen: "BOTH",
-    frontText: "모든 적에게 피해 10, S -1, F +1, 소모",
+    frontText: "전체 피해 10, S -1, F +1, 소모",
     backText: "드로우 2, S +2, F +1, 소모",
     front: [
       { op: "damageEnemy", target: "all", n: 10 },
@@ -208,7 +208,7 @@ export const CARDS: CardData[] = [
 
     upgrades: [
       {
-        frontText: "모든 적에게 피해 13, S -2, F +1, 소모",
+        frontText: "전체 피해 13, S -2, F +1, 소모",
         front: [{ op: "damageEnemy", target: "all", n: 13 },
       { op: "supplies", n: -2 },
       { op: "fatigue", n: 1 },],
@@ -262,7 +262,7 @@ export const CARDS: CardData[] = [
     name: "비장의 일격",
     exhaustWhen: "BOTH",
     frontText: "무작위 피해 (F의 3배), 소모",
-    backText: "모든 적에게 취약 +4 및 약화 +4, 소모",
+    backText: "전체 취약 +4 및 약화 +4, 소모",
     front: [{ op: "damageEnemyByPlayerFatigue", target: "random", mult: 3 }],
     back: [
       { op: "statusEnemy", target: "all", key: "vuln", n: 4 },
@@ -275,7 +275,7 @@ export const CARDS: CardData[] = [
         frontText: "지정 피해 (F의 3배), 소모",
         front: [{ op: "damageEnemyByPlayerFatigue", target: "select", mult: 3 }],
 
-        backText: "모든 적에게 취약 +4 및 약화 +4",
+        backText: "전체 취약 +4 및 약화 +4",
         back: [{ op: "statusEnemy", target: "all", key: "vuln", n: 4 },
         { op: "statusEnemy", target: "all", key: "weak", n: 4 },],
       },
@@ -289,7 +289,7 @@ export const CARDS: CardData[] = [
     name: "화염 두루마리",
     exhaustWhen: "BOTH",
     frontText: "방어 +7, 소모",
-    backText: "모든 적에게 피해 12, 소모",
+    backText: "전체 피해 12, 소모",
     front: [{ op: "block", n: 7 }],
     back: [{ op: "damageEnemy", target: "all", n: 12 }],
 
@@ -298,7 +298,7 @@ export const CARDS: CardData[] = [
         frontText: "방어 +8, 소모",
         front: [{ op: "block", n: 8 }],
 
-        backText: "모든 적에게 피해 14, 소모",
+        backText: "전체 피해 14, 소모",
         back: [{ op: "damageEnemy", target: "all", n: 14 }],
       },
     ]
@@ -308,14 +308,14 @@ export const CARDS: CardData[] = [
   {
     id: "caltrops",
     name: "마름쇠",
-    frontText: "모든 적에게 출혈 4 부여",
+    frontText: "전체 출혈 4 부여",
     backText: "이번 턴에 자신을 공격하려는 적에게 출혈 3 부여",
     front: [{ op: "statusEnemy", target: "all", key: "bleed", n: 4 }],
     back: [{ op: "statusEnemiesAttackingThisTurn", key: "bleed", n: 3 }],
 
     upgrades: [
       {
-        frontText: "모든 적에게 출혈 5 부여",
+        frontText: "전체 출혈 5 부여",
         backText: "이번 턴에 자신을 공격하려는 적에게 출혈 4 부여",
         front: [{ op: "statusEnemy", target: "all", key: "bleed", n: 5 }],
         back: [{ op: "statusEnemiesAttackingThisTurn", key: "bleed", n: 4 }],
@@ -371,7 +371,7 @@ export const CARDS: CardData[] = [
     id: "field_experience",
     name: "실전 경험",
     exhaustWhen: "BACK",
-    frontText: "모든 적에게 피해 3",
+    frontText: "전체 피해 3",
     backText: "이 카드가 후열에 있는 턴에 승리하면 최대 체력 +2, 소모",
     front: [{ op: "damageEnemy", target: "all", n: 3 }],
     back: [],
@@ -379,17 +379,11 @@ export const CARDS: CardData[] = [
 
     upgrades: [
       {
-        frontText: "모든 적에게 피해 4",
+        frontText: "전체 피해 4",
         backText: "이 카드가 후열에 있는 턴에 승리하면 최대 체력 +3, 소모",
         front: [{ op: "damageEnemy", target: "all", n: 4 }],
         onWinWhileInBack: [{ op: "maxHp", n: 3 }],
       },
-//      {
-//        frontText: "모든 적에게 5 피해",
-//        backText: "이 카드가 후열에 있는 턴에 승리하면 최대 체력 +4, 소모",
-//        front: [{ op: "damageEnemy", target: "all", n: 5 }],
-//        onWinWhileInBack: [{ op: "maxHp", n: 4 }],
-//      }, 강화는 우선 하나만.
     ],
   },
 
@@ -447,7 +441,7 @@ export const CARDS: CardData[] = [
     id: "taunt",
     name: "독설",
     frontText: "지정 약화 +4",
-    backText: "모든 적에게 취약 +2 및 약화 +2",
+    backText: "전체 취약 +2 및 약화 +2",
     front: [{ op: "statusEnemy", target: "select", key: "weak", n: 4 }],
     back: [
       { op: "statusEnemy", target: "all", key: "vuln", n: 2 },
@@ -457,7 +451,7 @@ export const CARDS: CardData[] = [
     upgrades: [
       {
         frontText: "지정 약화 +5",
-        backText: "모든 적에게 취약 +2 및 약화 +3",
+        backText: "전체 취약 +2 및 약화 +3",
         front: [{ op: "statusEnemy", target: "select", key: "weak", n: 5 }],
         back: [
           { op: "statusEnemy", target: "all", key: "vuln", n: 2 },
