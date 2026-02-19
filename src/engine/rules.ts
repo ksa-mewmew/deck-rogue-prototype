@@ -18,6 +18,16 @@ export function applyStatusTo(target: HasStatus, key: StatusKey, n: number, g?: 
     const bonus = Number((g as any)._bleedBonusPerApply ?? 0);
     if (bonus) amount += bonus;
   }
+  if (g && key === "vuln" && amount > 0 && target === g.player) {
+    const rs = g.run as any;
+    const relics: string[] = rs?.relics ?? [];
+    if (relics.includes("relic_ratskin_charm")) {
+      const rt = rs?.relicRuntime?.["relic_ratskin_charm"];
+      const active = rt?.active !== false;
+      if (active) amount = Math.max(0, amount - 1);
+    }
+  }
+
   target.status[key] = Math.max(0, (target.status[key] ?? 0) + amount);
 }
 

@@ -56,7 +56,28 @@ function previewFormula(kind: FormulaKind, g: GameState, e: any): { raw: number;
     const raw = 4 + used;
     return { raw, hits: 1 };
   }
+  if (kind === "gloved_hunter") {
+    const blk = Number(g.player.block ?? 0);
+    const raw = blk >= 4 ? 12 : 6;
+    return { raw, hits: 1 };
+  }
   return { raw: 0, hits: 1 };
+}
+
+function previewDeckSizeDamage(g: GameState, act: any): number {
+  const base = Number(act.base ?? 0);
+  const per = Number(act.per ?? 0);
+  const div = Math.max(1, Number(act.div ?? 1));
+  const cap = act.cap == null ? Infinity : Number(act.cap);
+
+  const deckSize =
+    (g.deck?.length ?? 0) +
+    (g.discard?.length ?? 0) +
+    (g.hand?.length ?? 0);
+
+  const steps = Math.floor(deckSize / div);
+  const raw = base + per * steps;
+  return Math.min(cap, Math.max(0, raw));
 }
 
 export function buildIntentPreview(
@@ -132,6 +153,27 @@ export function buildIntentPreview(
         break;
       }
 
+      case "damagePlayerIfSuppliesPositive": {
+        if (g.player.supplies > 0) {
+          hitRaws.push(Math.max(0, Number(act.n) || 0));
+        } else {
+        }
+        break;
+      }
+
+      case "damagePlayerIfSuppliesZero": {
+        if (g.player.supplies == 0) {
+          hitRaws.push(Math.max(0, Number(act.n) || 0));
+        } else {
+        }
+        break;
+      }
+
+      case "damagePlayerByDeckSize": {
+        hitRaws.push(previewDeckSizeDamage(g, act));
+        break;
+      }
+      
       default:
         break;
     }

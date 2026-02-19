@@ -1,6 +1,7 @@
 import type { GameState } from "../types";
 import { aliveEnemies, logMsg, pickOne } from "../rules";
 import { runRelicHook } from "../relics";
+import { buildIntentPreview } from "../intentPreview";
 
 const NO_REPEAT_INTENT_INDEXES: Record<string, ReadonlySet<number>> = {
   other_adventurer: new Set([1]),
@@ -163,7 +164,7 @@ export function revealIntentsAndDisrupt(g: GameState) {
           continue;
         }
         const it = intents[e.intentIndex % intents.length];
-        e.intentLabelOverride = `${it.label} (⚠ 폭발 가능 상태)`;
+        e.intentLabelOverride = `${it.label} (폭발 가능 상태)`;
         logMsg(g, `적 의도: ${e.name} → ${e.intentLabelOverride}`);
         continue;
       }
@@ -175,28 +176,18 @@ export function revealIntentsAndDisrupt(g: GameState) {
     }
 
     const intent = intents[e.intentIndex % intents.length];
-    let label = intent.label;
 
-    const deckAct = intent.acts.find((a: any) => a.op === "damagePlayerByDeckSize");
-    if (deckAct && deckAct.op === "damagePlayerByDeckSize") {
-      const deckSize = getCombatDeckSize(g);
-      const { dmg } = calcDeckSizeDamage(deckAct, deckSize);
-      const head = intent.label.split(":")[0].trim();
-      label = `${head}: ${dmg} 피해`;
+    const p = buildIntentPreview(g, e, intent);
+
+    let suffix = "";
+    if (p.dmgTotal != null) {
+      suffix = (p.hits ?? 1) > 1 ? ` (${p.dmgTotal}, ${p.hits}타)` : ` (${p.dmgTotal})`;
+    } else if ((p.hits ?? 0) > 1) {
+      suffix = ` (${p.hits}타)`;
     }
 
-    const rampAct = intent.acts.find((a: any) => a.op === "damagePlayerRampHits");
-    if (rampAct && rampAct.op === "damagePlayerRampHits") {
-      const turn = Math.max(1, Number((g as any).combatTurn ?? 1));
-      const baseHits = Math.max(1, Number(rampAct.baseHits ?? 1));
-      const every = Math.max(1, Number(rampAct.everyTurns ?? 1));
-      let hits = baseHits + Math.floor((turn - 1) / every);
-      if (rampAct.capHits != null) hits = Math.min(hits, Math.max(1, Number(rampAct.capHits)));
+    const label = `${intent.label}${suffix}`;
 
-      const head = intent.label.split(":")[0].trim();
-      label = `${head}: ${rampAct.n} 피해 (${hits}타)`;
-    }
-    
     e.intentLabelOverride = label;
     logMsg(g, `적 의도: ${e.name} → ${label}`);
   }

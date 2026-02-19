@@ -23,7 +23,7 @@ import { logMsg } from "../engine/rules";
 import { createInitialState } from "../engine/state";
 import { applyChoiceKey } from "../engine/choiceApply";
 import type { EventOutcome } from "../content/events";
-import { pickEventByMadness, getEventById } from "../content/events";
+import { pickEventByMadness, getEventById, type EventDef, type EventOption } from "../content/events";
 import { removeCardByUid, addCardToDeck, offerRewardsByFatigue, canUpgradeUid, upgradeCardByUid, obtainTreasure } from "../content/rewards";
 import { getCardDefByIdWithUpgrade } from "../content/cards";
 
@@ -1032,7 +1032,7 @@ function computeIntentDamageText(g: GameState, e: EnemyState, pv: IntentPreview 
 }
 
 function computeIntentIconFromPreview(pv: IntentPreview | any): string {
-  if (!pv) return "？";
+  if (!pv) return "?";
 
   const isAttack = isAttackCat((pv as any).cat as any);
 
@@ -1050,7 +1050,7 @@ function computeIntentIconFromPreview(pv: IntentPreview | any): string {
     if (cat === "DEFEND") return "🛡️";
     if (cat === "BUFF") return "✨";
     if (cat === "DEBUFF") return "🌀";
-    return "？";
+    return "?";
   }
   return out;
 }
@@ -3014,28 +3014,42 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         node.kind = "EMPTY";
         (node as any).lastClearedMove = tmNow;
         const runAny2: any = g.run;
-        runAny2.ominousProphecySeen ??= false;
+
+        // 1회성 이벤트 / 보스 전까지 잠금 이벤트 관리
+        runAny2.seenOneTimeEvents ??= {};
+        runAny2.ominousProphecyLockedUntilBossKill ??= false;
+
+        const isOneTime = (id: string) => id === "goblin_ambush_low_supplies" || id === "rat_circle";
+        const isBlocked = (id: string) =>
+          (id === "ominous_prophecy" && runAny2.ominousProphecyLockedUntilBossKill === true) ||
+          (isOneTime(id) && runAny2.seenOneTimeEvents?.[id] === true);
 
         const OMEN_CHANCE = 0.3;
-        let ev = pickEventByMadness(g);
+        let ev: EventDef | null = null;
 
-        if (runAny2.ominousProphecySeen === true) {
-          for (let i = 0; i < 50 && (ev as any).id === "ominous_prophecy"; i++) {
-            ev = pickEventByMadness(g);
-          }
-        } else {
-          if (Math.random() < OMEN_CHANCE) {
-            ev = getEventById("ominous_prophecy") ?? ev;
-            runAny2.ominousProphecySeen = true;
-          }
+        if (runAny2.ominousProphecyLockedUntilBossKill !== true && Math.random() < OMEN_CHANCE) {
+          ev = getEventById("ominous_prophecy");
         }
+
+        if (!ev) ev = pickEventByMadness(g);
+
+        for (let i = 0; i < 80 && ev && isBlocked(ev.id); i++) {
+          ev = pickEventByMadness(g);
+        }
+
+        if (ev && isBlocked(ev.id)) {
+          ev = getEventById("drop_bag") ?? ev;
+        }
+
+        if (ev?.id === "ominous_prophecy") runAny2.ominousProphecyLockedUntilBossKill = true;
+        if (ev?.id && isOneTime(ev.id)) runAny2.seenOneTimeEvents[ev.id] = true;
 
         if (!ev) {
           render(g, actions);
           return;
         }
 
-        let opts = ev.options(g);
+        const opts: EventOption[] = ev.options(g);
 
         
         /*const { tier } = madnessP(g);
@@ -3161,7 +3175,14 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
 
           if (typeof outcome === "object" && outcome.kind === "BATTLE_SPECIAL") {
             clearChoiceStack(g);
+
+            (g.run as any).onWinGrantRelicId = outcome.onWinGrantRelicId ?? null;
+
             logMsg(g, outcome.title ? `이벤트 전투: ${outcome.title}` : "이벤트 전투 발생!");
+          
+            const runAny = g.run as any;
+            runAny.pendingEventWinRelicId = outcome.onWinGrantRelicId ?? null;
+
             g.phase = "NODE";
             spawnEncounter(g, { forcePatternIds: outcome.enemyIds });
             g._justStartedCombat = true;
@@ -3802,9 +3823,11 @@ function renderRelicHud(g: GameState, actions: UIActions) {
     icon.tabIndex = 0;
 
     if (v.icon) {
-      const img = document.createElement("div");
+      const img = document.createElement("img");
       img.className = "relicIconImg";
-      img.style.backgroundImage = `url(${v.icon})`;
+      // assetUrl을 거치지 않으면(상대경로) 아이콘이 안 보일 수 있음
+      img.src = assetUrl(v.icon);
+      img.alt = v.name ?? v.id ?? "relic";
       icon.appendChild(img);
     } else {
       const t = document.createElement("div");
@@ -4495,6 +4518,7 @@ function renderRelicTray(g: GameState, actions: UIActions) {
     if (def.art) {
       const img = document.createElement("img");
       img.className = "relicIconImg";
+      img.src = assetUrl(def.art);
       img.alt = disp.name;
       btn.appendChild(img);
     } else {

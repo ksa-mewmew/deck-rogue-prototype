@@ -95,14 +95,22 @@ export function spawnEncounter(
   }
 
   const patternsByTier: string[][][] = [
-    [["goblin_raider"], ["watching_statue"], ["pebble_golem"], ["slime"], ["rat_swarm"]],
+    [
+      ["goblin_raider"],
+      ["watching_statue"],
+      ["pebble_golem"],
+      ["slime"],
+      ["rat_swarm"],
+      ["supply_hound"],
+    ],
     [
       ["goblin_raider", "slime"],
       ["pebble_golem", "pebble_golem"],
       ["rock_golem"],
       ["poison_spider"],
       ["rat_swarm", "rat_swarm"],
-      ["goblin_archer", "goblin_raider"]
+      ["goblin_archer", "goblin_raider"],
+      ["supply_hound", "goblin_raider"],
     ],
     [
       ["goblin_raider", "goblin_raider", "goblin_raider"],
@@ -110,7 +118,8 @@ export function spawnEncounter(
       ["slime", "slime"],
       ["poison_spider", "slime"],
       ["gravity_echo"],
-      ["gloved_hunter"]
+      ["gloved_hunter"],
+      ["debt_collector"],
     ],
   ];
 
@@ -122,19 +131,20 @@ export function spawnEncounter(
     ["poison_spider", "poison_spider"],
     ["rock_golem", "gravity_echo"],
     ["goblin_raider", "goblin_raider", "watching_statue"],
-    ["rat_swarm", "rat_swarm", "rat_swarm"]
+    ["rat_swarm", "rat_swarm", "rat_swarm"],
   ];
 
   const elitePatternsByTier: string[][][] = [
     [["goblin_raider", "watching_statue"], ["rat_swarm", "goblin_archer"]],
     [["goblin_commander", "goblin_archer", "goblin_archer"], ["watching_statue", "watching_statue"], ["gloved_hunter", "rat_swarm"]],
-    [["rock_golem", "gravity_echo"], ["poison_spider", "poison_spider"]],
+    [["rock_golem", "gravity_echo"], ["poison_spider", "poison_spider", "poison_spider"],], 
   ];
 
   const elitePostTreasurePatterns: string[][] = [
     ["gravity_echo", "gravity_echo"],
     ["rock_golem", "poison_spider"],
     ["watching_statue", "gravity_echo"],
+    ["debt_collector", "supply_hound", "supply_hound"],
   ];
 
   const T = Number((g.run as any).timeMove ?? 0) + (g.time ?? 0);

@@ -1,7 +1,42 @@
 // engine/relics.ts
 import type { GameState, Side, StatusKey } from "./types";
-import { RELICS_BY_ID } from "../content/relicsContent";
+import { RELICS_BY_ID, EVENT_RELIC_POOL } from "../content/relicsContent";
 import { logMsg } from "./rules";
+
+export function hasRelic(g: GameState, id: string) {
+  const rs = g.run as any;
+  const relics: string[] = rs?.relics ?? [];
+  return relics.includes(id);
+}
+
+export function gainRelic(g: GameState, id: string) {
+  const rs = g.run as any;
+  rs.relics ??= [];
+  if (!rs.relics.includes(id)) rs.relics.push(id);
+}
+
+export const EVENT_RELIC_IDS = new Set<string>(EVENT_RELIC_POOL.map((r) => r.id));
+
+export function isEventRelicId(id: string) {
+  return EVENT_RELIC_IDS.has(id);
+}
+
+export function rollEventRelicId(g: GameState): string | null {
+  const owned = new Set<string>(((g.run as any)?.relics ?? []) as string[]);
+  const candidates = EVENT_RELIC_POOL.map((r) => r.id).filter((id) => !owned.has(id));
+  if (candidates.length === 0) return null;
+  return candidates[(Math.random() * candidates.length) | 0];
+}
+
+export function rollNormalRelicId(g: GameState): string | null {
+  const owned = new Set<string>((g.run as any)?.relics ?? []);
+  const candidates = Object.keys(RELICS_BY_ID)
+    .filter(id => !owned.has(id))
+    .filter(id => !isEventRelicId(id));
+
+  if (!candidates.length) return null;
+  return candidates[(Math.random() * candidates.length) | 0];
+}
 
 /* ---------------- Hook(런렐릭훅) 타입 ---------------- */
 
@@ -50,15 +85,21 @@ export type RelicHooks = Partial<{
   [K in RelicHookName]: (g: GameState, ...args: RelicHookMap[K]) => void;
 }>;
 
+export type RelicTag = "EVENT_ONLY" | "ELITE_ONLY" | "COMMON";
+
 export type RelicDef = {
   id: string;
   name: string;
   text?: string;
 
+  art?: string;
+
   dormantName?: string;
   dormantText?: string;
   unlockHint?: string;
-  unlockFlavor?: string;
+
+  unlockFlavor?: string | ((g: GameState) => string);
+  tags?: RelicTag[];
 
   unlock?: (g: GameState) => boolean;
   onActivate?: (g: GameState) => void;
@@ -107,6 +148,7 @@ function ensureRelicSystem(g: GameState) {
   runAny.relicRuntime ??= {};
   runAny.pendingRelicActivations ??= [];
   runAny.unlock ??= { ...DEFAULT_UNLOCK };
+  runAny.relicUnlocked ??= {};
 }
 
 function runtimeMap(g: GameState): Record<string, RelicRuntimeState> {
@@ -162,16 +204,17 @@ function isRelicUnlocked(g: GameState, id: string): boolean {
   if (runAny.unlockProgress?.relics?.[id] === true) return true;
   if (runAny.unlocks?.relics?.[id] === true) return true;
 
-  if ((g.run.relics ?? []).includes(id)) return true;
-
   return false;
 }
 
 export function getRelicDisplay(g: GameState, id: string) {
+  ensureRelicSystem(g);
+
   const def = RELICS_BY_ID[id] as RelicDef | undefined;
 
   const baseName = def?.name ?? id;
   const baseText = def?.text ?? "";
+  const art = def?.art;
 
   const runAny = g.run as any;
   const st = (runAny.relicRuntime?.[id] ?? null) as
@@ -181,22 +224,29 @@ export function getRelicDisplay(g: GameState, id: string) {
   const hasUnlock = !!def?.unlock;
   const unlocked = isRelicUnlocked(g, id);
 
+  const state =
+    st?.active === true ? ("ACTIVE" as const) :
+    st?.pending === true ? ("PENDING" as const) :
+    ("DORMANT" as const);
 
-  const flavor = (hasUnlock && unlocked && def?.unlockFlavor)
-    ? `\n\n${def.unlockFlavor}`
-    : "";
+  const flavorText = (() => {
+    const f = def?.unlockFlavor;
+    if (!f) return "";
+    if (hasUnlock && !unlocked) return "";
+    const s = typeof f === "function" ? f(g) : f;
+    return s ? `\n\n${s}` : "";
+  })();
 
-  const isActive = st?.active === true && (!hasUnlock || unlocked);
-  if (isActive) {
-    return {
-      id,
-      state: "ACTIVE" as const,
-      name: baseName,
-      text: `${baseText}${flavor}`,
-    };
+  if (state === "ACTIVE") {
+    return { id, state, name: baseName, text: `${baseText}${flavorText}`, art };
   }
 
-  const state = st?.pending === true ? ("PENDING" as const) : ("DORMANT" as const);
+  if (state === "PENDING") {
+    if (hasUnlock && !unlocked) {
+      return { id, state, name: baseName, text: `${baseText}\n\n(다음 노드부터 활성)`, art };
+    }
+    return { id, state, name: baseName, text: `${baseText}${flavorText}`, art };
+  }
 
   if (hasUnlock && !unlocked) {
     const dn = def?.dormantName ?? baseName;
@@ -204,20 +254,24 @@ export function getRelicDisplay(g: GameState, id: string) {
     if (def?.dormantText) parts.push(def.dormantText);
     if (def?.unlockHint) parts.push(def.unlockHint);
     const dt = parts.length ? parts.join("\n") : baseText;
-    return { id, state, name: dn, text: dt };
+    return { id, state, name: dn, text: dt, art };
   }
 
-  return {
-    id,
-    state,
-    name: baseName,
-    text: `${baseText}${flavor}`,
-  };
+  return { id, state, name: baseName, text: `${baseText}${flavorText}`, art };
 }
+
 /* ---------------- 획득/해금/활성화 ---------------- */
 
-export function grantRelic(g: GameState, id: string) {
+export type RelicGrantSource = "NORMAL" | "EVENT";
+
+export function grantRelic(g: GameState, id: string, source: RelicGrantSource = "NORMAL") {
   ensureRelicSystem(g);
+
+  if (isEventRelicId(id) && source !== "EVENT") {
+    const def0 = RELICS_BY_ID[id] as RelicDef | undefined;
+    logMsg(g, `이 유물은 이벤트로만 획득할 수 있습니다: ${def0?.name ?? id}`);
+    return;
+  }
 
   if (!g.run.relics.includes(id as any)) g.run.relics.push(id as any);
 
@@ -227,11 +281,11 @@ export function grantRelic(g: GameState, id: string) {
   if (!def?.unlock) {
     st.active = true;
     st.pending = false;
+    (g.run as any).relicUnlocked[id] = true;
     logMsg(g, `유물 획득: ${def?.name ?? id}`);
     return;
   }
 
-  // 잠금 유물(조건 있음)
   st.active = false;
 
   const disp = getRelicDisplay(g, id);
@@ -282,6 +336,8 @@ export function applyPendingRelicActivations(g: GameState) {
     st.pending = false;
     st.active = true;
     st.activatedAtNode = g.run.nodePickCount;
+
+    (g.run as any).relicUnlocked[id] = true;
 
     const def = RELICS_BY_ID[id] as RelicDef | undefined;
     def?.onActivate?.(g);

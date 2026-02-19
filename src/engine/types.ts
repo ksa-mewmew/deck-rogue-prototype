@@ -284,9 +284,11 @@ export type EnemyEffect =
       op: "damagePlayerRampHits";
       n: number;            // 1타당 피해
       baseHits: number;     // 1턴 기준 타수
-      everyTurns: number;   // 몇 턴마다 +1타? (1이면 매 턴)
+      everyTurns: number;   // 몇 턴마다 +1타
       capHits?: number;     // 최대 타수(선택)
-    };
+    }
+  | { op: "damagePlayerIfSuppliesPositive"; n: number }
+  | { op: "damagePlayerIfSuppliesZero"; n: number };
 
 
 export type UnlockProgress = {

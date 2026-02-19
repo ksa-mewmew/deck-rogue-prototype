@@ -1,34 +1,23 @@
-import type { GameState } from "../engine/types";
-import type { DamageContext } from "../engine/relics";
+import type { RelicDef } from "../engine/relics";
 import { healPlayer } from "../engine/effects";
 import { logMsg, aliveEnemies, applyStatusTo } from "../engine/rules";
 
-export type RelicDef = {
-  id: string;
-  name: string;
-  text: string;
-
-  art?: string;
-
-  dormantName?: string;
-  dormantText?: string;
-  unlockHint?: string;
-
-  unlockFlavor?: string | ((g: GameState) => string);
-
-  unlock?: (g: GameState) => boolean;
-  onActivate?: (g: GameState) => void;
-
-  onCombatStart?: (g: GameState) => void;
-  onVictory?: (g: GameState) => void;
-
-  modifyDamage?: (g: GameState, ctx: DamageContext) => number;
-  onUpkeepEnd?: (g: GameState) => void;
-};
 
 export function listAllRelicIds(): string[] {
   return Object.keys(RELICS_BY_ID).sort((a, b) => a.localeCompare(b));
 }
+
+export const EVENT_RELIC_POOL: RelicDef[] = [
+  {
+    id: "relic_ratskin_charm",
+    name: "쥐가죽 부적",
+    text: "취약을 받을 때 1 덜 받습니다.",
+    unlockFlavor: "살가죽. 얇게, 아주 얇게.",
+    tags: ["EVENT_ONLY"],
+
+    art: "assets/relics/relic_ratskin_charm.png",
+  },
+]
 
 export const RELICS_BY_ID: Record<string, RelicDef> = {
   relic_unknown_square: {
@@ -54,11 +43,19 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
     id: "relic_monster_leather_helm",
     dormantName: "들러붙는 가죽",
     dormantText: "털과 피가 뒤섞인 가죽이 손에 들러붙는다.",
-    unlockHint: "조건: 엘리트 전투 승리 1회",
+    unlockHint: "조건: 엘리트 전투 승리 1회(획득 후)",
 
     art: "assets/relics/relic_monster_leather_helm.png",
 
-    unlock: (g) => (g.run as any).unlock?.eliteWins >= 1,
+    // NOTE: '획득 후' 추가 엘리트 1회가 필요하도록, 획득 시점의 eliteWins를 스냅샷으로 저장
+    unlock: (g) => {
+      const runAny: any = g.run;
+      const eliteWins = Number((runAny?.unlock?.eliteWins ?? 0) as any) || 0;
+      const rt = runAny?.relicRuntime?.["relic_monster_leather_helm"] as any;
+      if (rt && rt.eliteWinsAtObtain == null) rt.eliteWinsAtObtain = eliteWins;
+      const base = Number.isFinite(rt?.eliteWinsAtObtain) ? rt.eliteWinsAtObtain : eliteWins;
+      return eliteWins >= base + 1;
+    },
 
     name: "몬스터 가죽 투구",
     text: "첫 턴에 🛡️ 방어 +4",
@@ -317,24 +314,23 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
     text: "🌾S = 0으로 턴을 종료하면, 🌾S +2, 💤 F +1",
     unlockFlavor: "장부. 무엇의?",
     onUpkeepEnd(g) {
-      const targets: any[] = aliveEnemies(g) as any;
-      if (!targets?.length) return;
+      // S=0으로 턴을 종료했을 때만 발동
+      if ((g.player.supplies ?? 0) !== 0) return;
 
-      for (const e of targets) {
-        let dmg = 2;
-        const blk = Number((e as any).block ?? 0);
-        if (blk > 0) {
-          const used = Math.min(blk, dmg);
-          (e as any).block = blk - used;
-          dmg -= used;
-        }
-        if (dmg > 0) {
-          const hp = Number((e as any).hp ?? 0);
-          (e as any).hp = Math.max(0, hp - dmg);
-        }
-      }
+      g.player.supplies = (g.player.supplies ?? 0) + 2;
+      g.player.fatigue = Math.max(0, (g.player.fatigue ?? 0) + 1);
 
       logMsg(g, "유물[검은 장부 조각]: S +2, F +1");
     },
+  },
+
+  relic_ratskin_charm: {
+    id: "relic_ratskin_charm",
+    name: "쥐가죽 부적",
+    text: "취약을 받을 때 1 덜 받습니다.",
+    unlockFlavor: "살가죽. 얇게, 아주 얇게.",
+    tags: ["EVENT_ONLY"],
+
+    art: "assets/relics/relic_ratskin_charm.png",
   },
 };

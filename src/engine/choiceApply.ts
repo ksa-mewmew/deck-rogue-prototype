@@ -103,18 +103,27 @@ function applyRestChoiceKey(g: GameState, key: string): boolean {
   }
 
   if (key === "rest:upgrade") {
-    const next = buildUpgradePickChoice(g);
-    if (!next) {
-      logMsg(g, "강화할 수 있는 카드가 없습니다.");
-      applyRestHighF(g, highF);
-      clearAllChoices(g);
-      g.phase = "NODE";
-      applyPendingRelicActivations(g);
-      return true;
-    }
+    const all = Object.values(g.cards).filter((c) => c.zone === "deck" || c.zone === "hand" || c.zone === "discard");
+    const candidates = all.filter((c) => canUpgradeUid(g, c.uid));
 
-    applyRestHighF(g, highF);
-    setChoice(g, next, null);
+    const options: ChoiceOption[] = [
+      ...candidates.map((c) => {
+        const def = getCardDefByIdWithUpgrade(g.content, c.defId, c.upgrade ?? 0);
+        const name = (g.content.cardsById[c.defId]?.name ?? c.defId);
+        const label = (c.upgrade ?? 0) > 0 ? `${name} +${c.upgrade}` : name;
+        return { key: `up:${c.uid}`, label, detail: `전열: ${def.frontText} / 후열: ${def.backText}`, cardUid: c.uid };
+      }),
+      { key: "skip", label: "취소" },
+    ];
+
+    const returnChoice = g.choice;
+    const returnCtx = g.choiceCtx;
+
+    setChoice(
+      g,
+      { kind: "UPGRADE_PICK" as any, title: "강화", prompt: "강화할 카드 1장을 선택하세요.", options },
+      { kind: "UPGRADE_PICK" as any, returnChoice, returnCtx } as any
+    );
     return true;
   }
 
@@ -202,12 +211,20 @@ export function applyChoiceKey(g: GameState, key: string): boolean {
 
   if (c.kind === ("UPGRADE_PICK" as any)) {
     if (key === "skip") {
+      const anyCtx = g.choiceCtx as any;
+      if (anyCtx?.returnChoice) {
+        logMsg(g, "강화 취소");
+        setChoice(g, anyCtx.returnChoice, anyCtx.returnCtx ?? null);
+        return true;
+      }
+
       logMsg(g, "강화 취소");
       clearAllChoices(g);
       g.phase = "NODE";
       applyPendingRelicActivations(g);
       return true;
     }
+
     if (key.startsWith("up:")) {
       const uid = key.slice("up:".length);
       const ok = upgradeCardByUid(g, uid);

@@ -2,7 +2,7 @@ import type { GameState } from "../types";
 import { aliveEnemies, logMsg } from "../rules";
 import { resolvePlayerEffects } from "../resolve";
 import { getCardDefFor } from "../../content/cards";
-import { runRelicHook, checkRelicUnlocks, getUnlockProgress } from "../relics";
+import { runRelicHook, checkRelicUnlocks, getUnlockProgress, grantRelic } from "../relics";
 import { openBattleCardRewardChoice, openEliteRelicOfferChoice, openBossRelicOfferChoice } from "../engineRewards";
 import { escapeRequiredNodePicks } from "./encounter";
 import { _cleanupBattleTransientForVictory } from "./phases";
@@ -103,9 +103,21 @@ export function checkEndConditions(g: GameState) {
     g.enemies = [];
     g.player.zeroSupplyTurns = 0;
 
+    {
+      const runAny = g.run as any;
+      const rid = runAny.pendingEventWinRelicId as string | null;
+      if (rid) {
+        runAny.pendingEventWinRelicId = null;
+        grantRelic(g, rid, "EVENT");
+      }
+    }
+
     runRelicHook(g, "onVictory");
 
     if (wasBoss) {
+      // 불길한 예언: 보스 격파 후에는 다시 등장 가능
+      (g.run as any).ominousProphecyLockedUntilBossKill = false;
+      (g.run as any).ominousProphecySeen = false;
       g.player.hp = g.player.maxHp;
       logMsg(g, "보스 격파! 체력이 완전히 회복되었습니다.");
       openBossRelicOfferChoice(g); // 3개 중 1개

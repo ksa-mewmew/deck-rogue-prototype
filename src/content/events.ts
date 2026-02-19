@@ -2,6 +2,7 @@ import type { GameState } from "../engine/types";
 import { logMsg, pickOne, madnessP, rollMad } from "../engine/rules";
 import { addFatigue, healPlayer } from "../engine/effects";
 import { addCardToDeck, removeRandomCardFromDeck } from "../content/rewards"; 
+import { hasRelic, grantRelic } from "../engine/relics";
 
 
 export type EventOutcome =
@@ -10,7 +11,7 @@ export type EventOutcome =
   | "REWARD"
   | { kind: "UPGRADE_PICK"; title?: string; prompt?: string }
   | { kind: "REMOVE_PICK"; title: string; prompt?: string; then: "NONE" | "REWARD" | "BATTLE" }
-  | { kind: "BATTLE_SPECIAL"; enemyIds: string[]; title?: string };
+  | { kind: "BATTLE_SPECIAL"; enemyIds: string[]; title?: string; onWinGrantRelicId?: string };
 
 export type EventOption = {
   key: string;
@@ -50,14 +51,13 @@ export const BOSS_OMEN_HINT: Record<string, string> = {
 
 // ===== 광기(악몽) 이벤트 풀 =====
 
-const base = import.meta.env.BASE_URL;
 
 export const MAD_EVENTS: EventDef[] = [
   {
     id: "mad_mirror",
     name: "거울에 잠긴 물",
     prompt: "물 속의 당신이 먼저 웃습니다.",
-    art: `${base}assets/events/event_mad_mirror.png`,
+    art: `assets/events/event_mad_mirror.png`,
     options: (g) => [
       {
         key: "mad_mirror:take",
@@ -84,7 +84,7 @@ export const MAD_EVENTS: EventDef[] = [
     id: "mad_contract",
     name: "젖은 계약서",
     prompt: "곰팡이 냄새가 납니다.",
-    art: `${base}assets/events/event_mad_contract.png`,
+    art: `assets/events/event_mad_contract.png`,
     options: (g) => [
       {
         key: "mad_contract:sign",
@@ -114,7 +114,7 @@ export const MAD_EVENTS: EventDef[] = [
     id: "mad_lullaby",
     name: "자장가",
     prompt: "잠들면 회복하지만, 깨어나면 잊습니다.",
-    art: `${base}assets/events/event_mad_lullaby.png`,
+    art: `assets/events/event_mad_lullaby.png`,
     options: (g) => [
       {
         key: "mad_lullaby:sleep",
@@ -151,7 +151,7 @@ export const EVENTS: EventDef[] = [
     id: "drop_bag",
     name: "짐 버리기",
     prompt: "짐을 줄여 피로를 낮추자.",
-    art: `${base}assets/events/event_drop_bag.png`,
+    art: `assets/events/event_drop_bag.png`,
     options: () => [
       {
         key: "drop",
@@ -177,7 +177,7 @@ export const EVENTS: EventDef[] = [
     id: "hide_from_monster",
     name: "몬스터로부터 숨기",
     prompt: "전투하거나, 대가를 치르고 숨을 수 있다.",
-    art: `${base}assets/events/event_hide_from_monster.png`,
+    art: `assets/events/event_hide_from_monster.png`,
     options: () => [
       {
         key: "fight",
@@ -205,12 +205,12 @@ export const EVENTS: EventDef[] = [
     prompt:
       "고블린들이 보급을 약탈했다.\n" +
       "이번 전투는 보급(S) 5로 시작합니다.",
-    art: `${base}assets/events/event_goblin_ambush_low_supplies.png`,
+    art: `assets/events/event_goblin_ambush_low_supplies.png`,
     options: () => [
       {
         key: "fight",
         label: "맞서 싸운다",
-        detail: "고블린 약탈자 2마리 전투 (S=5 시작)",
+        detail: "고블린 약탈자 2마리 전투 (S = 5 시작)",
         apply: (g: any) => {
           g.run.nextBattleSuppliesBonus = -5;
           return { kind: "BATTLE_SPECIAL", title: "고블린 매복", enemyIds: ["goblin_raider", "goblin_raider"] };
@@ -223,7 +223,7 @@ export const EVENTS: EventDef[] = [
     id: "find_adventurer",
     name: "다른 모험가 발견",
     prompt: "거래한다.",
-    art: `${base}assets/events/event_find_adventurer.png`,
+    art: `assets/events/event_find_adventurer.png`,
     options: (g: GameState) => {
 
       if (g.run.treasureObtained) {
@@ -285,7 +285,7 @@ export const EVENTS: EventDef[] = [
     id: "ominous_prophecy",
     name: "불길한 예언",
     prompt: "불길한 속삭임이 귓가를 맴돈다. 대가를 치르고 미래를 엿볼까?",
-    art: `${base}assets/events/event_ominous_prophecy.png`,
+    art: `assets/events/event_ominous_prophecy.png`,
     options: (g: GameState) => [
       {
         key: "omen:listen",
@@ -326,6 +326,49 @@ export const EVENTS: EventDef[] = [
         },
       },
     ],
+  },
+
+  {
+    id: "rat_circle",
+    name: "쥐들의 원",
+    prompt:
+      "쥐들이 돌바닥에 원을 만든다.\n" +
+      "당신을 보자 원이 커진다.",
+    art: `assets/events/event_rat_circle.png`,
+    options: (g) => {
+      const canCircle = !hasRelic(g, "relic_ratskin_charm");
+
+      const opts: EventOption[] = [
+        {
+          key: "rat_circle:one",
+          label: "쥐떼 한 마리와 싸운다",
+          detail: "전투",
+          apply: (gg) => {
+            logMsg(gg, "이벤트: 쥐들의 판 → 쥐떼 1");
+            return { kind: "BATTLE_SPECIAL", title: "쥐들의 원", enemyIds: ["rat_swarm"] };
+          },
+        },
+      ];
+
+      if (canCircle) {
+        opts.splice(1, 0, {
+          key: "rat_circle:three_for_relic",
+          label: "유물을 걸고 쥐떼 셋과 싸운다",
+          detail: "승리 시 고유 유물 획득",
+          apply: (gg) => {
+            logMsg(gg, "이벤트: 쥐들의 판 → 쥐떼 3 (고유 유물)");
+            return {
+              kind: "BATTLE_SPECIAL",
+              title: "쥐들의 원",
+              enemyIds: ["rat_swarm", "rat_swarm", "rat_swarm"],
+              onWinGrantRelicId: "relic_ratskin_charm",
+            };
+          },
+        });
+      }
+
+      return opts;
+    },
   },
 
 

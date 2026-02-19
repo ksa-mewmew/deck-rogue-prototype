@@ -60,7 +60,7 @@ export const ENEMIES = [
     maxHp: 50,
     intents: [
       { label: "바위 던지기: 10 피해", acts: [{ op: "damagePlayer", n: 10 }] },
-      { label: "땅 모으기: 자신 HP 8 회복", acts: [{ op: "enemyHealSelf", n: 10 }] },
+      { label: "땅 모으기: 자신 HP 8 회복", acts: [{ op: "enemyHealSelf", n: 8 }] },
     ],
   },
   {
@@ -199,6 +199,30 @@ export const ENEMIES = [
       },
     ],
   },
+
+  {
+    id: "debt_collector",
+    name: "장부 수금관",
+    maxHp: 55,
+    intents: [
+      { label: "수금: S -3", acts: [{ op: "supplies", n: -4 }] },
+      { label: "압류: (S가 0이면) 15 피해", acts: [{ op: "damagePlayerIfSuppliesZero", n: 15 }] },
+      { label: "재점검: 아무 행동도 하지 않음", acts: [] },
+    ],
+  },
+
+  {
+    id: "supply_hound",
+    name: "보급 사냥개",
+    maxHp: 26,
+    intents: [
+      { label: "냄새 맡기: 취약 +2 부여", acts: [{ op: "statusPlayer", key: "vuln", n: 2 }] },
+      { label: "덮치기: (S가 0이 아니면) 10 피해", acts: [{ op: "damagePlayerIfSuppliesPositive", n: 7 }] },
+      { label: "뜯어내기: S -2", acts: [{ op: "supplies", n: -2 }] },
+    ],
+  },
+
+
 
 
   {

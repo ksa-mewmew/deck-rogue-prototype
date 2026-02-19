@@ -44,7 +44,7 @@ export function startCombat(g: GameState) {
   const bonus = g.run.nextBattleSuppliesBonus ?? 0;
   g.player.supplies = 7 + bonus;
   if (bonus !== 0) {
-    logMsg(g, `다음 전투 보너스 적용: S +${bonus}`);
+    logMsg(g, `다음 전투 S 변동: ${bonus}`);
     g.run.nextBattleSuppliesBonus = 0;
   }
 
@@ -63,6 +63,13 @@ export function startCombat(g: GameState) {
   g.phase = "PLACE";
 
   runRelicHook(g, "onCombatStart");
+
+  // 전투 시작 추가 드로우(예: 뼈가 만든 나침반)
+  {
+    const extra = Number((g as any)._combatStartExtraDraw ?? 0);
+    (g as any)._combatStartExtraDraw = 0;
+    if (extra > 0) drawCards(g, extra);
+  }
 }
 
 export function placeCard(g: GameState, cardUid: string, side: Side, idx: number) {
@@ -294,8 +301,13 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
     }
 
     case "statusPlayer": {
-      applyStatusTo(g.player, act.key, act.n, g, "ENEMY");
-      logMsg(g, `적 효과: 플레이어 상태 ${act.key} ${act.n >= 0 ? "+" : ""}${act.n}`);
+      let n = act.n;
+      // 쥐가죽 부적: 취약을 받을 때 1 덜 받는다.
+      if (act.key === "vuln" && n > 0 && isRelicActive(g, "relic_ratskin_charm")) {
+        n = Math.max(0, n - 1);
+      }
+      applyStatusTo(g.player, act.key, n, g, "ENEMY");
+      logMsg(g, `적 효과: 플레이어 상태 ${act.key} ${n >= 0 ? "+" : ""}${n}`);
       return;
     }
 
@@ -326,8 +338,9 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
     case "damagePlayerByDeckSize": {
       const deckSize = getCombatDeckSize(g);
       const { dmg, scale } = calcDeckSizeDamage(act, deckSize);
+      const ew = enemy.status.weak ?? 0;
 
-      applyDamageToPlayer(g, dmg, "ENEMY_ATTACK", enemy.name);
+      applyDamageToPlayer(g, dmg, "ENEMY_ATTACK", enemy.name, ew);
       logMsg(g, `중력 피해: base ${act.base} + per ${act.per} * ceil(${deckSize}/${act.div})=${scale} => ${dmg}`);
       return;
     }
@@ -349,6 +362,27 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
       return;
     }
 
+    case "damagePlayerIfSuppliesPositive": {
+      const s = g.player.supplies ?? 0;
+      if (s > 0) {
+        const ew = enemy.status.weak ?? 0;
+        applyDamageToPlayer(g, act.n, "ENEMY_ATTACK", enemy.name, ew);
+      } else {
+        logMsg(g, `덮치기: S = 0 → 피해 없음`);
+      }
+      break;
+    }
+
+    case "damagePlayerIfSuppliesZero": {
+      const s = g.player.supplies ?? 0;
+      if (s === 0) {
+        const ew = enemy.status.weak ?? 0;
+        applyDamageToPlayer(g, act.n, "ENEMY_ATTACK", enemy.name, ew); // 프로젝트에서 쓰는 실제 함수명으로
+      } else {
+        logMsg(g, `압류: S = ${s} → 피해 없음`);
+      }
+      break;
+    }
     default: {
       const _exhaustive: never = act;
       return _exhaustive;
@@ -474,10 +508,6 @@ export function drawStepStartNextTurn(g: GameState) {
   g.attackedEnemyIndicesThisTurn = [];
   g.drawCountThisTurn = 0;
   g.combatTurn = (g.combatTurn ?? 0) + 1;
-  if ( aliveEnemies(g).length > 0 && g.player.supplies === 0 && isRelicActive(g, "relic_black_ledger_shard")){
-    g.player.supplies += 2
-    g.player.fatigue += 1
-  }
 }
 
 export function drawCards(g: GameState, n: number): number {
