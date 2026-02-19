@@ -1,10 +1,7 @@
 import type { GameState } from "./types";
-import type { EnemyState } from "./types";
 import type { EnemyIntentData, IntentPreview, IntentApply, IntentCategory } from "./types";
 
-type PreviewOptions = {
-  includeBlock?: boolean;
-};
+type PreviewOptions = { includeBlock?: boolean };
 
 function clamp0(n: number) { return n < 0 ? 0 : n; }
 
@@ -12,6 +9,17 @@ function applyDamageMods(raw: number, g: GameState, e: any) {
   const playerV = g.player.status?.vuln ?? 0;
   const enemyW  = e.status?.weak ?? 0;
   return clamp0(raw + playerV - enemyW);
+}
+
+function applyBlockSequential(hits: number[], block: number) {
+  let b = Math.max(0, Number(block) || 0);
+  const out: number[] = [];
+  for (const h of hits) {
+    const used = Math.min(b, h);
+    b -= used;
+    out.push(h - used);
+  }
+  return out;
 }
 
 function pushApply(applies: IntentApply[], a: IntentApply) {
@@ -35,19 +43,16 @@ function catFromPreview(p: IntentPreview): IntentCategory {
   return "OTHER";
 }
 
-type FormulaKind = "goblin_raider" | "watching_statue";
+type FormulaKind = "goblin_raider" | "watching_statue" | "gloved_hunter";
 
 function previewFormula(kind: FormulaKind, g: GameState, e: any): { raw: number; hits?: number } {
-
   const used = g.usedThisTurn ?? 0;
 
   if (kind === "goblin_raider") {
-
     const raw = Math.max(0, 12 - used);
     return { raw, hits: 1 };
   }
   if (kind === "watching_statue") {
-
     const raw = 4 + used;
     return { raw, hits: 1 };
   }
@@ -67,10 +72,8 @@ export function buildIntentPreview(
   }
 
   const applies: IntentApply[] = [];
-  let dmgTotalRaw = 0;
-  let hits = 0;
-  let perHitRaw: number | null = null;
   const notes: string[] = [];
+  const hitRaws: number[] = [];
 
   if (intent.meta?.applies) {
     for (const a of intent.meta.applies) pushApply(applies, a);
@@ -79,18 +82,15 @@ export function buildIntentPreview(
   for (const act of intent.acts) {
     switch (act.op) {
       case "damagePlayer": {
-        const raw = act.n;
-        dmgTotalRaw += raw;
-        hits += 1;
-        perHitRaw = perHitRaw == null ? raw : perHitRaw;
+        hitRaws.push(Math.max(0, Number(act.n) || 0));
         break;
       }
 
       case "damagePlayerFormula": {
-        const { raw, hits: hh } = previewFormula(act.kind, g, e);
-        dmgTotalRaw += raw;
-        hits += (hh ?? 1);
-
+        const { raw, hits } = previewFormula(act.kind as any, g, e);
+        const hh = Math.max(1, Number(hits ?? 1) || 1);
+        const r = Math.max(0, Number(raw) || 0);
+        for (let i = 0; i < hh; i++) hitRaws.push(r);
         break;
       }
 
@@ -119,30 +119,51 @@ export function buildIntentPreview(
         break;
       }
 
+      case "damagePlayerRampHits": {
+        const turn = Math.max(1, Number((g as any).combatTurn ?? 1));
+        const baseHits = Math.max(1, Number(act.baseHits ?? 1));
+        const every = Math.max(1, Number(act.everyTurns ?? 1));
 
-      default: {
+        let hits = baseHits + Math.floor((turn - 1) / every);
+        if (act.capHits != null) hits = Math.min(hits, Math.max(1, Number(act.capHits)));
 
+        const per = Math.max(0, Number(act.n) || 0);
+        for (let i = 0; i < hits; i++) hitRaws.push(per);
         break;
       }
+
+      default:
+        break;
     }
   }
 
-  if (e.immuneThisTurn) {
-
+  if (!hitRaws.length) {
+    const hh = Math.max(0, Number(intent.meta?.hits ?? 0) || 0);
+    const base = Math.max(0, Number(intent.meta?.baseDmg ?? 0) || 0);
+    if (hh > 0 && base > 0) {
+      for (let i = 0; i < hh; i++) hitRaws.push(base);
+    }
   }
 
-  let dmgTotal = dmgTotalRaw > 0 ? applyDamageMods(dmgTotalRaw, g, e) : undefined;
+  let hitDamages = hitRaws.map((r) => applyDamageMods(r, g, e));
 
-  if (opt.includeBlock && dmgTotal != null) {
-    const blk = g.player.block ?? 0;
-    dmgTotal = Math.max(0, dmgTotal - blk);
+  if (opt.includeBlock && hitDamages.length) {
+    hitDamages = applyBlockSequential(hitDamages, g.player.block ?? 0);
   }
+
+  const hits = hitDamages.length;
+  const dmgTotal = hits ? hitDamages.reduce((s, x) => s + x, 0) : undefined;
+
+  const perHit =
+    hits && hitDamages.every((x) => x === hitDamages[0])
+      ? hitDamages[0]
+      : undefined;
 
   const out: IntentPreview = {
     cat: intent.meta?.cat ?? "OTHER",
     dmgTotal,
     hits: hits > 0 ? hits : intent.meta?.hits,
-    perHit: perHitRaw != null ? applyDamageMods(perHitRaw, g, e) : intent.meta?.baseDmg,
+    perHit: perHit ?? intent.meta?.baseDmg,
     applies: applies.length ? applies : undefined,
     notes: notes.length ? notes : undefined,
   };

@@ -44,11 +44,7 @@ export type DamageContext = {
   applied?: number;
 };
 
-/* ---------------- 유물 정의 타입 ----------------
-   - dormantName / dormantText / unlockHint
-   - unlock(g): boolean   // 조건 판정
-   - onActivate(g)        // pending->active 되는 순간 1회 실행
--------------------------------------------------- */
+
 
 export type RelicHooks = Partial<{
   [K in RelicHookName]: (g: GameState, ...args: RelicHookMap[K]) => void;

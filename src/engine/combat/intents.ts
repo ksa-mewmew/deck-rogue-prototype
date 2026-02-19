@@ -185,6 +185,18 @@ export function revealIntentsAndDisrupt(g: GameState) {
       label = `${head}: ${dmg} 피해`;
     }
 
+    const rampAct = intent.acts.find((a: any) => a.op === "damagePlayerRampHits");
+    if (rampAct && rampAct.op === "damagePlayerRampHits") {
+      const turn = Math.max(1, Number((g as any).combatTurn ?? 1));
+      const baseHits = Math.max(1, Number(rampAct.baseHits ?? 1));
+      const every = Math.max(1, Number(rampAct.everyTurns ?? 1));
+      let hits = baseHits + Math.floor((turn - 1) / every);
+      if (rampAct.capHits != null) hits = Math.min(hits, Math.max(1, Number(rampAct.capHits)));
+
+      const head = intent.label.split(":")[0].trim();
+      label = `${head}: ${rampAct.n} 피해 (${hits}타)`;
+    }
+    
     e.intentLabelOverride = label;
     logMsg(g, `적 의도: ${e.name} → ${label}`);
   }

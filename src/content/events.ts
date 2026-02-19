@@ -1,6 +1,6 @@
 import type { GameState } from "../engine/types";
 import { logMsg, pickOne, madnessP, rollMad } from "../engine/rules";
-import { addFatigue } from "../engine/effects";
+import { addFatigue, healPlayer } from "../engine/effects";
 import { addCardToDeck, removeRandomCardFromDeck } from "../content/rewards"; 
 
 
@@ -36,7 +36,6 @@ export function pickEventByMadness(g: GameState) {
   const pNightmare = tier === 0 ? 0 : tier === 1 ? 0.25 : tier === 2 ? 0.55 : 0.85;
 
   if (Math.random() < pNightmare) {
-    // 악몽 풀 (따로 배열/함수로 관리)
     return pickRandomNightmareEvent(g);
   }
   return pickRandomEvent();
@@ -122,7 +121,7 @@ export const MAD_EVENTS: EventDef[] = [
         label: "잠든다",
         detail: "HP +12. 덱에서 무작위 1장 소실.",
         apply: (gg) => {
-          gg.player.hp = Math.min(gg.player.maxHp, gg.player.hp + 12);
+          healPlayer(gg, 12)
           removeRandomCardFromDeck(gg);
           logMsg(gg, "자장가: HP 회복, 그러나 잊었다… (무작위 1장 소실)");
           return "NONE";
@@ -263,7 +262,7 @@ export const EVENTS: EventDef[] = [
     },
   },
 
-  {
+  /*{
     id: "edible_mushroom",
     name: "식용 버섯 발견",
     prompt: "기운이 난다. 다음 전투의 시작 보급이 늘어난다.",
@@ -280,7 +279,7 @@ export const EVENTS: EventDef[] = [
         },
       },
     ],
-  },
+  },*/
 
   {
     id: "ominous_prophecy",
@@ -341,7 +340,7 @@ export function getEventById(id: string) {
 export function applyWhisperDeal(g: GameState) {
   const { tier: t } = madnessP(g);
 
-  // 이득 테이블
+  // 이득
   const gains = [
     () => {
       g.player.hp = Math.min(g.player.maxHp, g.player.hp + (t >= 2 ? 14 : 10));
@@ -357,7 +356,7 @@ export function applyWhisperDeal(g: GameState) {
     },
   ];
 
-  // 대가 테이블
+  // 대가
   const costs = [
     () => { addFatigue(g, 1); logMsg(g, "대가: F +1"); },
     () => { g.player.hp = Math.max(0, g.player.hp - 6); logMsg(g, "대가: HP -6"); },

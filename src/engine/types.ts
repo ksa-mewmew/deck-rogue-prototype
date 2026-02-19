@@ -8,6 +8,47 @@ export type CardTag = "EXHAUST" | "VANISH";
 export type RelicId = string;
 
 export type NodeType = "BATTLE" | "ELITE" | "REST" | "TREASURE" | "EVENT";
+
+// =========================
+// Map / Dungeon graph
+// =========================
+export type MapNodeId = string;
+export type MapNodeKind = "START" | NodeType;
+
+export type MapNode = {
+  id: MapNodeId;
+  kind: MapNodeKind;
+  depth: number;
+  order?: number;
+  visited: boolean;
+  cleared: boolean;
+  reprocCount: number;
+  lastProcTime: number;
+};
+
+export type DungeonMap = {
+  nodes: Record<MapNodeId, MapNode>;
+  edges: Record<MapNodeId, MapNodeId[]>;
+  startId: MapNodeId;
+  pos: MapNodeId;
+  treasureId: MapNodeId | null;
+  visionNonce: number;
+};
+
+export type PursuitState = { heat: number };
+
+export type VisionMode = "NORMAL" | "FOCUS" | "WIDE";
+
+export type VisionState = {
+  mode: VisionMode;
+  blind: boolean;
+  presenceR: number;
+  typeR: number;
+  detailR: number;
+  noise: number;
+};
+
+
 export type NodeOfferId = "A" | "B";
 
 export type NodeOffer = {
@@ -229,14 +270,21 @@ export type DamageContext = {
 
 export type EnemyEffect =
   | { op: "damagePlayer"; n: number }
-  | { op: "damagePlayerFormula"; kind: "goblin_raider" | "watching_statue" }
+  | { op: "damagePlayerFormula"; kind: "goblin_raider" | "watching_statue" | "gloved_hunter" }
   | { op: "supplies"; n: number }
   | { op: "statusPlayer"; key: StatusKey; n: number }
   | { op: "enemyHealSelf"; n: number }
   | { op: "enemyImmuneThisTurn" }
   | { op: "enemyImmuneNextTurn" }
   | { op: "fatiguePlayer"; n: number }
-  | { op: "damagePlayerByDeckSize"; base: number; per: number; div: number; cap?: number };
+  | { op: "damagePlayerByDeckSize"; base: number; per: number; div: number; cap?: number }
+  | {
+      op: "damagePlayerRampHits";
+      n: number;            // 1타당 피해
+      baseHits: number;     // 1턴 기준 타수
+      everyTurns: number;   // 몇 턴마다 +1타? (1이면 매 턴)
+      capHits?: number;     // 최대 타수(선택)
+    };
 
 
 export type UnlockProgress = {
@@ -270,6 +318,15 @@ export type PlayerState = {
 };
 
 export type RunState = {
+
+
+  timeMove: number;
+
+  map: DungeonMap;
+
+  pursuit: PursuitState;
+
+  vision: VisionState;
 
   encounterCount: number;
   treasureObtained: boolean;
@@ -317,11 +374,15 @@ export type ChoiceCtx =
   | { kind: "BATTLE_CARD_REWARD"; offers: Array<{ defId: string; upgrade: number }> }
   | { kind: "ELITE_RELIC"; offerIds: string[] }
   | { kind: "REST"; highF?: boolean }
-  | { kind: "EVENT"; eventId: string };
+  | { kind: "EVENT"; eventId: string }
+  | { kind: "RELIC_OFFER"; offerIds: string[]; source?: "BOSS" | "ELITE" | "PAID" | string };
   
 export type ChoiceFrame = { choice: ChoiceState; ctx: ChoiceCtx };
 
 export type GameState = {
+
+  combatTurn: number;
+    
   uidSeq: number;
 
   intentsRevealedThisTurn: boolean;
@@ -369,4 +430,7 @@ export type GameState = {
   choiceStack: ChoiceFrame[];
   choice: ChoiceState | null;
   choiceCtx: ChoiceCtx;
+
+  _justStartedCombat: boolean;
+
 };

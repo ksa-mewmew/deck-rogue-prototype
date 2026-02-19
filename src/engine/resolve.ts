@@ -131,7 +131,7 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
       }
 
       case "damageEnemyByPlayerFatigue": {
-        const amount = Math.max(0, g.player.fatigue * e.mult);
+        const amount = Math.max(0, Math.floor(g.player.fatigue * e.mult));
 
         if (e.target === "random") {
           const alive = aliveEnemies(g);

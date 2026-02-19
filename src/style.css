@@ -98,10 +98,10 @@
   --logBg: rgba(0,0,0,.75);
 
   /* ---------- ASSETS ---------- */
-  --bgUrl: url("ui/background/dungeon_bg.png");
-  --boardUrl: url("ui/boards/battle_board.png");
-  --cardUrl: url("ui/cards/card_parchment.png");
-
+  --bgUrl: url("assets/ui/background/dungeon_bg.png");
+  --boardUrl: url("assets/ui/boards/battle_board.png");
+  --cardUrl: url("assets/ui/cards/card_parchment.png");
+  --mapBgUrl: url("assets/ui/background/map_bg.png");
   /* ---------- ENEMY HUD ---------- */
   --enemyBannerW: calc(360px * var(--uiScale));
   --enemyHudDx: 0px;
@@ -552,7 +552,7 @@ html, body, #app,
 }
 
 .slot .card.slotNameOnly{
-  --slotTextScale: calc(var(--slotCardScale, 1) * 1.5);
+  --slotTextScale: calc(var(--slotCardScale, 1) * 1.25);
 }
 
 /* =========================
@@ -731,11 +731,32 @@ html, body, #app,
   align-items:center;
   justify-content:center;
   padding: calc(6px * var(--uiScale) * var(--boardScale));
+  text-align: center;
+
+  overflow: hidden; /* ✅ 삐져나오는 텍스트/요소 잘라내기 */
+  border-radius: calc(16px * var(--uiScale)); /* ✅ 카드 모서리랑 맞추기 */
+  clip-path: inset(0 round calc(16px * var(--uiScale))); /* ✅ 더 확실하게 */
 }
 .card.slotNameOnly .cardTitle{
-  font-size: calc(12px * var(--uiScale) * var(--boardScale));
+  font-size: calc(10px * var(--uiScale) * var(--boardScale));
   font-weight: 900 !important;
+
+  width: 100%;                /* ✅ 제목 박스가 카드 폭을 넘지 않게 */
+  box-sizing: border-box;
+  padding: 0 0.35em;          /* ✅ 좌우 안전 여백 */
+
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.1;
+
+  display: -webkit-box;       /* ✅ 너무 길면 2줄에서 컷 */
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
+
 .card.slotNameOnly .cardBody{ display:none !important; }
 
 
@@ -1739,6 +1760,230 @@ pre.choice-detail,
 .enemyBanner.enemyCardWrap:hover .enemyMiniHud{ opacity: 0.18; }
 
 /* =========================
-   20) MOBILE (placeholder)
+   20) MAP (2-column, full-viewport)
+   ========================= */
+
+:root{
+  /* ui scale (already in your project, fallback=1) */
+  --S: var(--uiScale, 1);
+
+  /* ---- Panel placement (center + tweak; %는 스케일 영향 X) ---- */
+  --mapPanelCX: 50%;
+  --mapPanelCY: 50%;
+  --mapPanelDX: 0%;
+  --mapPanelDY: -30%;
+
+  /* ---- Base sizes (px) : 여기 숫자만 바꾸면 됨 ---- */
+  --panelInsetPx: 3;      /* 화면 여백 */
+  --panelMaxInsetPx: 60;   /* max-height 계산용(=2*inset 느낌) */
+  --panelMaxWidthPx: 650;
+
+  --gridGapPx: 16;
+  --sideColWidthPx: 380;
+
+  --boxPadPx: 14;
+  --boxRadiusPx: 14;
+  --scrollerRadiusPx: 12;
+
+  /* ---- Map content transform ---- */
+  --mapSvgScale: 0.70; /* (배율은 숫자라 uiScale과 별개) */
+  --mapSvgDX: 0%;
+  --mapSvgDY: 0%;
+
+  /* ---- Background image ---- */
+  --mapBgDim: 0.25;       /* 어둡게 덮는 정도 */
+  --mapBgOpacity: 1;      /* cover 레이어는 opacity 대신 dim으로 조절 추천 */
+  --mapHeaderSafeTopPx: 12;
+  --mapHeaderSafeSidePx: 14;
+
+  /* ✅ 패널 최대높이(스케일 반영해서 clamp) */
+  --mapPanelMaxHPx: 900; /* 필요하면 숫자만 조절 */
+  --mapScrollerMinHPx: 520;
+  --mapSvgScale: 1.0;
+
+  --pillarPx: 49;
+  --pillarW: calc(var(--pillarPx) * 1px * var(--S));
+
+  /* ✅ 지도 창 최소 높이(노드 적어도 높이 유지) */
+  --mapScrollerMinHPx: 520;
+
+}
+
+
+.nodeSelectWrap.mapNodeSelect{
+  position: fixed !important;
+  inset: auto !important;
+
+  left: calc(var(--mapPanelCX) + var(--mapPanelDX)) !important;
+  top:  calc(var(--mapPanelCY) + var(--mapPanelDY)) !important;
+  transform: translate(-50%, -40%) !important;
+
+  /* width / max-height : uiScale 적용 */
+  width: min(
+    calc(var(--panelMaxWidthPx) * 1px * var(--S)),
+    calc(100vw - (calc(var(--panelMaxInsetPx) * 1px * var(--S))))
+  ) !important;
+
+  max-height: calc(var(--mapPanelMaxHPx) * 1px * var(--S)) !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+
+  box-sizing: border-box !important;
+  z-index: 52000 !important;
+
+}
+
+
+.mapNodeSelectBody{
+  flex: 1 1 auto;
+  min-height: 0;
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) calc(var(--sideColWidthPx) * 1px * var(--S));
+  gap: calc(var(--gridGapPx) * 1px * var(--S));
+
+  margin-top: calc(3px * var(--S));
+}
+
+.mapNodeSelectMapCol{
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.mapNodeSelectSideCol{
+  min-height: 0;
+  overflow: auto;
+
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.mapNodeSelectSideCol::-webkit-scrollbar{ width:0; height:0; }
+
+
+.mapNodeSelectMapCol .mapMiniBox,
+.mapNodeSelect .mapMiniBox{
+  flex: 1 1 auto;
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  padding: calc(var(--boxPadPx) * 1px * var(--S)) !important;
+  border-radius: calc(var(--boxRadiusPx) * 1px * var(--S)) !important;
+  margin: 0 !important;
+}
+
+/* scroller: fill + center */
+.mapNodeSelectMapCol .mapMiniScroller,
+.mapNodeSelect .mapMiniScroller{
+  flex: 1 1 auto;
+  min-height: calc(var(--mapScrollerMinHPx) * 1px * var(--S)) !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  display: block !important;
+  align-items: center !important;
+  justify-content: center !important;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  border-radius: calc(var(--scrollerRadiusPx) * 1px * var(--S)) !important;
+
+  /* ✅ JS inline background 덮어쓰기 + 배경 이미지 */
+  background: var(--mapBgUrl) center/cover no-repeat !important;
+}
+
+.mapNodeSelect .mapMiniViewport{
+  width: 100%;
+  height: 100%;
+
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  /* ✅ 기둥 사이만 보이게 */
+  clip-path: inset(0 var(--pillarW) 0 var(--pillarW));
+
+  /* (선택) 시작부터 기둥 안쪽에서 보이게 약간 여백 */
+  padding-left: var(--pillarW);
+  padding-right: var(--pillarW);
+  box-sizing: border-box;
+
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.mapNodeSelect .mapMiniViewport::-webkit-scrollbar{ width:0; height:0; }
+
+.mapNodeSelect .mapMiniViewport svg{
+  height: 100% !important;
+  width: auto !important;
+  max-width: none !important;
+  display: block !important;
+
+  transform: none !important; /* “전체 축소” 범인 제거 */
+}
+
+.mapNodeSelectMapCol .mapMiniScroller svg,
+.mapNodeSelect .mapMiniScroller svg{
+  height: 100% !important;
+  width: auto !important;      /* ✅ 이게 핵심: 가로는 늘어나게 */
+  max-width: none !important;  /* ✅ auto가 다시 눌리지 않게 */
+  display: block !important;
+
+  /* 필요하면 약간만(권장: 1.0~1.08) */
+  transform: scale(var(--mapSvgScale)) !important;
+  transform-origin: top left !important;
+}
+
+
+.mapNodeSelectMapCol .mapMiniScroller svg path,
+.mapNodeSelect .mapMiniScroller svg path{
+  stroke-width: calc(1px * var(--S)) !important;
+  stroke: rgb(255, 255, 255) !important;
+}
+
+.mapNodeSelectMapCol .mapMiniScroller svg circle,
+.mapNodeSelect .mapMiniScroller svg circle{
+  stroke-width: calc(3px * var(--S)) !important;
+}
+
+.mapNodeSelectMapCol .mapMiniScroller svg text,
+.mapNodeSelect .mapMiniScroller svg text{
+  font-size: calc(16px * var(--S)) !important;
+  text-anchor: middle !important;
+  dominant-baseline: central !important;
+}
+
+
+.mapDetailPanel{
+  width: min(
+    calc(520px * var(--S)),
+    calc(100vw - (calc(64px * var(--S))))
+  ) !important;
+
+  max-height: calc(100vh - (calc(64px * var(--S)))) !important;
+  overflow-y: auto !important;
+  transform: translate(-11%, 0%) !important;
+}
+
+
+.mapNodeSelect .nodeSelectHeader{
+  padding:
+    calc(14px * var(--S))
+    calc(16px * var(--S))
+    calc(8px  * var(--S))
+    calc(16px * var(--S)) !important;
+
+  /* 혹시라도 내부가 튀어나오면 보이게 */
+  padding-top:  calc(6px * var(--S)) !important;
+  padding-right:calc(6px * var(--S)) !important;
+  overflow: visible !important;
+}
+/* 버튼 자체도 위/오른쪽 여유(보험) */
+.mapNodeSelect .nodeSelectHeaderRight button{
+  margin-top: calc(2px * var(--S)) !important;
+}
+/* =========================
+   21) MOBILE (placeholder)
    ========================= */
 /* keep empty for now */

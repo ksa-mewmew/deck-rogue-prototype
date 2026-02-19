@@ -1,5 +1,6 @@
 import type { CardInstance, Content, GameState, RunState } from "./types";
 import { logMsg, shuffle } from "./rules";
+import { generateDungeonMap } from "./map";
 
 function nextUid(g: GameState): string {
   g.uidSeq += 1;
@@ -21,6 +22,11 @@ export function createInitialRunState(): RunState {
       skippedTurn: false,
       bleedApplied: 0,
     },
+
+    timeMove: 0,
+    map: generateDungeonMap(),
+    pursuit: { heat: 0 },
+    vision: { mode: "NORMAL", blind: false, presenceR: 2, typeR: 2, detailR: 0, noise: 0 },
 
     encounterCount: 0,
     treasureObtained: false,
@@ -59,7 +65,7 @@ export function createInitialRunState(): RunState {
 export function createInitialState(content: Content): GameState {
   const g: GameState = {
     uidSeq: 0,
-
+    combatTurn: 0,
     intentsRevealedThisTurn: false,
     disruptIndexThisTurn: null,
     attackedEnemyIndicesThisTurn: [],
@@ -70,8 +76,8 @@ export function createInitialState(content: Content): GameState {
     run: createInitialRunState(),
 
     player: {
-      hp: 40,
-      maxHp: 40,
+      hp: 60,
+      maxHp: 60,
       block: 0,
       supplies: 7,
       fatigue: 0,
@@ -119,6 +125,7 @@ export function createInitialState(content: Content): GameState {
     choiceCtx: null,
 
     selectedEnemyIndex: null,
+    _justStartedCombat: false,
   };
 
   makeBasicDeck(g);

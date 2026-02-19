@@ -86,7 +86,7 @@ function getCmdSpecs(): CmdSpec[] {
       args: "<relicId> [now|locked|unlocked]",
       desc: "grant relic",
       suggest: (_g, parts) => {
-        if (parts.length <= 2) return listAllRelicIds();     // ✅ 전체 유물
+        if (parts.length <= 2) return listAllRelicIds();
         if (parts.length === 3) return ["now","locked","unlocked"];
         return [];
       },
@@ -540,7 +540,7 @@ function runDevCommand(raw: string) {
 
   if (cmd === "addrelic") {
     const id = a1;
-    const mode = (a2 ?? "").toLowerCase(); // now | locked | unlocked
+    const mode = (a2 ?? "").toLowerCase();
     if (!id) { out("ERR: addrelic <relicId> [now|locked|unlocked]"); return; }
 
     grantRelic(g, id);

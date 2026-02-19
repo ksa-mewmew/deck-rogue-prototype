@@ -1,7 +1,7 @@
 import type { GameState, EnemyState, PlayerDamageKind } from "./types";
 import { logMsg, clampMin, aliveEnemies } from "./rules";
 import { checkEndConditions } from "./combat";
-import { modifyDamageByRelics, notifyDamageAppliedByRelics, checkRelicUnlocks, getUnlockProgress } from "./relics";
+import { modifyDamageByRelics, notifyDamageAppliedByRelics, checkRelicUnlocks, getUnlockProgress, isRelicActive } from "./relics";
 
 
 export function addBlock(g: GameState, n: number) {
@@ -22,8 +22,13 @@ export function addFatigue(g: GameState, n: number) {
 
 export function healPlayer(g: GameState, n: number) {
   if (n <= 0) return;
+  let amount = n;
+  if (isRelicActive(g, "relic_bloody_spoon") && amount > 0) {
+    amount += 1
+    logMsg(g, `피 묻은 숟가락, 추가 회복 +1`)
+  };
   const before = g.player.hp;
-  g.player.hp = Math.min(g.player.maxHp, g.player.hp + n);
+  g.player.hp = Math.min(g.player.maxHp, g.player.hp + amount);
   logMsg(g, `HP +${g.player.hp - before} (현재 ${g.player.hp}/${g.player.maxHp})`);
 }
 

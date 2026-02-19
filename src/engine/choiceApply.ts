@@ -6,6 +6,7 @@ import { applyPendingRelicActivations, checkRelicUnlocks, getUnlockProgress } fr
 import { getEventById } from "../content/events";
 import { getCardDefByIdWithUpgrade } from "../content/cards";
 import { canUpgradeUid, upgradeCardByUid, removeCardByUid, addCardToDeck } from "../content/rewards";
+import { healPlayer } from "./effects";
 
 function applyRestHighF(g: GameState, highF: boolean) {
   if (!highF) return;
@@ -83,7 +84,7 @@ function applyRestChoiceKey(g: GameState, key: string): boolean {
 
   if (key === "rest:heal") {
     applyRestHighF(g, highF);
-    g.player.hp = Math.min(g.player.maxHp, g.player.hp + 15);
+    healPlayer(g, 15)
     logMsg(g, "휴식: HP +15");
     clearAllChoices(g);
     g.phase = "NODE";

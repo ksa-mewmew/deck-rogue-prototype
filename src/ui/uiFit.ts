@@ -2,7 +2,7 @@
 export function installUiFit() {
   const r = document.documentElement;
 
-  const BASE_SLOT_W = 180; // px
+  const BASE_SLOT_W = 180;
   const BASE_SLOT_AR_W = 5;
   const BASE_SLOT_AR_H = 7;
 
@@ -30,11 +30,9 @@ export function installUiFit() {
     const baseGapX = parseFloat(cs.getPropertyValue("--slotGapXBase")) || 22;
     const baseGapY = parseFloat(cs.getPropertyValue("--slotGapYBase")) || 6;
 
-    // 전장(중앙) 가용 영역
     const availW = Math.max(320, vw - (playerW + logW + logGap * 2 + edgePad * 2));
     const availH = Math.max(260, vh - (hudH + dockH + uiGap));
 
-    // 보드(3칸) 기준 크기
     const baseBoardW = BASE_COLS * BASE_SLOT_W + (BASE_COLS - 1) * baseGapX;
 
     const slotH = BASE_SLOT_W * (BASE_SLOT_AR_H / BASE_SLOT_AR_W);

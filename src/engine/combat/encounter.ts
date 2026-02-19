@@ -95,21 +95,22 @@ export function spawnEncounter(
   }
 
   const patternsByTier: string[][][] = [
-    [["goblin_raider"], ["watching_statue"], ["pebble_golem"], ["slime"]],
+    [["goblin_raider"], ["watching_statue"], ["pebble_golem"], ["slime"], ["rat_swarm"]],
     [
       ["goblin_raider", "slime"],
       ["pebble_golem", "pebble_golem"],
       ["rock_golem"],
-      ["goblin_raider", "goblin_raider"],
       ["poison_spider"],
+      ["rat_swarm", "rat_swarm"],
+      ["goblin_archer", "goblin_raider"]
     ],
     [
       ["goblin_raider", "goblin_raider", "goblin_raider"],
-      ["pebble_golem", "pebble_golem", "slime"],
       ["rock_golem", "pebble_golem"],
       ["slime", "slime"],
       ["poison_spider", "slime"],
       ["gravity_echo"],
+      ["gloved_hunter"]
     ],
   ];
 
@@ -121,12 +122,13 @@ export function spawnEncounter(
     ["poison_spider", "poison_spider"],
     ["rock_golem", "gravity_echo"],
     ["goblin_raider", "goblin_raider", "watching_statue"],
+    ["rat_swarm", "rat_swarm", "rat_swarm"]
   ];
 
   const elitePatternsByTier: string[][][] = [
-    [["rock_golem"], ["poison_spider"], ["watching_statue", "slime"]],
-    [["rock_golem", "slime"], ["poison_spider", "slime"], ["watching_statue", "watching_statue"]],
-    [["gravity_echo"], ["rock_golem", "gravity_echo"], ["poison_spider", "poison_spider"]],
+    [["goblin_raider", "watching_statue"], ["rat_swarm", "goblin_archer"]],
+    [["goblin_commander", "goblin_archer", "goblin_archer"], ["watching_statue", "watching_statue"], ["gloved_hunter", "rat_swarm"]],
+    [["rock_golem", "gravity_echo"], ["poison_spider", "poison_spider"]],
   ];
 
   const elitePostTreasurePatterns: string[][] = [
@@ -135,7 +137,7 @@ export function spawnEncounter(
     ["watching_statue", "gravity_echo"],
   ];
 
-  const T = (g.run.nodePickCount ?? 0) + (g.time ?? 0);
+  const T = Number((g.run as any).timeMove ?? 0) + (g.time ?? 0);
   const tierIdx = Math.min(patternsByTier.length - 1, Math.floor(Math.max(0, T) / 15));
 
   const patterns: string[][] = (() => {

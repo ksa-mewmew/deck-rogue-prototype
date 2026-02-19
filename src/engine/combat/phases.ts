@@ -3,11 +3,15 @@ import { aliveEnemies, clampMin, logMsg, shuffle, applyStatusTo } from "../rules
 import { applyDamageToPlayer, cleanupPendingTargetsIfNoEnemies } from "../effects";
 import { resolvePlayerEffects } from "../resolve";
 import { getCardDefFor, cardNameWithUpgrade } from "../../content/cards";
-import { runRelicHook, checkRelicUnlocks, getUnlockProgress } from "../relics";
+import { runRelicHook, checkRelicUnlocks, getUnlockProgress, isRelicActive } from "../relics";
 import { revealIntentsAndDisrupt, __SOUL_WARN_INTENT_INDEX } from "./intents";
 import { checkEndConditions } from "./victory";
 
 export function startCombat(g: GameState) {
+  g.combatTurn = 1;
+  g.time = (g.time ?? 0) + 1;
+  logMsg(g, "전투: 시간 +1");
+
   g.player.block = 0;
   g.player.status.vuln = 0;
   g.player.status.weak = 0;
@@ -54,13 +58,11 @@ export function startCombat(g: GameState) {
   g.attackedEnemyIndicesThisTurn = [];
 
   drawCards(g, 4);
-
+  
   revealIntentsAndDisrupt(g);
   g.phase = "PLACE";
 
   runRelicHook(g, "onCombatStart");
-
-  (g as any)._justStartedCombat = true;
 }
 
 export function placeCard(g: GameState, cardUid: string, side: Side, idx: number) {
@@ -272,6 +274,11 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
         const dmg = Math.max(0, 12 - g.usedThisTurn);
         const ew = enemy.status.weak ?? 0;
         applyDamageToPlayer(g, dmg, "ENEMY_ATTACK", enemy.name, ew);
+      } else if (act.kind === "gloved_hunter") {
+        const blk = g.player.block ?? 0;
+        const dmg = blk >= 4 ? 12 : 6;
+        const ew = enemy.status.weak ?? 0;
+        applyDamageToPlayer(g, dmg, "ENEMY_ATTACK", enemy.name, ew);
       } else {
         const dmg = 4 + g.usedThisTurn;
         const ew = enemy.status.weak ?? 0;
@@ -322,6 +329,23 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
 
       applyDamageToPlayer(g, dmg, "ENEMY_ATTACK", enemy.name);
       logMsg(g, `중력 피해: base ${act.base} + per ${act.per} * ceil(${deckSize}/${act.div})=${scale} => ${dmg}`);
+      return;
+    }
+
+    case "damagePlayerRampHits": {
+      const turn = Math.max(1, Number(g.combatTurn ?? 1));
+      const baseHits = Math.max(1, Number(act.baseHits ?? 1));
+      const every = Math.max(1, Number(act.everyTurns ?? 1));
+
+      let hits = baseHits + Math.floor((turn - 1) / every);
+      if (act.capHits != null) hits = Math.min(hits, Math.max(1, Number(act.capHits)));
+
+      const ew = enemy.status.weak ?? 0;
+      const reason = `${enemy.name} (${hits}타)`;
+
+      for (let i = 0; i < hits; i++) {
+        applyDamageToPlayer(g, act.n, "ENEMY_ATTACK", reason, ew);
+      }
       return;
     }
 
@@ -449,6 +473,11 @@ export function drawStepStartNextTurn(g: GameState) {
   g.backUidsThisTurn = [];
   g.attackedEnemyIndicesThisTurn = [];
   g.drawCountThisTurn = 0;
+  g.combatTurn = (g.combatTurn ?? 0) + 1;
+  if ( aliveEnemies(g).length > 0 && g.player.supplies === 0 && isRelicActive(g, "relic_black_ledger_shard")){
+    g.player.supplies += 2
+    g.player.fatigue += 1
+  }
 }
 
 export function drawCards(g: GameState, n: number): number {

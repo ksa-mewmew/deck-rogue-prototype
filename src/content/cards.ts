@@ -59,8 +59,8 @@ export const CARDS: CardData[] = [
       {
         frontText: "방어 +5",
         front: [{ op: "block", n: 5 }],
-        backText: "F -1, S +1, 소모",
-        back: [{ op: "fatigue", n: -1 }, { op: "supplies", n: 1 }],
+        backText: "F -1, S +2, 소모",
+        back: [{ op: "fatigue", n: -1 }, { op: "supplies", n: 2 }],
       },
     ]    
   
@@ -83,8 +83,8 @@ export const CARDS: CardData[] = [
         front: [{ op: "damageEnemy", target: "select", n: 4 },
           { op: "block", n: 2 },
         ],
-        backText: "드로우 2, S +2",
-        back: [{ op: "draw", n: 2 }, { op: "supplies", n: 2 }]
+        backText: "드로우 2, S +3",
+        back: [{ op: "draw", n: 2 }, { op: "supplies", n: 3 }]
       },
     ]    
 
@@ -159,15 +159,15 @@ export const CARDS: CardData[] = [
   {
     id: "berserk",
     name: "광폭화",
-    frontText: "무작위 피해 15, F +1",
+    frontText: "무작위 피해 15, S -3",
     backText: "S +4, F +1",
-    front: [{ op: "damageEnemy", target: "random", n: 15 }, { op: "fatigue", n: 1 }],
+    front: [{ op: "damageEnemy", target: "random", n: 15 }, { op: "supplies", n: -3 }],
     back: [{ op: "supplies", n: 4 }, { op: "fatigue", n: 1 }],
 
     upgrades: [
       {
-        frontText: "무작위 피해 20, F +2",
-        front: [{ op: "damageEnemy", target: "random", n: 20 }, { op: "fatigue", n: 2 }],
+        frontText: "무작위 피해 20, S -4",
+        front: [{ op: "damageEnemy", target: "random", n: 20 }, { op: "supplies", n: -4 }],
         backText: "S +6, F +2",
         back: [{ op: "supplies", n: 6 }, { op: "fatigue", n: 2 }],
       },
@@ -197,21 +197,19 @@ export const CARDS: CardData[] = [
     id: "arrow_rain",
     name: "화살의 비",
     exhaustWhen: "BOTH",
-    frontText: "전체 피해 10, S -1, F +1, 소모",
+    frontText: "전체 피해 10, S -2 소모",
     backText: "드로우 2, S +2, F +1, 소모",
     front: [
       { op: "damageEnemy", target: "all", n: 10 },
-      { op: "supplies", n: -1 },
-      { op: "fatigue", n: 1 },
+      { op: "supplies", n: -2 },
     ],
     back: [{ op: "draw", n: 2 }, { op: "supplies", n: 2 }, { op: "fatigue", n: 1 }],
 
     upgrades: [
       {
-        frontText: "전체 피해 13, S -2, F +1, 소모",
+        frontText: "전체 피해 13, S -2, 소모",
         front: [{ op: "damageEnemy", target: "all", n: 13 },
-      { op: "supplies", n: -2 },
-      { op: "fatigue", n: 1 },],
+        { op: "supplies", n: -2 },],
 
         backText: "드로우 3, S +3, F +2, 소모",
         back: [{ op: "draw", n: 3 }, { op: "supplies", n: 3 }, { op: "fatigue", n: 2 }],
@@ -223,11 +221,12 @@ export const CARDS: CardData[] = [
   {
     id: "smoke",
     name: "연막",
-    exhaustWhen: "FRONT",
-    frontText: "이번 턴 적 공격 피해 무효, 소모",
-    backText: "자신은 교란 당하지 않음",
+    vanishWhen: "FRONT",
+    frontText: "이번 턴 적 공격 피해 무효, 소실",
+    backText: "F +1",
     front: [{ op: "nullifyDamageThisTurn" }],
-    back: [{ op: "immuneDisruptThisTurn" }],
+    back: [{ op: "fatigue", n: 1 }],
+ 
   },
 
 
@@ -261,19 +260,19 @@ export const CARDS: CardData[] = [
     id: "secret_strike",
     name: "비장의 일격",
     exhaustWhen: "BOTH",
-    frontText: "무작위 피해 (F의 3배), 소모",
-    backText: "전체 취약 +4 및 약화 +4, 소모",
-    front: [{ op: "damageEnemyByPlayerFatigue", target: "random", mult: 3 }],
+    frontText: "무작위 피해 (F의 2배), 소모",
+    backText: "전체 취약 +3 및 약화 +3, 소모",
+    front: [{ op: "damageEnemyByPlayerFatigue", target: "random", mult: 2 }],
     back: [
-      { op: "statusEnemy", target: "all", key: "vuln", n: 4 },
-      { op: "statusEnemy", target: "all", key: "weak", n: 4 },
+      { op: "statusEnemy", target: "all", key: "vuln", n: 3 },
+      { op: "statusEnemy", target: "all", key: "weak", n: 3 },
     ],
 
     upgrades: [
       {
         exhaustWhen: "FRONT",
-        frontText: "지정 피해 (F의 3배), 소모",
-        front: [{ op: "damageEnemyByPlayerFatigue", target: "select", mult: 3 }],
+        frontText: "지정 피해 (F의 2배), 소모",
+        front: [{ op: "damageEnemyByPlayerFatigue", target: "select", mult: 2 }],
 
         backText: "전체 취약 +4 및 약화 +4",
         back: [{ op: "statusEnemy", target: "all", key: "vuln", n: 4 },
@@ -287,19 +286,20 @@ export const CARDS: CardData[] = [
   {
     id: "fire_scroll",
     name: "화염 두루마리",
-    exhaustWhen: "BOTH",
-    frontText: "방어 +7, 소모",
-    backText: "전체 피해 12, 소모",
-    front: [{ op: "block", n: 7 }],
+    exhaustWhen: "FRONT",
+    vanishWhen: "BACK",
+    frontText: "전체 피해 6, 소모",
+    backText: "전체 피해 12, 소실",
+    front: [{ op: "damageEnemy", target: "all", n: 6 }],
     back: [{ op: "damageEnemy", target: "all", n: 12 }],
 
     upgrades: [
       {
-        frontText: "방어 +8, 소모",
-        front: [{ op: "block", n: 8 }],
+        frontText: "전체 피해 8, 소모",
+        front: [{ op: "damageEnemy", target: "all", n: 8 }],
 
-        backText: "전체 피해 14, 소모",
-        back: [{ op: "damageEnemy", target: "all", n: 14 }],
+        backText: "전체 피해 15, 소실",
+        back: [{ op: "damageEnemy", target: "all", n: 15 }],
       },
     ]
   },
@@ -329,16 +329,16 @@ export const CARDS: CardData[] = [
     name: "비상식량",
     vanishWhen: "BACK",
     frontText: "S +2",
-    backText: "S를 10으로 만듦. 소실",
+    backText: "S를 7로 만듦. 소실",
     front: [{ op: "supplies", n: 2 }],
-    back: [{ op: "setSupplies", n: 10 }],
+    back: [{ op: "setSupplies", n: 7 }],
 
     upgrades: [
       {
         frontText: "S +3",
-        backText: "S를 15으로 만듦. 소실",
+        backText: "S를 10으로 만듦. 소실",
         front: [{ op: "supplies", n: 3 }],
-        back: [{ op: "setSupplies", n: 15 }],
+        back: [{ op: "setSupplies", n: 10 }],
 
       },
     ]
@@ -349,18 +349,19 @@ export const CARDS: CardData[] = [
   {
     id: "painkiller",
     name: "진통제",
-    exhaustWhen: "BOTH",
-    frontText: "HP -8, F -2, 소모",
-    backText: "HP +8, F +2, 소모",
-    front: [{ op: "hp", n: -8 }, { op: "fatigue", n: -2 }],
-    back: [{ op: "hp", n: 8 }, { op: "fatigue", n: 2 }],
+    exhaustWhen: "FRONT",
+    vanishWhen: "BACK",
+    frontText: "HP -8, F -3, 소모",
+    backText: "HP +8, F +1, 소실",
+    front: [{ op: "hp", n: -8 }, { op: "fatigue", n: -3 }],
+    back: [{ op: "hp", n: 8 }, { op: "fatigue", n: 1 }],
 
     upgrades: [
       {
-        frontText: "HP -6, F -2, 소모",
-        backText: "HP +10, F +2, 소모",
-        front: [{ op: "hp", n: -6 }, { op: "fatigue", n: -2 }],
-        back: [{ op: "hp", n: 10 }, { op: "fatigue", n: 2 }],
+        frontText: "HP -6, F -3, 소모",
+        backText: "HP +10, F +1, 소실",
+        front: [{ op: "hp", n: -6 }, { op: "fatigue", n: -3 }],
+        back: [{ op: "hp", n: 10 }, { op: "fatigue", n: 1 }],
       },
     ]
 
@@ -382,6 +383,7 @@ export const CARDS: CardData[] = [
         frontText: "전체 피해 4",
         backText: "이 카드가 후열에 있는 턴에 승리하면 최대 체력 +3, 소모",
         front: [{ op: "damageEnemy", target: "all", n: 4 }],
+        back: [],
         onWinWhileInBack: [{ op: "maxHp", n: 3 }],
       },
     ],
@@ -490,19 +492,55 @@ export const CARDS: CardData[] = [
     ]    
 
   },
+  // 11) 피의 계약
+  {
+    id: "blood_contract",
+    name: "피의 계약",
+    frontText: "지정 피해 12, HP -3",
+    backText: "S +3, F +1",
+    front: [{ op: "damageEnemy", target: "select", n: 12 }, { op: "hp", n: -3 }],
+    back: [{ op: "supplies", n: 3 }, { op: "fatigue", n: 1 }],
+
+    upgrades: [
+      {
+        frontText: "지정 피해 15, HP -3",
+        backText: "S +4, F +1",
+        front: [{ op: "damageEnemy", target: "select", n: 15 }, { op: "hp", n: -3 }],
+        back: [{ op: "supplies", n: 4 }, { op: "fatigue", n: 1 }],
+      },
+    ]
+  },
+
+  // 12) 천 조각 갑옷
+  {
+    id: "cloth_scrap_armor",
+    name: "천 조각 갑옷",
+    frontText: "방어 +8, S -1",
+    backText: "방어 +4",
+    front: [{ op: "supplies", n: -1 }, { op: "block", n: 8 }],
+    back: [{ op: "block", n: 4 }],
+    upgrades: [
+      {
+        frontText: "방어 +10, S -1",
+        backText: "방어 +5",
+        front: [{ op: "supplies", n: -1 }, { op: "block", n: 10 }],
+        back: [{ op: "block", n: 5 }],
+      },
+    ]
+  },
 
 // 광기 카드
   {
     id: "mad_echo",
     name: "메아리",
-    frontText: "무작위 피해 (F)",
+    frontText: "무작위 피해 (F의 절반 (버림))",
     backText: "드로우 1, S +2, F +1",
-    front: [{ op: "damageEnemyByPlayerFatigue", target: "random", mult: 1 }],
+    front: [{ op: "damageEnemyByPlayerFatigue", target: "random", mult: 0.5 }],
     back: [{ op: "draw", n: 1 }, { op: "supplies", n: 2 }, { op: "fatigue", n: 1 }],
     upgrades: [
       {
-        frontText: "무작위 피해 (F의 2배)",
-        front: [{ op: "damageEnemyByPlayerFatigue", target: "random", mult: 2 }],
+        frontText: "무작위 피해 (F)",
+        front: [{ op: "damageEnemyByPlayerFatigue", target: "random", mult: 1 }],
         backText: "드로우 2, S +2, F +1",
         back: [{ op: "draw", n: 2 }, { op: "supplies", n: 2 }, { op: "fatigue", n: 1 }],
       },
@@ -537,8 +575,8 @@ export const CARDS: CardData[] = [
     back: [{ op: "heal", n: 6 }, { op: "fatigue", n: 2 }],
     upgrades: [
       {
-        frontText: "지정 16 피해, S -1, F +1, 소모",
-        front: [{ op: "damageEnemy", target: "select", n: 16 }, { op: "supplies", n: -1 }, { op: "fatigue", n: 1 }],
+        frontText: "지정 20 피해, S -1, F +1, 소모",
+        front: [{ op: "damageEnemy", target: "select", n: 20 }, { op: "supplies", n: -1 }, { op: "fatigue", n: 1 }],
         backText: "HP +8, F +2, 소모",
         back: [{ op: "heal", n: 8 }, { op: "fatigue", n: 2 }],
       },

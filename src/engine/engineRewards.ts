@@ -1,5 +1,5 @@
 import type { ChoiceState, GameState } from "./types";
-import { addCardToDeck, offerRewardPair } from "../content/rewards";
+import { addCardToDeck, offerRewardPair, removeCardByUid } from "../content/rewards";
 import { closeChoice, enqueueChoice } from "./choice";
 import { logMsg } from "./rules";
 import { getCardDefByIdWithUpgrade } from "../content/cards";
@@ -94,7 +94,7 @@ export function applyRewardChoiceKey(g: GameState, key: string): boolean {
     if (!id) return false;
 
     g.run.relics ??= [];
-    if (!g.run.relics.includes(id)) g.run.relics.push(id);
+    if (!g.run.relics.includes(id)) grantRelic(g, id);
 
     logMsg(g, `유물 획득: ${RELICS_BY_ID[id]?.name ?? id}`);
     closeChoice(g);
@@ -149,18 +149,9 @@ export function applyRewardChoiceKey(g: GameState, key: string): boolean {
     const uid = key.slice("remove:".length);
     if (!uid) return false;
 
-    const idxDeck = g.deck.indexOf(uid);
-    if (idxDeck >= 0) g.deck.splice(idxDeck, 1);
+    const ok = removeCardByUid(g, uid);
+    if (!ok) return false;
 
-    const idxHand = g.hand.indexOf(uid);
-    if (idxHand >= 0) g.hand.splice(idxHand, 1);
-
-    const idxDis = g.discard.indexOf(uid);
-    if (idxDis >= 0) g.discard.splice(idxDis, 1);
-
-    delete g.cards[uid];
-
-    logMsg(g, "카드를 제거했습니다.");
     closeChoice(g);
     return true;
   }
@@ -169,7 +160,8 @@ export function applyRewardChoiceKey(g: GameState, key: string): boolean {
     const id = key.slice("relic:".length);
     if (!id) return false;
 
-    if (g.choiceCtx?.kind === "ELITE_RELIC" && !g.choiceCtx.offerIds.includes(id)) return false;
+    const offerIds = (g.choiceCtx as any)?.offerIds as string[] | undefined;
+    if (offerIds && offerIds.length > 0 && !offerIds.includes(id)) return false;
 
     g.run.relics ??= [];
     if (!g.run.relics.includes(id)) grantRelic(g, id);
@@ -180,4 +172,61 @@ export function applyRewardChoiceKey(g: GameState, key: string): boolean {
   }
 
   return false;
+}
+
+export function openRelicOfferChoice(
+  g: GameState,
+  opt: {
+    count: number;
+    title: string;
+    prompt: string;
+    allowSkip?: boolean;
+    source?: "BOSS" | "ELITE" | "PAID" | string;
+  }
+) {
+  const roll = offerRelicSingleContent(g, opt.count);
+  if (!roll || roll.choices.length === 0) return null;
+
+  const offerIds = roll.choices.map((x) => x.id);
+
+  const options = roll.choices.map((r) => {
+    const def: any = RELICS_BY_ID[r.id];
+    const isLocked = !!def?.unlock;
+
+    const displayName = isLocked
+      ? (def?.dormantName ?? def?.name ?? r.id)
+      : (def?.name ?? r.id);
+
+    const displayDesc = isLocked
+      ? [def?.dormantText, def?.unlockHint].filter(Boolean).join("\n")
+      : (def?.text ?? "");
+
+    return {
+      key: `relic:${r.id}`,
+      label: displayName,
+      detail: `${displayName}\n\n${displayDesc}`,
+    };
+  });
+
+  if (opt.allowSkip) options.push({ key: "skip", label: "생략", detail: "" });
+
+  const choice: ChoiceState = {
+    kind: "REWARD",
+    title: opt.title,
+    prompt: opt.prompt,
+    options,
+  };
+
+  enqueueChoice(g, choice, { kind: "RELIC_OFFER", offerIds, source: opt.source });
+  return offerIds;
+}
+
+export function openBossRelicOfferChoice(g: GameState) {
+  return openRelicOfferChoice(g, {
+    count: 3,
+    title: "보스 보상: 유물",
+    prompt: "유물 1개를 선택합니다.",
+    allowSkip: false,
+    source: "BOSS",
+  });
 }

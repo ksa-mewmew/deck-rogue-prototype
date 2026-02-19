@@ -28,11 +28,3 @@ document.documentElement.style.setProperty(
   "--base",
   import.meta.env.BASE_URL
 );
-
-
-const base = import.meta.env.BASE_URL;
-
-// CSS에서 쓸 완성 URL들을 변수로 주입
-document.documentElement.style.setProperty("--bgUrl", `url(${base}ui/background/dungeon_bg.png)`);
-document.documentElement.style.setProperty("--boardUrl", `url(${base}ui/boards/battle_board.png)`);
-document.documentElement.style.setProperty("--cardUrl", `url(${base}ui/cards/card_parchment.png)`);

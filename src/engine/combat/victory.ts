@@ -3,9 +3,10 @@ import { aliveEnemies, logMsg } from "../rules";
 import { resolvePlayerEffects } from "../resolve";
 import { getCardDefFor } from "../../content/cards";
 import { runRelicHook, checkRelicUnlocks, getUnlockProgress } from "../relics";
-import { openBattleCardRewardChoice, openEliteRelicOfferChoice } from "../engineRewards";
+import { openBattleCardRewardChoice, openEliteRelicOfferChoice, openBossRelicOfferChoice } from "../engineRewards";
 import { escapeRequiredNodePicks } from "./encounter";
 import { _cleanupBattleTransientForVictory } from "./phases";
+
 
 function shuffleInPlace<T>(a: T[]) {
   for (let i = a.length - 1; i > 0; i--) {
@@ -79,12 +80,18 @@ export function checkEndConditions(g: GameState) {
 
   if (aliveEnemies(g).length === 0 && g.phase !== "NODE") {
     g.victoryResolvedThisCombat = true;
-
+    const wasBoss = g.enemies.some((e) => String(e.id).startsWith("boss_"));
     _cleanupBattleTransientForVictory(g);
     applyWinHooksWhileInBackThisTurn(g);
 
     logMsg(g, "적을 모두 처치!");
-
+    {
+      const map = (g.run as any).map as any;
+      if (map && map.nodes && map.pos && map.nodes[map.pos]) {
+        map.nodes[map.pos].cleared = true;
+        map.nodes[map.pos].visited = true;
+      }
+    }
     // 유물 해금 진행도: 엘리트 전투 승리 1회
     if (g.run.lastBattleWasElite) {
       const up = getUnlockProgress(g);
@@ -97,6 +104,12 @@ export function checkEndConditions(g: GameState) {
     g.player.zeroSupplyTurns = 0;
 
     runRelicHook(g, "onVictory");
+
+    if (wasBoss) {
+      g.player.hp = g.player.maxHp;
+      logMsg(g, "보스 격파! 체력이 완전히 회복되었습니다.");
+      openBossRelicOfferChoice(g); // 3개 중 1개
+    }
 
     openEliteRelicOfferChoice(g);
     openBattleCardRewardChoice(g);

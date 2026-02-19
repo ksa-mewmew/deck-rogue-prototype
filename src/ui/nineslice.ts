@@ -43,7 +43,6 @@ export function drawNineSlice(
   const mode: NineSliceMode = opts?.mode ?? "stretch";
   const drawCenter = opts?.drawCenter ?? true;
 
-  // 너무 작은 박스에도 안전하게: 좌/우/상/하 보더는 박스 크기를 넘지 않게 조정
   let L = border.left, R = border.right, T = border.top, B = border.bottom;
   L = Math.min(L, Math.floor(w / 2));
   R = Math.min(R, Math.floor(w / 2));
@@ -55,17 +54,14 @@ export function drawNineSlice(
   const cw = clampMin(w - L - R, 0);
   const ch = clampMin(h - T - B, 0);
 
-  // 픽셀아트 느낌이면 스무딩 끄기
   const prevSmoothing = ctx.imageSmoothingEnabled;
   if (opts?.pixelated) ctx.imageSmoothingEnabled = false;
 
-  // 1) 코너 4개 (고정)
   ctx.drawImage(imgs.tl, x, y, L, T);
   ctx.drawImage(imgs.tr, x + w - R, y, R, T);
   ctx.drawImage(imgs.bl, x, y + h - B, L, B);
   ctx.drawImage(imgs.br, x + w - R, y + h - B, R, B);
 
-  // 2) 변 4개 + 중앙
   if (mode === "stretch") {
     // 상/하
     ctx.drawImage(imgs.t,  cx, y,          cw, T);
@@ -76,7 +72,6 @@ export function drawNineSlice(
     // 중앙
     if (drawCenter) ctx.drawImage(imgs.c, cx, cy, cw, ch);
   } else {
-    // repeat 타일링: 작은 이미지 반복해 채우기
     const patT = ctx.createPattern(imgs.t, "repeat")!;
     const patB = ctx.createPattern(imgs.b, "repeat")!;
     const patL = ctx.createPattern(imgs.l, "repeat")!;

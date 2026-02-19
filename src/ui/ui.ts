@@ -1,16 +1,10 @@
-/* =========================================================
-   ui.ts — REORDERED BY INTENT (no logic changes)
-   - Only moved declarations (functions / globals)
-   - Added section dividers for navigation
-   ========================================================= */
 
-/* =========================
-   IMPORTS
-   ========================= */
+
+
 
 import { setDevConsoleCtx, renderDevConsole, toggleDevConsole, isDevConsoleOpen } from "./dev_console";
 import { drawNineSlice } from "./nineslice";
-import type { GameState, PileKind, NodeOffer, Side, IntentCategory, IntentPreview } from "../engine/types";
+import type { GameState, PileKind, Side, IntentCategory, IntentPreview, DungeonMap, MapNode } from "../engine/types";
 import {
   spawnEncounter,
   startCombat,
@@ -24,11 +18,9 @@ import {
   drawStepStartNextTurn,
   isTargeting,
   currentTotalDeckLikeSize,
-  escapeRequiredNodePicks,
 } from "../engine/combat";
-import { logMsg, rollBranchOffer, advanceBranchOffer, madnessP, } from "../engine/rules";
+import { logMsg } from "../engine/rules";
 import { createInitialState } from "../engine/state";
-
 import { applyChoiceKey } from "../engine/choiceApply";
 import type { EventOutcome } from "../content/events";
 import { pickEventByMadness, getEventById } from "../content/events";
@@ -38,14 +30,10 @@ import { getCardDefByIdWithUpgrade } from "../content/cards";
 import { saveGame, hasSave, loadGame, clearSave } from "../persist";
 
 import { RELICS_BY_ID } from "../content/relicsContent";
-import { getRelicDisplay } from "../engine/relics";
+import { getRelicDisplay, getUnlockProgress, checkRelicUnlocks } from "../engine/relics";
 
 
 import { buildIntentPreview } from "../engine/intentPreview";
-
-/* =========================
-   STATIC TEXT / RULEBOOK COPY
-   ========================= */
 
 const RULEBOOK_TEXT = `# Deck Rogue Prototype — 룰북 (플레이어용)
 
@@ -106,9 +94,54 @@ const RULEBOOK_TEXT = `# Deck Rogue Prototype — 룰북 (플레이어용)
 중요한 건 이곳이 당신에게 넉넉한 시간을 주지 않는다는 것이겠지요.
 `;
 
-/* =========================
-   UTILITIES — time + math
-   ========================= */
+
+let _ASSET_BASE: string | null = null;
+
+function getAssetBase(): string {
+  if (_ASSET_BASE) return _ASSET_BASE;
+
+  const viteBase = (import.meta as any)?.env?.BASE_URL as string | undefined;
+  if (viteBase && typeof viteBase === "string") {
+    _ASSET_BASE = new URL(viteBase, window.location.origin).href.replace(/\/?$/, "/");
+    return _ASSET_BASE;
+  }
+
+  const baseTag = document.querySelector("base") as HTMLBaseElement | null;
+  if (baseTag?.href) {
+    _ASSET_BASE = baseTag.href.replace(/\/?$/, "/");
+    return _ASSET_BASE;
+  }
+
+  _ASSET_BASE = `${window.location.origin}/`;
+  return _ASSET_BASE;
+}
+
+const APP_BASE_HREF = new URL(
+  (import.meta as any).env?.BASE_URL ?? "/",
+  window.location.origin
+).href;
+
+export function assetUrl(ref: string): string {
+  if (!ref) return ref;
+  if (/^(https?:|data:|blob:)/i.test(ref)) return ref;
+  const clean = ref.replace(/^\/+/, "");
+  return new URL(clean, APP_BASE_HREF).href;
+}
+
+let _assetVarsApplied = false;
+function applyAssetVarsOnce() {
+  if (_assetVarsApplied) return;
+  _assetVarsApplied = true;
+
+  const root = document.documentElement;
+
+  root.style.setProperty("--bgUrl", `url("${assetUrl("assets/ui/background/dungeon_bg.png")}")`);
+  root.style.setProperty("--boardUrl", `url("${assetUrl("assets/ui/boards/battle_board.png")}")`);
+  root.style.setProperty("--cardUrl", `url("${assetUrl("assets/ui/cards/card_parchment.png")}")`);
+
+  root.style.setProperty("--mapBgUrl", `url("${assetUrl("assets/ui/background/map_bg.png")}")`);
+}
+
 
 function sleep(ms: number) {
   return new Promise<void>((res) => window.setTimeout(res, ms));
@@ -120,16 +153,14 @@ function tickMsForPhase(phase: GameState["phase"]) {
     case "ENEMY": return 100;
     case "UPKEEP": return 100;
     case "DRAW":  return 100;
-    case "PLACE": return 0;   // PLACE에서는 멈추도록
+    case "PLACE": return 0;   
     default: return 220;
   }
 }
 
 
 
-/* =========================
-   FLOATING FX — state + delta emission
-   ========================= */
+
 
 type FloatFx = {
   id: number;
@@ -175,7 +206,7 @@ function pushFloatFx(kind: FloatFx["kind"], text: string, x: number, y: number) 
 
 function cleanupFloatFx() {
   const now = performance.now();
-  // floatUp 애니메이션 650ms 기준으로 컷
+  
   floatFx = floatFx.filter((f) => now - f.born < 700);
 }
 
@@ -192,7 +223,7 @@ function detectAndEmitDeltas(g: GameState) {
     return;
   }
 
-  // 플레이어
+  
   if (prevPlayerHp != null) {
     const d = g.player.hp - prevPlayerHp;
     if (d !== 0) emitPlayerDelta(d);
@@ -202,7 +233,7 @@ function detectAndEmitDeltas(g: GameState) {
     if (d !== 0) emitPlayerBlockDelta(d);
   }
 
-  // 적들
+  
   for (let i = 0; i < g.enemies.length; i++) {
     const cur = g.enemies[i].hp;
     const prev = prevEnemyHp[i];
@@ -260,17 +291,15 @@ function emitEnemyDelta(i: number, dhp: number) {
 
 
 
-/* =========================
-   UI SCALE — persisted settings + derived helpers
-   ========================= */
 
-// 스케일
+
+
 
 
 
 type UiSettings = {
-  uiScaleDesktop: number; // 0.8 ~ 1.4
-  uiScaleMobile: number;  // 0.8 ~ 1.4
+  uiScaleDesktop: number; 
+  uiScaleMobile: number;  
   slotCardMode: "FULL" | "NAME_ONLY";
 };
 
@@ -324,11 +353,9 @@ function sx(px: number) {
 
 
 
-/* =========================
-   RESPONSIVE — mobile UI detection
-   ========================= */
 
-//모바일
+
+
 
 function isMobileUiNow() {
   return window.matchMedia("(max-width: 900px) and (pointer: coarse)").matches;
@@ -339,9 +366,7 @@ let logCollapsed = false;
 
 
 
-/* =========================
-   LOG PANEL — persisted collapse state
-   ========================= */
+
 
 function loadLogCollapsed() {
   try {
@@ -369,9 +394,7 @@ function scheduleSave(g: GameState) {
 
 
 
-/* =========================
-   AUTO-ADVANCE — forced next / schedule
-   ========================= */
+
 
 type ForcedNext = null | "BOSS";
 
@@ -379,9 +402,9 @@ let autoAdvancing = false;
 
 async function runAutoAdvanceRAF(g: GameState, actions: UIActions) {
 
-  if ((g as any)._justStartedCombat) {
-    (g as any)._justStartedCombat = false;
-    return;
+  if (g._justStartedCombat) {
+    g._justStartedCombat = false;
+    return
   }
 
   if (autoAdvancing) return;
@@ -401,10 +424,10 @@ async function runAutoAdvanceRAF(g: GameState, actions: UIActions) {
       if (g.choice || overlay) break;
       if (isTargeting(g)) break;
 
-      const step = computeNextStep(g, actions, /*targeting*/ false);
+      const step = computeNextStep(g, actions,  false);
       if (!step.fn || step.disabled) break;
 
-      // 현재 단계 기억
+      
       const beforePhase = g.phase;
 
       step.fn();
@@ -422,12 +445,9 @@ async function runAutoAdvanceRAF(g: GameState, actions: UIActions) {
 
 function ensureBossSchedule(g: GameState) {
   const runAny = g.run as any;
-  if (runAny.nextBossTime == null) runAny.nextBossTime = 40; // 첫 보스 시간
+  if (runAny.timeMove == null) runAny.timeMove = g.run.nodePickCount ?? 0;
+  if (runAny.nextBossTime == null) runAny.nextBossTime = 40; 
   if (runAny.forcedNext == null) runAny.forcedNext = null as ForcedNext;
-}
-
-function totalTime(g: GameState) {
-  return (g.run.nodePickCount ?? 0) + (g.time ?? 0);
 }
 
 function rollExtraTime01FromDeck(deckN: number) {
@@ -450,6 +470,7 @@ function hydrateLoadedState(loaded: any, content: any) {
   g.run.relics ??= [];
 
   g.run ??= {};
+  (g.run as any).timeMove ??= g.run.nodePickCount ?? 0;
   g.run.nextBossTime ??= 40;
   g.run.forcedNext ??= null;
   g.run.bossOmenText ??= null;
@@ -584,11 +605,9 @@ let currentG: GameState | null = null;
 
 
 
-/* =========================
-   CARDS HOVER
-   ========================= */
 
-// 카드 호버 닫기
+
+
 
 let hoveredCardKey: string | null = null;
 let suppressHoverUntil = 0;
@@ -651,11 +670,9 @@ function createCardHoverPreviewApi(): CardHoverPreviewApi {
   return { ensure, show, hide };
 }
 
-/* =========================
-   UI PRIMITIVES — DOM builders + small helpers
-   ========================= */
 
-// Helpers / UI primitives
+
+
 
 
 
@@ -684,11 +701,9 @@ function cardDisplayNameByUid(g: GameState, uid: string) {
 
 
 
-/* =========================
-   CARDS — render + layout
-   ========================= */
 
-// Cards
+
+
 
 type CardRenderMode = "FULL" | "SLOT_NAME_ONLY";
 
@@ -735,7 +750,7 @@ function renderCard(
 
   if (mode === "SLOT_NAME_ONLY") d.classList.add("slotNameOnly");
 
-  // HEADER
+  
   const header = div("cardHeader");
   const title = displayNameForUid(g, cardUid);
   header.appendChild(divText("cardTitle", title));
@@ -749,7 +764,7 @@ function renderCard(
 
   d.appendChild(header);
 
-  // BODY
+  
   if (mode === "FULL") {
     const body = div("cardBody");
 
@@ -765,13 +780,13 @@ function renderCard(
 
     d.appendChild(body);
   } else {
-    // SLOT_NAME_ONLY: 바디 자체를 만들지 않음
+    
   }
 
-  // 클릭
+  
   if (clickable && onClick) d.onclick = () => onClick(cardUid);
 
-  // 드래그
+  
   if (clickable) {
     d.onpointerdown = (ev) => {
       if ((ev as any).button !== 0 && (ev as any).pointerType === "mouse") return;
@@ -784,7 +799,7 @@ function renderCard(
     };
   }
 
-// ===== hover 프리뷰 =====
+
 
   if (opt?.hoverPreview) {
     const { root, api, buildDetail } = opt.hoverPreview;
@@ -835,7 +850,7 @@ function plainTextFromRich(node: any): string {
 
 
 
-// Small UI primitives
+
 
 function div(cls: string) {
   const d = document.createElement("div");
@@ -903,9 +918,7 @@ function displayNameForOffer(g: GameState, offer: { defId: any; upgrade: number 
 
 
 
-/* =========================
-   CARD RICH TEXT — keyword icons + inline markup
-   ========================= */
+
 
 const KW_ICON: Record<string, string> = {
   "취약": "🎯",
@@ -958,13 +971,10 @@ function renderCardRichTextNode(text: string): HTMLElement {
 }
 
 function enemyArtUrl(enemyId: string) {
-  return `assets/enemies/${enemyId}.png`;
+  return assetUrl(`assets/enemies/${enemyId}.png`);
 }
 
 
-/* =========================
-   INTENTS — mode-aware formatter + tooltip helpers
-   ========================= */
 
 const EFFECT_ICON: Record<string, string> = {
   vuln: "🎯",
@@ -984,14 +994,40 @@ function isAttackCat(cat: IntentCategory) {
 
 function computeIntentDamageText(g: GameState, e: EnemyState, pv: IntentPreview | any): string {
   if (!pv) return "";
-
   if (!isAttackCat((pv as any).cat as any)) return "";
 
   const hits = Math.max(1, Number((pv as any).hits ?? 1) || 1);
   const per  = Math.max(0, Number((pv as any).perHit ?? 0) || 0);
   const total = Math.max(0, Number((pv as any).dmgTotal ?? (per * hits)) || 0);
 
-  if (hits > 1) return `${total} (${per}*${hits})`;
+  if (hits > 1) {
+    if (per <= 0) return `${total} (${hits}타)`;
+
+    const baseTotal = per * hits;
+
+    if (total === baseTotal) return `${total} (${per}x${hits})`;
+
+    const blk = Math.max(0, Number(g.player?.block ?? 0) || 0);
+    if (blk > 0) {
+      let b = blk;
+      const afterHits: number[] = [];
+      for (let i = 0; i < hits; i++) {
+        const used = Math.min(b, per);
+        b -= used;
+        afterHits.push(per - used);
+      }
+      const afterTotal = afterHits.reduce((s, x) => s + x, 0);
+
+      if (afterTotal === total) {
+        const allSame = afterHits.every((x) => x === afterHits[0]);
+        if (allSame) return `${total} (${afterHits[0]}x${hits})`;
+        return `${total} (${afterHits.join("+")})`;
+      }
+    }
+
+    return `${total} (${per}x${hits})`;
+  }
+
   return `${total}`;
 }
 
@@ -1045,11 +1081,9 @@ function renderStatusEmojiRow(st: any, immuneThisTurn?: boolean) {
   return row;
 }
 
-/* =========================
-   UI ACTIONS — imperative interface
-   ========================= */
 
-// UI Actions
+
+
 
 
 export type UIActions = ReturnType<typeof makeUIActions>;
@@ -1096,12 +1130,13 @@ let uiMounted = false;
 let drag: DragState = null;
 let hoverSlot: SlotDrop | null = null;
 let showLogOverlay = false;
+let mapDetailOverlayOpen = false;
 
 let relicHoverId: string | null = null;
 let relicHoverAt: Pt | null = null;
 let relicModalId: string | null = null;
 
-// 카드 렌더
+
 
 
 function renderCardPreviewByUidWithUpgrade(g: GameState, uid: string, upgrade: number): HTMLElement {
@@ -1114,7 +1149,7 @@ function renderRealCardForOverlay(
   uid: string,
   onPick?: (uid: string) => void
 ): HTMLElement {
-  const clickable = !!onPick; // 선택 가능할 때만 클릭 허용
+  const clickable = !!onPick; 
   const el = renderCard(g, uid, clickable, onPick, { draggable: false });
   el.classList.add("overlayCard");
   return el;
@@ -1148,13 +1183,13 @@ function renderCardPreviewByDef(g: GameState, defId: string, upgrade: number): H
   return el;
 }
 
-// 길
+
 
 
 
 type NodeType = "BATTLE" | "ELITE" | "REST" | "TREASURE" | "EVENT";
 
-const VS15 = "\uFE0E"; // text presentation (emoji화 완화)
+const VS15 = "\uFE0E"; 
 
 function sepSpan(cls: string, txt: string) {
   const s = document.createElement("span");
@@ -1201,8 +1236,8 @@ export function renderLabelList(
   el.replaceChildren();
 
   if (isBoss) {
-    // 기존 동작 유지하고 싶으면 그냥 "보스" 텍스트만 넣어도 되고,
-    // 아이콘까지 원하면 아래 한 줄로:
+    
+    
     appendNodeLabel(el, "BATTLE", true);
     return;
   }
@@ -1218,164 +1253,1407 @@ export function renderLabelList(
   });
 }
 
-function renderNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
-
-  const DROP = sx(106);
-
-  const wrap = div("nodeSelectWrap");
-  wrap.style.cssText = `margin-top:${DROP}px;`;
 
 
-  const parts: string[] = [`[탐험 ${g.run.nodePickCount}회]`];
 
-  if (g.run.treasureObtained) {
-    const snap = g.run.deckSizeAtTreasure ?? currentTotalDeckLikeSize(g);
-    const req = escapeRequiredNodePicks(snap);
-    parts.push(`[탈출까지 ${g.run.afterTreasureNodePicks}/${req}]`);
+
+type VisionMode = "NORMAL" | "FOCUS" | "WIDE";
+
+type VisionParams = {
+  mode: VisionMode;
+  
+  presenceR: number;
+  
+  typeR: number;
+  
+  detailR: number;
+  
+  noise: number;
+};
+
+type MapNodeKind = NodeType | "START" | "EMPTY";
+
+type MapNodeLite = {
+  id: string;
+  kind: MapNodeKind;
+  visited?: boolean;
+  cleared?: boolean;
+  depth?: number;
+  order?: number;
+};
+
+type GraphMapLite = {
+  pos: string;
+  startId: string;
+  nodes: Record<string, MapNodeLite>;
+  edges: Record<string, string[]>;
+  visionNonce?: number;
+  treasureId?: string | null;
+  
+  seen?: Record<string, 0 | 1 | 2 | 3>;
+};
+
+function pushUniq(arr: string[], v: string) {
+  if (!arr.includes(v)) arr.push(v);
+}
+function addUndirectedEdge(edges: Record<string, string[]>, a: string, b: string) {
+  (edges[a] ||= []);
+  (edges[b] ||= []);
+  pushUniq(edges[a], b);
+  pushUniq(edges[b], a);
+}
+
+function dungeonToGraphLite(dm: DungeonMap, opts?: { verticalLinks?: boolean }): GraphMapLite {
+  const nodes: Record<string, MapNodeLite> = {};
+
+  const dmNodes = dm.nodes as Record<string, MapNode>;
+  for (const n of Object.values(dmNodes)) {
+    nodes[n.id] = { id: n.id, kind: n.kind as any, depth: n.depth, order: n.order };
   }
 
-  wrap.appendChild(p(parts.join(" ")));
+  const edges: Record<string, string[]> = {};
+  for (const id of Object.keys(nodes)) edges[id] = [];
 
-  ensureBossSchedule(g);
-
-  if (!g.run.bossOmenText || String(g.run.bossOmenText).trim() === "") {
-    g.run.bossOmenText = "아직 징조가 없다.";
+  for (const n of Object.values(dmNodes)) {
+    nodes[n.id] = { id: n.id, kind: n.kind as any, depth: n.depth, order: n.order };
   }
 
-  const runAny = g.run as any;
 
-  const T = totalTime(g);
-  const nextBossTime = runAny.nextBossTime ?? 40;
-
-  const offers = actions.getNodeOffers();
-
-  const extra = runAny.nodeExtra01 ?? 0;
-  const afterTBase = T + 1 + extra;
-
-  const forcedBossNow = runAny.forcedNext === "BOSS";
-  const willForceRest = !forcedBossNow && afterTBase >= nextBossTime;
-
-
-  const canPickBattle = !forcedBossNow && !willForceRest && (offers[0]?.type === "BATTLE" || offers[1]?.type === "BATTLE");
-
-  const afterT_ifBattle = afterTBase + 1;
-  const afterT2 = forcedBossNow
-    ? (afterTBase + 1)
-    : canPickBattle
-    ? afterT_ifBattle
-    : afterTBase;
-
-  const remaining = Math.max(0, nextBossTime - T);
-
-
-  const willHitBossUI = afterT2 >= nextBossTime;
-
-  if (willHitBossUI && runAny.forcedNext !== "BOSS") {
-    const warn = divText("bossIncomingBanner", "보스가 온다.");
-    warn.style.cssText =
-      "margin-top:10px; padding:10px 12px; border-radius:14px;" +
-      "border:1px solid rgba(255,255,255,1);" +
-      "background: rgba(255,120,60,1);" +
-      "font-weight:700; font-size:13px; line-height:1.25;";
-    wrap.appendChild(warn);
+  if (opts?.verticalLinks) {
+    const byDepth = new Map<number, string[]>();
+    for (const id of Object.keys(nodes)) {
+      const d = nodes[id].depth ?? 0;
+      const arr = byDepth.get(d) ?? [];
+      arr.push(id);
+      byDepth.set(d, arr);
+    }
+    for (const [, ids] of byDepth) {
+      ids.sort((a, b) => (nodes[a].order ?? 0) - (nodes[b].order ?? 0));
+      for (let i = 0; i < ids.length - 1; i++) {
+        addUndirectedEdge(edges, ids[i], ids[i + 1]);
+      }
+    }
   }
 
-  const { tier } = madnessP(g);
-  const extraOmen =
-    tier === 0 ? "" :
-    tier === 1 ? (Math.random() < 0.1 ? " . . . 들린다." : "") :
-    tier === 2 ? (Math.random() < 0.1 ? " . . . 보인다." : "") :
-                (Math.random() < 0.1 ? " . . . 닿았다." : "");
-
-  const omenTxt = ` . . . ${g.run.bossOmenText}${extraOmen}`;
-
-
-  const omen = divText(
-    "bossOmenBanner",
-    `다음 보스까지 남은 시간: ${remaining}${omenTxt}`
-  );
-
-  omen.style.cssText =
-    "margin-top:8px; padding:10px 12px; border-radius:14px;" +
-    "border:1px solid rgba(255, 255, 255, 1);" +
-    "background:rgba(0, 0, 0, 1);" +
-    "font-weight:600;" +
-    "font-size:13px;" +
-    "line-height:1.2;";
-  omen.style.color = "white";
-  wrap.appendChild(omen);
-
-  const br = g.run.branchOffer;
-  if (br) {
-    const preview = div("nodePreviewBox");
-    preview.style.cssText =
-      "margin-top:10px; padding:12px; border:1px solid rgba(255,255,255,1); border-radius:16px; background:rgba(0,0,0,1);";
-
-    const forcedBoss = runAny.forcedNext === "BOSS";
-
-    const makeRow = (side: "A" | "B") => {
-      const row = div("nodePreviewRow");
-      row.onmouseenter = () => (row.style.background = "rgba(255,255,255,.06)");
-      row.onmouseleave = () => (row.style.background = "transparent");
-      row.onclick = () => actions.onChooseNode(side);
-
-      const idx = side === "A" ? 0 : 1;
-
-      const nowWrap = div("nodeCol");
-      const pillNow = document.createElement("div");
-      pillNow.className = "nodePill primary";
-      pillNow.onclick = (e) => {
-        e.stopPropagation();
-        actions.onChooseNode(side);
-      };
-      pillNow.replaceChildren();
-      if (forcedBoss) appendNodeLabel(pillNow, "BATTLE", true);
-      else appendNodeLabel(pillNow, (offers[idx]?.type ?? "BATTLE") as any, false);
-      nowWrap.appendChild(pillNow);
-
-      const arrowWrap = div("nodeCol");
-      arrowWrap.appendChild(sepSpan("nodeSepArrow", "→"));
-
-      const nextList = side === "A" ? br.nextIfA : br.nextIfB;
-      const a = nextList[0]?.type ?? "BATTLE";
-      const b = nextList[1]?.type ?? "BATTLE";
-
-      const next1Wrap = div("nodeCol");
-      const next1 = document.createElement("span");
-      next1.replaceChildren();
-      appendNodeLabel(next1, a as any, false);
-      next1Wrap.appendChild(next1);
-
-      const slashWrap = div("nodeCol");
-      slashWrap.appendChild(sepSpan("nodeSepSlash", "/"));
-
-      const next2Wrap = div("nodeCol");
-      const next2 = document.createElement("span");
-      next2.replaceChildren();
-      appendNodeLabel(next2, b as any, false);
-      next2Wrap.appendChild(next2);
-
-      row.appendChild(nowWrap);
-      row.appendChild(arrowWrap);
-      row.appendChild(next1Wrap);
-      row.appendChild(slashWrap);
-      row.appendChild(next2Wrap);
-
-      return row;
-    };
-
-    preview.appendChild(makeRow("A"));
-    preview.appendChild(makeRow("B"));
-
-    wrap.appendChild(preview);
-    wrap.appendChild(hr());
-    root.appendChild(wrap);
-  }
+  return {
+    pos: dm.pos,
+    startId: dm.startId,
+    nodes,
+    edges,
+    visionNonce: dm.visionNonce,
+    treasureId: dm.treasureId,
+  };
 }
 
 
+function hash32(s: string) {
+  
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function seeded01(seed: number) {
+  
+  let x = seed >>> 0;
+  x ^= x << 13;
+  x ^= x >>> 17;
+  x ^= x << 5;
+  return ((x >>> 0) / 4294967296);
+}
+
+function clamp01(x: number) { return Math.max(0, Math.min(1, x)); }
+function clampInt(x: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, Math.floor(x))); }
+
+function ensureGraphRuntime(g: GameState) {
+  const runAny = g.run as any;
+
+  runAny.timeMove ??= 0;
+
+  runAny.vision ??= {
+    mode: "NORMAL" as VisionMode,
+    presenceR: 2,
+    typeR: 1,
+    detailR: 0,
+    noise: 0.01 * g.player.fatigue,
+  };
+  
+  runAny.pursuit ??= { heat: 0 };
+
+  
+  if (!runAny.map) {
+    runAny.map = makeDebugGraphMap();
+  } else {
+    
+    const m = runAny.map as any;
+    if (Array.isArray(m.nodes)) {
+      const rec: Record<string, MapNodeLite> = {};
+      for (const n of m.nodes) rec[String(n.id)] = n;
+      m.nodes = rec;
+    }
+  }
+
+    const mapLite = runAny.map as GraphMapLite;
+  const isLayered = Object.keys(mapLite?.nodes ?? {}).every(
+    (id) => typeof (mapLite.nodes[id] as any)?.order === "number"
+  );
+
+  if (!isLayered) {
+    try { ensureNoDeadEnds(mapLite, 2); } catch {}
+  }
+
+  try { ensureSeenMap(mapLite); } catch {}
 
 
+  return {
+    map: runAny.map as GraphMapLite,
+    vision: runAny.vision as VisionParams,
+    pursuit: runAny.pursuit as { heat: number },
+    timeMove: runAny.timeMove as number,
+  };
+}
+
+function totalTimeOnMap(g: GameState) {
+  const runAny = g.run as any;
+  const tm = Number(runAny.timeMove ?? 0) || 0;
+  const ta = Number(g.time ?? 0) || 0;
+  return tm + ta;
+}
+
+function pursuitTier(heat: number) {
+  if (heat >= 14) return 3;
+  if (heat >= 9) return 2;
+  if (heat >= 5) return 1;
+  return 0;
+}
+
+
+function maybeShiftTopology(g: GameState) {
+  const { map, pursuit } = ensureGraphRuntime(g);
+  const tier = pursuitTier(pursuit.heat ?? 0);
+  if (tier <= 0) return;
+
+  const p = 0.05 + 0.04 * tier;
+  if (Math.random() >= p) return;
+
+  const edges = (map.edges ??= {});
+  const ids = Object.keys(map.nodes);
+  if (ids.length < 4) return;
+
+  const depthOf = (id: string) => Number(map.nodes[id]?.depth ?? 999);
+  const orderOf = (id: string) => Number((map.nodes[id] as any)?.order ?? 0);
+
+  const ensureUndirected = (a: string, b: string) => {
+    edges[a] ??= [];
+    edges[b] ??= [];
+    if (!edges[a].includes(b)) edges[a].push(b);
+    if (!edges[b].includes(a)) edges[b].push(a);
+  };
+
+  const removeUndirected = (a: string, b: string) => {
+    edges[a] = (edges[a] ?? []).filter((x) => x !== b);
+    edges[b] = (edges[b] ?? []).filter((x) => x !== a);
+  };
+
+  const connectedFrom = (start: string) => {
+    const seen = new Set<string>();
+    const q: string[] = [start];
+    seen.add(start);
+    while (q.length) {
+      const cur = q.shift()!;
+      for (const nx of edges[cur] ?? []) {
+        if (seen.has(nx)) continue;
+        seen.add(nx);
+        q.push(nx);
+      }
+    }
+    return seen;
+  };
+
+  const byDepth = new Map<number, string[]>();
+  for (const id of ids) {
+    const d = depthOf(id);
+    if (!byDepth.has(d)) byDepth.set(d, []);
+    byDepth.get(d)!.push(id);
+  }
+  for (const [d, arr] of byDepth) arr.sort((a, b) => (orderOf(a) - orderOf(b)) || a.localeCompare(b));
+
+  const pairKeys = Array.from(byDepth.keys()).filter((d) => byDepth.has(d) && byDepth.has(d + 1));
+  if (pairKeys.length === 0) return;
+
+  const layerEdgePairs = (d: number) => {
+    const left = byDepth.get(d) ?? [];
+    const right = byDepth.get(d + 1) ?? [];
+    const li = new Map<string, number>();
+    const ri = new Map<string, number>();
+    for (let i = 0; i < left.length; i++) li.set(left[i], i);
+    for (let j = 0; j < right.length; j++) ri.set(right[j], j);
+
+    const pairs: Array<[number, number]> = [];
+    for (const a of left) {
+      for (const b of edges[a] ?? []) {
+        if (depthOf(b) !== d + 1) continue;
+        const i = li.get(a);
+        const j = ri.get(b);
+        if (i == null || j == null) continue;
+        pairs.push([i, j]);
+      }
+    }
+    return { left, right, li, ri, pairs };
+  };
+
+  const wouldCross = (d: number, leftId: string, rightId: string) => {
+    const { li, ri, pairs } = layerEdgePairs(d);
+    const i = li.get(leftId);
+    const j = ri.get(rightId);
+    if (i == null || j == null) return true;
+    for (const [i2, j2] of pairs) {
+      if ((i < i2 && j > j2) || (i > i2 && j < j2)) return true;
+    }
+    return false;
+  };
+
+  const addPlanar = (a: string, b: string) => {
+    if ((edges[a] ?? []).includes(b)) return false;
+    const da = depthOf(a);
+    const db = depthOf(b);
+    if (Math.abs(da - db) !== 1) return false;
+
+    const d = Math.min(da, db);
+    const left = da < db ? a : b;
+    const right = da < db ? b : a;
+    if (wouldCross(d, left, right)) return false;
+
+    ensureUndirected(left, right);
+    return true;
+  };
+
+  const doAdd = Math.random() < 0.55;
+
+  if (doAdd) {
+    for (let tries = 0; tries < 80; tries++) {
+      const d = pairKeys[Math.floor(Math.random() * pairKeys.length)];
+      const { left, right } = layerEdgePairs(d);
+      if (!left.length || !right.length) continue;
+
+      const a = left[Math.floor(Math.random() * left.length)];
+      const b = right[Math.floor(Math.random() * right.length)];
+      if (addPlanar(a, b)) {
+        logMsg(g, `대격변: 길이 새로 열렸습니다. (${a} ↔ ${b})`);
+        return;
+      }
+    }
+    return;
+  }
+
+  const allPairs: Array<[string, string]> = [];
+  for (const a of ids) {
+    for (const b of edges[a] ?? []) {
+      if (a >= b) continue;
+      if (Math.abs(depthOf(a) - depthOf(b)) !== 1) continue;
+      allPairs.push([a, b]);
+    }
+  }
+  if (allPairs.length === 0) return;
+
+  for (let tries = 0; tries < 120; tries++) {
+    const [a, b] = allPairs[Math.floor(Math.random() * allPairs.length)];
+    const degA = (edges[a] ?? []).length;
+    const degB = (edges[b] ?? []).length;
+    if (degA <= 1 || degB <= 1) continue;
+
+    removeUndirected(a, b);
+
+    const start = Object.values(map.nodes).find((n) => n.kind === "START")?.id ?? map.pos;
+    const seen = connectedFrom(start);
+
+    if (seen.size === ids.length && ids.every((id) => (edges[id] ?? []).length >= 1)) {
+      logMsg(g, `대격변: 길이 무너졌습니다. (${a} ↔ ${b})`);
+      return;
+    }
+
+    ensureUndirected(a, b);
+  }
+}
+
+function bfsDistances(map: GraphMapLite, start: string, maxDist: number) {
+  const dist: Record<string, number> = {};
+  const q: string[] = [];
+
+  dist[start] = 0;
+  q.push(start);
+
+  while (q.length) {
+    const cur = q.shift()!;
+    const d = dist[cur] ?? 0;
+    if (d >= maxDist) continue;
+
+    const ns = map.edges[cur] ?? [];
+    for (const nx of ns) {
+      if (dist[nx] != null) continue;
+      dist[nx] = d + 1;
+      q.push(nx);
+    }
+  }
+
+  return dist;
+}
+
+
+type RevealLevel = 0 | 1 | 2 | 3;
+
+function ensureSeenMap(map: GraphMapLite): Record<string, RevealLevel> {
+  const m: any = map as any;
+  if (!m.seen) m.seen = {};
+  
+  m.seen[map.pos] = 3;
+  return m.seen as Record<string, RevealLevel>;
+}
+
+
+function updateSeenFromVision(map: GraphMapLite, vp: VisionParams) {
+  const seen = ensureSeenMap(map);
+  const maxD = Math.max(0, vp.presenceR | 0);
+  const distNow = bfsDistances(map, map.pos, maxD);
+
+  for (const id of Object.keys(distNow)) {
+    const d = distNow[id] ?? 0;
+    const r = revealLevelForDist(d, vp);
+    const prev = (seen[id] ?? 0) as RevealLevel;
+    if (r > prev) seen[id] = r;
+  }
+
+  
+  seen[map.pos] = 3;
+}
+
+function seenLevel(map: GraphMapLite, id: string): RevealLevel {
+  const seen = (map.seen ?? {}) as Record<string, RevealLevel>;
+  return (seen[id] ?? 0) as RevealLevel;
+}
+
+
+function ensureNoDeadEnds(map: GraphMapLite, minDegree: number = 2) {
+  const ids = Object.keys(map.nodes);
+  if (ids.length <= 2) return;
+
+  map.edges ??= {};
+
+  for (const a of Object.keys(map.edges)) {
+    for (const b of (map.edges[a] ?? []).slice()) {
+      map.edges[b] ??= [];
+      if (!map.edges[b].includes(a)) map.edges[b].push(a);
+    }
+  }
+
+  const depthOf = (id: string) => Number(map.nodes[id]?.depth ?? 999);
+  const orderOf = (id: string) => Number((map.nodes[id] as any)?.order ?? 0);
+  const degree = (id: string) => (map.edges[id] ?? []).length;
+
+  const hasLayered = ids.every((id) => {
+    const d = depthOf(id);
+    return d >= 0 && d < 900 && typeof (map.nodes[id] as any)?.order === "number";
+  });
+
+  const byDepth = new Map<number, string[]>();
+  if (hasLayered) {
+    for (const id of ids) {
+      const d = depthOf(id);
+      if (!byDepth.has(d)) byDepth.set(d, []);
+      byDepth.get(d)!.push(id);
+    }
+    for (const [d, arr] of byDepth) arr.sort((a, b) => (orderOf(a) - orderOf(b)) || a.localeCompare(b));
+  }
+
+  const layerPairs = (d: number) => {
+    const left = byDepth.get(d) ?? [];
+    const right = byDepth.get(d + 1) ?? [];
+    const li = new Map<string, number>();
+    const ri = new Map<string, number>();
+    for (let i = 0; i < left.length; i++) li.set(left[i], i);
+    for (let j = 0; j < right.length; j++) ri.set(right[j], j);
+
+    const pairs: Array<[number, number]> = [];
+    for (const a of left) {
+      for (const b of map.edges[a] ?? []) {
+        if (depthOf(b) !== d + 1) continue;
+        const i = li.get(a);
+        const j = ri.get(b);
+        if (i == null || j == null) continue;
+        pairs.push([i, j]);
+      }
+    }
+    return { left, right, li, ri, pairs };
+  };
+
+  const wouldCross = (leftId: string, rightId: string) => {
+    const dl = depthOf(leftId);
+    const dr = depthOf(rightId);
+    if (dr !== dl + 1) return true;
+
+    const { li, ri, pairs } = layerPairs(dl);
+    const i = li.get(leftId);
+    const j = ri.get(rightId);
+    if (i == null || j == null) return true;
+
+    for (const [i2, j2] of pairs) {
+      if ((i < i2 && j > j2) || (i > i2 && j < j2)) return true;
+    }
+    return false;
+  };
+
+  const tryAddEdge = (from: string) => {
+    map.edges[from] ??= [];
+    const neigh = new Set(map.edges[from] ?? []);
+    const fromD = depthOf(from);
+
+    let candidates = ids.filter((x) => x !== from && !neigh.has(x));
+    if (candidates.length === 0) return false;
+
+    if (hasLayered) {
+      candidates = candidates.filter((x) => Math.abs(depthOf(x) - fromD) === 1);
+      if (candidates.length === 0) return false;
+
+      candidates = candidates.filter((to) => {
+        const da = depthOf(from);
+        const db = depthOf(to);
+        const left = da < db ? from : to;
+        const right = da < db ? to : from;
+        return !wouldCross(left, right);
+      });
+      if (candidates.length === 0) return false;
+    }
+
+    candidates.sort((a, b) => degree(b) - degree(a));
+
+    const to = candidates[0];
+    map.edges[from].push(to);
+    map.edges[to] ??= [];
+    map.edges[to].push(from);
+    return true;
+  };
+
+  for (let iter = 0; iter < 200; iter++) {
+    const dead = ids.filter((id) => degree(id) < minDegree);
+    if (dead.length === 0) break;
+
+    let progressed = false;
+    for (const id of dead) {
+      while (degree(id) < minDegree) {
+        if (!tryAddEdge(id)) break;
+        progressed = true;
+      }
+    }
+    if (!progressed) break;
+  }
+}
+
+function makeDebugGraphMap(): GraphMapLite {
+  const N = 18;
+
+  const nodes: Record<string, MapNodeLite> = {};
+  const edges: Record<string, string[]> = {};
+
+  const ids = Array.from({ length: N }, (_, i) => `n${i}`);
+
+  
+  edges[ids[0]] = [];
+  nodes[ids[0]] = { id: ids[0], kind: "START", visited: true, cleared: true, depth: 0 };
+
+  for (let i = 1; i < ids.length; i++) {
+    const id = ids[i];
+    const parent = ids[Math.floor(Math.random() * i)];
+    edges[id] ??= [];
+    edges[parent] ??= [];
+    edges[id].push(parent);
+    edges[parent].push(id);
+    nodes[id] = { id, kind: "BATTLE", visited: false, cleared: false };
+  }
+
+  
+  const extra = 10;
+  for (let k = 0; k < extra; k++) {
+    const a = ids[Math.floor(Math.random() * ids.length)];
+    const b = ids[Math.floor(Math.random() * ids.length)];
+    if (a === b) continue;
+    edges[a] ??= [];
+    edges[b] ??= [];
+    if (edges[a].includes(b)) continue;
+    edges[a].push(b);
+    edges[b].push(a);
+  }
+
+  
+  const tmpMap: GraphMapLite = {
+    pos: ids[0],
+    startId: ids[0],
+    nodes,
+    edges,
+    visionNonce: 1,
+    treasureId: ids[ids.length - 1],
+  };
+
+  ensureNoDeadEnds(tmpMap, 2);
+
+  const dist = bfsDistances(tmpMap, ids[0], 999);
+  let deepest = ids[1];
+  let bestD = -1;
+  for (const id of ids) {
+    const d = dist[id] ?? 999;
+    nodes[id].depth = d;
+    if (id !== ids[0] && d > bestD) {
+      bestD = d;
+      deepest = id;
+    }
+  }
+
+  
+  for (const id of ids) {
+    if (id === ids[0]) continue;
+    nodes[id].kind = "BATTLE";
+  }
+
+  
+  const pickKinds: NodeType[] = ["BATTLE", "BATTLE", "BATTLE", "EVENT", "REST", "ELITE"];
+  for (const id of ids) {
+    if (id === ids[0] || id === deepest) continue;
+    const k = pickKinds[Math.floor(Math.random() * pickKinds.length)];
+    nodes[id].kind = k;
+  }
+
+  nodes[deepest].kind = "TREASURE";
+
+  return {
+    pos: ids[0],
+    startId: ids[0],
+    nodes,
+    edges,
+    visionNonce: 1,
+    treasureId: deepest,
+  };
+}
+
+
+function visionParamsFromState(g: GameState): VisionParams {
+  const { vision, pursuit } = ensureGraphRuntime(g);
+  const runAny = g.run as any;
+  const tm = Number(runAny.timeMove ?? 0) || 0;
+  const vAny = vision as any;
+
+  
+  if (vAny.forceModeUntilMove != null && tm >= Number(vAny.forceModeUntilMove)) {
+    vAny.forceModeUntilMove = null;
+    vAny.forceMode = null;
+  }
+  if (vAny.switchLockedUntilMove != null && tm >= Number(vAny.switchLockedUntilMove)) {
+    vAny.switchLockedUntilMove = null;
+  }
+
+
+  let mode = ((vAny.forceMode ?? vision.mode) ?? "NORMAL") as VisionMode;
+  let presenceR = Number(vision.presenceR ?? 2) || 0;
+  let typeR = Number(vision.typeR ?? 1) || 0;
+  let detailR = Number(vision.detailR ?? 0) || 0;
+  let noise = clamp01(Number(vision.noise ?? 0.08) || 0);
+
+  
+  if (mode === "FOCUS") {
+    presenceR -= 1;
+    typeR -= 1;
+    detailR += 1;
+    noise *= 0.6;
+  } else if (mode === "WIDE") {
+    presenceR += 1;
+    typeR += 1;
+    detailR += 0;
+    noise = clamp01(noise * 1.35);
+  }
+
+  
+  if (g.run.treasureObtained) {
+    const tier = pursuitTier(pursuit.heat ?? 0);
+    presenceR += tier >= 2 ? 1 : 0;
+    typeR -= tier;
+    detailR -= Math.max(0, tier - 1);
+    noise = clamp01(noise + tier * 0.07);
+  }
+
+  
+  const f = Math.max(0, Number(g.player.fatigue ?? 0) || 0);
+  if (f > 0) {
+    
+    const losePresence = Math.floor(f / 14);
+    const loseType = Math.floor(f / 6);
+    const loseDetail = Math.floor(f / 10);
+
+    presenceR -= losePresence;
+    typeR -= loseType;
+    detailR -= loseDetail;
+
+    noise = clamp01(noise + Math.min(0.30, f * 0.015));
+  }
+
+  presenceR = clampInt(presenceR, 0, 99);
+  typeR = clampInt(typeR, 0, presenceR);
+  detailR = clampInt(detailR, 0, typeR);
+  noise = clamp01(noise);
+
+  return { mode, presenceR, typeR, detailR, noise };
+}
+
+
+function revealLevelForDist(dist: number, vp: VisionParams): 0 | 1 | 2 | 3 {
+  if (dist <= 0) return 3;
+  if (dist <= vp.detailR) return 3;
+  if (dist <= vp.typeR) return 2;
+  if (dist <= vp.presenceR) return 1;
+  return 0;
+}
+
+function perceivedKindForNode(
+  g: GameState,
+  nodeId: string,
+  actual: MapNodeKind,
+  reveal: 0 | 1 | 2 | 3,
+  vp: VisionParams
+): { shown: NodeType | null; label: string; certainty: "HIDDEN" | "PRESENCE" | "TYPE" | "DETAIL" } {
+
+  if (reveal === 0) return { shown: null, label: "보이지 않음", certainty: "HIDDEN" };
+  if (reveal === 1) return { shown: null, label: "무언가", certainty: "PRESENCE" };
+
+  if (actual === "START") {
+    return { shown: null, label: "입구", certainty: reveal === 3 ? "DETAIL" : "TYPE" };
+  }
+
+  if (actual === "EMPTY") {
+    return { shown: null, label: "지나간 곳", certainty: "PRESENCE" };
+  }
+
+  if (reveal === 3) {
+    return { shown: actual, label: nodeLabelParts(actual, false).text, certainty: "DETAIL" };
+  }
+
+  const seed =
+    hash32(nodeId) ^
+    Math.imul(hash32(String((g.run as any).map?.visionNonce ?? 1)), 2654435761);
+
+  const r = seeded01(seed);
+
+  if (r < vp.noise) {
+    return { shown: null, label: "무언가", certainty: "PRESENCE" };
+  }
+
+  return { shown: actual, label: nodeLabelParts(actual, false).text, certainty: "TYPE" };
+}
+
+function renderPerceivedLabel(parent: HTMLElement, pk: ReturnType<typeof perceivedKindForNode>) {
+  const line = div("mapNodeLine");
+  line.style.cssText = `display:flex; gap:${sx(8)}px; align-items:center;`;
+
+  if (pk.shown) {
+    appendNodeLabel(line, pk.shown, false);
+  } else {
+    const s = document.createElement("span");
+    s.className = "nodeText";
+    s.textContent = `(${pk.label})`;
+    line.appendChild(s);
+  }
+
+  parent.appendChild(line);
+}
+
+type GraphLayout = {
+  width: number;
+  height: number;
+  pos: Record<string, { x: number; y: number; depth: number }>;
+  maxDepth: number;
+  maxCount: number;
+};
+
+function ensureDepths(map: GraphMapLite) {
+  const ids = Object.keys(map.nodes);
+  if (ids.length === 0) return;
+
+  const hasStableDepths = ids.every((id) => {
+    const d0 = (map.nodes[id] as any)?.depth;
+    const d = Number(d0);
+    return d0 != null && Number.isFinite(d) && d >= 0 && d < 900;
+  });
+  if (hasStableDepths) return;
+
+  const start =
+    Object.values(map.nodes).find((n) => n.kind === "START")?.id ??
+    map.pos ??
+    ids[0];
+
+  const dist = bfsDistances(map, start, 999);
+
+  for (const id of ids) {
+    const cur = (map.nodes[id] as any)?.depth;
+    if (cur != null && Number.isFinite(Number(cur)) && Number(cur) < 900) continue;
+    const d = dist[id];
+    map.nodes[id].depth = d != null ? d : (map.nodes[id].depth ?? 999);
+  }
+}
+
+function computeGraphLayout(map: GraphMapLite): GraphLayout {
+  ensureDepths(map);
+
+  const ids = Object.keys(map.nodes);
+  const lockOrder = ids.every((id) => typeof (map.nodes[id] as any)?.order === "number");
+
+  const byDepth = new Map<number, string[]>();
+  let maxDepthRaw = 0;
+
+  for (const id of ids) {
+    const d0 = Number(map.nodes[id]?.depth ?? 999);
+    const d = Number.isFinite(d0) ? d0 : 999;
+    maxDepthRaw = Math.max(maxDepthRaw, d);
+    if (!byDepth.has(d)) byDepth.set(d, []);
+    byDepth.get(d)!.push(id);
+  }
+
+  const depthKeysRaw = Array.from(byDepth.keys()).sort((a, b) => a - b);
+  const effectiveMaxDepth = depthKeysRaw.filter((d) => d < 900).length
+    ? Math.max(...depthKeysRaw.filter((d) => d < 900))
+    : maxDepthRaw;
+
+  const hasUnreach = depthKeysRaw.some((d) => d >= 900);
+  const maxDepthForWidth = effectiveMaxDepth + (hasUnreach ? 1 : 0);
+
+  const STEP_X = 110;
+  const STEP_Y = 64;
+  const PAD_X = 54;
+  const PAD_Y = 40;
+
+  const depthOf = (id: string) => {
+    const d0 = Number(map.nodes[id]?.depth ?? 999);
+    const dd = Number.isFinite(d0) ? d0 : 999;
+    return dd >= 900 ? (effectiveMaxDepth + 1) : dd;
+  };
+
+  const depths = Array.from({ length: maxDepthForWidth + 1 }, (_, i) => i);
+
+  const order: Record<number, string[]> = {};
+  for (const d of depths) order[d] = [];
+
+  for (const id of ids) {
+    const d = depthOf(id);
+    order[d].push(id);
+  }
+
+  for (const d of depths) {
+    order[d].sort((a, b) =>
+      (((map.nodes[a] as any).order ?? 0) - ((map.nodes[b] as any).order ?? 0)) || a.localeCompare(b)
+    );
+  }
+
+  const idxIn = (d: number) => {
+    const m = new Map<string, number>();
+    const arr = order[d] ?? [];
+    for (let i = 0; i < arr.length; i++) m.set(arr[i], i);
+    return m;
+  };
+
+  const adj = (id: string) => (map.edges[id] ?? []) as string[];
+
+  const sweep = (dir: "LR" | "RL") => {
+    if (dir === "LR") {
+      for (let d = 1; d <= maxDepthForWidth; d++) {
+        const prev = order[d - 1];
+        if (!prev || prev.length === 0) continue;
+        const prevIdx = idxIn(d - 1);
+        const cur = order[d];
+        cur.sort((a, b) => {
+          const ba = bary(a, prevIdx, d - 1);
+          const bb = bary(b, prevIdx, d - 1);
+          if (ba !== bb) return ba - bb;
+          return a.localeCompare(b);
+        });
+      }
+    } else {
+      for (let d = maxDepthForWidth - 1; d >= 0; d--) {
+        const nxt = order[d + 1];
+        if (!nxt || nxt.length === 0) continue;
+        const nxtIdx = idxIn(d + 1);
+        const cur = order[d];
+        cur.sort((a, b) => {
+          const ba = bary(a, nxtIdx, d + 1);
+          const bb = bary(b, nxtIdx, d + 1);
+          if (ba !== bb) return ba - bb;
+          return a.localeCompare(b);
+        });
+      }
+    }
+  };
+
+  const bary = (id: string, idxMap: Map<string, number>, targetDepth: number) => {
+    const ns = adj(id);
+    let sum = 0;
+    let cnt = 0;
+    for (const n of ns) {
+      if (depthOf(n) !== targetDepth) continue;
+      const ix = idxMap.get(n);
+      if (ix == null) continue;
+      sum += ix;
+      cnt += 1;
+    }
+    if (cnt === 0) {
+      const dHere = depthOf(id);
+      const ix0 = (order[dHere] ?? []).indexOf(id);
+      return ix0 < 0 ? 9999 : ix0;
+    }
+    return sum / cnt;
+  };
+
+  if (!lockOrder) {
+    for (let iter = 0; iter < 4; iter++) {
+      sweep("LR");
+      sweep("RL");
+    }
+  }
+
+  let maxCount = 1;
+  for (const d of depths) maxCount = Math.max(maxCount, (order[d]?.length ?? 0));
+
+  const innerH = maxCount * STEP_Y;
+  const height = PAD_Y * 2 + innerH;
+  const width = PAD_X * 2 + (maxDepthForWidth + 1) * STEP_X;
+
+  const pos: GraphLayout["pos"] = {};
+
+  for (const d of depths) {
+    const col = order[d] ?? [];
+    const k = col.length;
+    const colH = k * STEP_Y;
+    const offsetY = (innerH - colH) / 2;
+    const x = PAD_X + d * STEP_X;
+
+    for (let i = 0; i < k; i++) {
+      const id = col[i];
+      const y = PAD_Y + offsetY + (i + 0.5) * STEP_Y;
+      pos[id] = { x, y, depth: Number(map.nodes[id]?.depth ?? 999) };
+    }
+  }
+
+  return { width, height, pos, maxDepth: maxDepthForWidth, maxCount };
+}
+
+function mapIconFor(shown: NodeType | null, certainty: "HIDDEN" | "PRESENCE" | "TYPE" | "DETAIL", actualIsStart: boolean) {
+  if (actualIsStart) return "◎";
+  if (certainty === "HIDDEN") return "";
+  if (certainty === "PRESENCE") return "·";
+  if (!shown) return "?";
+  return nodeLabelParts(shown, false).icon;
+}
+
+function renderMapMiniGraph(
+  parent: HTMLElement,
+  g: GameState,
+  actions: UIActions,
+  map: GraphMapLite,
+  vp: VisionParams,
+  detailMode: boolean
+) {
+
+  const layout = computeGraphLayout(map);
+  const seen = ensureSeenMap(map);
+
+  const distNow = bfsDistances(map, map.pos, Math.max(0, vp.presenceR | 0));
+  const isShown = (id: string) => id === map.pos || ((seen[id] ?? 0) as RevealLevel) > 0;
+
+  const shownIds = Object.keys(map.nodes).filter(isShown);
+  if (!shownIds.includes(map.pos)) shownIds.push(map.pos);
+
+  const PAD = 70;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const id of shownIds) {
+    const p = layout.pos[id];
+    if (!p) continue;
+    minX = Math.min(minX, p.x);
+    minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x);
+    maxY = Math.max(maxY, p.y);
+  }
+  if (!Number.isFinite(minX)) { minX = 0; minY = 0; maxX = 300; maxY = 200; }
+
+  const viewX = (minX - PAD);
+  const viewY = (minY - PAD);
+  const viewW = (maxX - minX) + PAD * 2;
+  const viewH = (maxY - minY) + PAD * 2;
+
+  const mapZoom = detailMode ? 0.8 : 1.4;
+  const scrollerH = detailMode ? 420 : 460;
+
+
+  const C_WHITE = "#F2F1EA";
+  const C_BLACK = "#0B0B0B";
+  const C_ACCENT = "#B34A46";
+  const C_ACCENT_DARK = "#1A0B0B";
+
+  const EDGE_STROKE = "rgba(242,241,234,.70)";
+  const EDGE_STROKE_DIM = "rgba(242,241,234,.25)";
+
+  const NODE_FILL_BASE = "rgba(242,241,234,.34)";
+  const NODE_STROKE_BASE = "rgba(242,241,234,1)";
+  const NODE_FILL_ACCENT = "rgba(179,74,70,.34)";
+  const NODE_STROKE_ACCENT = C_ACCENT_DARK;
+
+  const ICON_FILL = C_BLACK;
+
+  const box = div("mapMiniBox");
+  box.style.cssText =
+    `margin-top:${sx(12)}px; ` +
+    `border:1px solid rgba(255,255,255,.12); border-radius:${sx(12)}px; ` +
+    `background:rgba(0,0,0,.18); ` +
+    `padding:${sx(10)}px;`;
+
+  const title = divText("", "지도");
+  title.style.cssText = `font-weight:700; margin-bottom:${sx(8)}px; opacity:.95;`;
+  box.appendChild(title);
+
+  const scroller = div("mapMiniScroller");
+  const viewport = div("mapMiniViewport");
+  scroller.appendChild(viewport);
+
+  scroller.style.cssText =
+    `position:relative; ` +
+    `overflow:auto; ` +
+    `max-height:${sx(scrollerH)}px; ` +
+    `border-radius:${sx(10)}px; ` +
+    `background:rgba(255,255,255,.02);`;
+
+  viewport.addEventListener("wheel", (ev) => {
+    if (Math.abs(ev.deltaY) > Math.abs(ev.deltaX)) {
+      viewport.scrollLeft += ev.deltaY;
+      ev.preventDefault();
+    }
+  }, { passive: false });
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `${viewX} ${viewY} ${viewW} ${viewH}`);
+  svg.setAttribute("width", String(sx(viewW * mapZoom)));
+  svg.setAttribute("height", String(sx(viewH * mapZoom)));
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  svg.style.display = "block";
+
+  const MAP_BG_HREF = assetUrl("assets/ui/background/map_bg.png");
+
+  const bg = document.createElementNS("http://www.w3.org/2000/svg", "image");
+  bg.setAttribute("href", MAP_BG_HREF);
+  bg.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", MAP_BG_HREF);
+
+  bg.setAttribute("x", String(viewX));
+  bg.setAttribute("y", String(viewY));
+  bg.setAttribute("width", String(viewW));
+  bg.setAttribute("height", String(viewH));
+  bg.setAttribute("preserveAspectRatio", "none");
+  bg.setAttribute("opacity", "0.22");
+  svg.appendChild(bg);
+
+  const gEdges = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  const gNodes = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  svg.appendChild(gEdges);
+  svg.appendChild(gNodes);
+
+  const neigh = new Set<string>((map.edges[map.pos] ?? []) as any);
+
+  const memoryPk = (id: string, actual: MapNodeKind, lv: RevealLevel) => {
+    const r = (Math.max(0, Math.min(3, lv)) as RevealLevel);
+    return perceivedKindForNode(g, id, actual, r, { ...vp, noise: 0 });
+  };
+
+  const mkEdgeD = (pa: { x: number; y: number; depth: number }, pb: { x: number; y: number; depth: number }) => {
+    const x1 = pa.x, y1 = pa.y;
+    const x2 = pb.x, y2 = pb.y;
+    const dd = Math.abs((pa.depth ?? 0) - (pb.depth ?? 0));
+
+    if (dd === 0) return `M ${x1} ${y1} L ${x2} ${y2}`;
+    if (dd >= 2) {
+      const off = 38 + 10 * dd;
+      const xOut = Math.max(x1, x2) + off;
+      return `M ${x1} ${y1} C ${xOut} ${y1}, ${xOut} ${y2}, ${x2} ${y2}`;
+    }
+    const dx = x2 - x1;
+    const c1x = x1 + dx * 0.35;
+    const c2x = x1 + dx * 0.65;
+    return `M ${x1} ${y1} C ${c1x} ${y1}, ${c2x} ${y2}, ${x2} ${y2}`;
+  };
+
+  const shownSet = new Set(shownIds);
+  for (const a of shownIds) {
+    for (const b of (map.edges[a] ?? [])) {
+      if (a >= b) continue;
+      if (!shownSet.has(b)) continue;
+
+      const da = (map.nodes[a] as any)?.depth;
+      const db = (map.nodes[b] as any)?.depth;
+      if (da != null && db != null) {
+        const dd = Math.abs(Number(da) - Number(db));
+        if (dd > 1) continue;
+      }
+
+      const pa = layout.pos[a];
+      const pb = layout.pos[b];
+      if (!pa || !pb) continue;
+
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", mkEdgeD(pa, pb));
+      path.setAttribute("fill", "none");
+
+      path.setAttribute("stroke", EDGE_STROKE);
+      path.setAttribute("stroke-width", detailMode ? "1.6" : "2");
+
+      gEdges.appendChild(path);
+    }
+  }
+
+  const sortedShown = shownIds.slice().sort((a, b) => a.localeCompare(b));
+  for (const id of sortedShown) {
+    const p = layout.pos[id];
+    if (!p) continue;
+
+    const node = map.nodes[id];
+    const actual = (node?.kind ?? "BATTLE") as MapNodeKind;
+
+    const dNow = distNow[id];
+    const revealNow: RevealLevel =
+      id === map.pos ? 3 : (dNow == null ? 0 : (revealLevelForDist(dNow, vp) as RevealLevel));
+
+    const lv = (seen[id] ?? 0) as RevealLevel;
+    const pk =
+      revealNow > 0
+        ? perceivedKindForNode(g, id, actual, revealNow as any, vp)
+        : memoryPk(id, actual, lv);
+
+    const isCur = id === map.pos;
+    const isAdj = neigh.has(id);
+    const isStart = actual === "START";
+
+    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    circle.setAttribute("cx", String(p.x));
+    circle.setAttribute("cy", String(p.y));
+    circle.setAttribute("r", String(isCur ? (detailMode ? 12 : 13) : (detailMode ? 9 : 10)));
+
+    // ✅ 색 적용 (WHITE/BLACK/ACCENT)
+    const useAccent = isCur || isAdj;
+    circle.setAttribute("fill", useAccent ? NODE_FILL_ACCENT : NODE_FILL_BASE);
+    circle.setAttribute("stroke", useAccent ? NODE_STROKE_ACCENT : NODE_STROKE_BASE);
+    circle.setAttribute("stroke-width", String(isCur ? 3 : 2));
+    circle.style.cursor = isAdj && !isCur ? "pointer" : "default";
+
+    if (isAdj && !isCur) {
+      circle.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        actions.onMoveToNode?.(id);
+      });
+    }
+
+    const titleEl = document.createElementNS("http://www.w3.org/2000/svg", "title");
+    const cleared = node?.cleared ? "클리어" : node?.visited ? "방문" : "미방문";
+    titleEl.textContent = `${cleared}`;
+    circle.appendChild(titleEl);
+    gNodes.appendChild(circle);
+
+    const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    label.setAttribute("x", String(p.x));
+    label.setAttribute("y", String(p.y));
+    label.setAttribute("dy", "0.05em"); // ✅ 살짝 쏠림 보정
+    label.setAttribute("dominant-baseline", "central");
+    label.setAttribute("text-anchor", "middle");
+    label.setAttribute("font-size", detailMode ? "12" : "14");
+
+    // ✅ 색 적용 (아이콘은 잉크 블랙)
+    label.setAttribute("fill", ICON_FILL);
+
+    label.style.pointerEvents = "none";
+    label.style.userSelect = "none";
+
+    const icon = mapIconFor(pk.shown, pk.certainty as any, isStart);
+    label.textContent = icon;
+    label.style.opacity = "0.95";
+    gNodes.appendChild(label);
+  }
+
+  viewport.appendChild(svg);
+
+  if (detailMode) {
+    const overlay = div("mapMiniOverlay");
+    overlay.style.cssText =
+      `position:absolute; right:${sx(10)}px; bottom:${sx(10)}px; ` +
+      `max-width:${sx(360)}px; ` +
+      `padding:${sx(10)}px; border-radius:${sx(12)}px; ` +
+      `border:1px solid rgba(255,255,255,.12); ` +
+      `background:rgba(0,0,0,.55); backdrop-filter: blur(2px); ` +
+      `font-size:12px; line-height:1.35;`;
+
+    const ns = map.edges[map.pos] ?? [];
+    const neighLine = div("mapMiniOverlayNeigh");
+    neighLine.style.cssText = `margin-bottom:${sx(8)}px; opacity:.95;`;
+    neighLine.appendChild(divText("", `이웃 ${ns.length}곳`));
+    overlay.appendChild(neighLine);
+
+    if (vp.presenceR >= 2) {
+      const dist = bfsDistances(map, map.pos, vp.presenceR);
+      const farIds = Object.keys(dist)
+        .filter((id) => (dist[id] ?? 999) >= 2 && (dist[id] ?? 999) <= vp.presenceR)
+        .sort((a, b) => (dist[a] - dist[b]) || a.localeCompare(b));
+
+      const buckets = new Map<number, Record<string, number>>();
+      for (const id of farIds) {
+        const d = dist[id] ?? 0;
+        const n = map.nodes[id];
+        const actual = n?.kind ?? "BATTLE";
+        const reveal = revealLevelForDist(d, vp);
+        const pk = perceivedKindForNode(g, id, actual, reveal as any, vp);
+        const key = (pk.certainty === "PRESENCE") ? "무언가" : pk.label;
+
+        const m = buckets.get(d) ?? {};
+        m[key] = (m[key] ?? 0) + 1;
+        buckets.set(d, m);
+      }
+
+      const ds = Array.from(buckets.keys()).sort((a, b) => a - b).slice(0, 4);
+      for (const d of ds) {
+        const m = buckets.get(d)!;
+        const parts = Object.keys(m).map((k) => `${k}×${m[k]}`);
+        overlay.appendChild(divText("", `거리 ${d}: ${parts.join(" · ")}`));
+      }
+    }
+
+    scroller.appendChild(overlay);
+  }
+
+  box.appendChild(scroller);
+
+  requestAnimationFrame(() => {
+    const p = layout.pos[map.pos];
+    if (!p) return;
+    const scale = getUiScaleNow();
+    const px = (p.x - viewX) * scale * mapZoom;
+    const py = (p.y - viewY) * scale * mapZoom;
+    const targetX = Math.max(0, px - viewport.clientWidth * 0.45);
+    const targetY = Math.max(0, py - viewport.clientHeight * 0.45);
+    viewport.scrollLeft = targetX;
+    viewport.scrollTop = targetY;
+  });
+
+  const tip = divText(
+    "",
+    detailMode
+      ? "상세: 지도 위에 요약 정보가 표시됩니다. 이동은 인접 노드 클릭으로만 가능합니다."
+      : "관측 가능한 곳만 지도에 드러납니다. 인접 노드를 클릭해 이동할 수 있습니다."
+  );
+  tip.style.cssText = `margin-top:${sx(8)}px; font-size:12px; opacity:.8; line-height:1.3;`;
+  box.appendChild(tip);
+
+  parent.appendChild(box);
+}
+function renderMapNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
+  const { map, timeMove, pursuit } = ensureGraphRuntime(g);
+  const vp = visionParamsFromState(g);
+  updateSeenFromVision(map, vp);
+
+  const wrap = div("nodeSelectWrap");
+  wrap.classList.add("mapNodeSelect");
+
+  const hdr = div("nodeSelectHeader");
+  hdr.style.cssText = "display:flex; align-items:flex-end; justify-content:space-between; gap:16px;";
+
+  const left = div("nodeSelectTitle");
+  const tNow = totalTimeOnMap(g);
+  const ex = g.run.nodePickCount ?? 0;
+
+  left.appendChild(divText("", `총 시간 ${tNow} · 탐험 ${ex} · 이동 ${timeMove}`));
+
+  ensureBossSchedule(g);
+  const runAny = g.run as any;
+  const nextBossTime = Number(runAny.nextBossTime ?? 40) || 40;
+  const remainingBoss = Math.max(0, nextBossTime - tNow);
+  const omenText =
+    (g.run.bossOmenText && String(g.run.bossOmenText).trim() !== "")
+      ? String(g.run.bossOmenText)
+      : "아직 징조가 없다.";
+
+  left.appendChild(divText("", `다음 보스까지 ${remainingBoss} · ${omenText}`));
+
+  if (g.run.treasureObtained) {
+    const distToStart = bfsDistances(map, map.pos, 9999)[map.startId];
+    const distTxt = distToStart == null ? "?" : String(distToStart);
+    left.appendChild(
+      divText("", `추격 ${pursuit.heat ?? 0} (tier ${pursuitTier(pursuit.heat ?? 0)}) · 입구까지 ${distTxt}`)
+    );
+  }
+
+  const right = div("nodeSelectHeaderRight");
+
+  const hint = divText("", `오류 ${Math.round(vp.noise * 100)}%`);
+  hint.style.opacity = "0.8";
+  right.appendChild(hint);
+
+  const btnDetail = mkButton(mapDetailOverlayOpen ? "상세 닫기" : "상세", () => {
+    mapDetailOverlayOpen = !mapDetailOverlayOpen;
+    render(g, actions);
+  });
+  btnDetail.style.cssText = `margin-left:${sx(-10)}px; padding:${sx(2)}px ${sx(5)}px; opacity:.9;`;
+  right.appendChild(btnDetail);
+
+  hdr.appendChild(left);
+  hdr.appendChild(right);
+  wrap.appendChild(hdr);
+
+  renderMapMiniGraph(wrap, g, actions, map, vp, false);
+
+  if (mapDetailOverlayOpen) {
+
+    const panel = div("mapDetailPanel");
+    panel.style.cssText =
+      `position:fixed; right:${sx(24)}px; top:${sx(24)}px; ` +
+      `width:min(${sx(520)}px, calc(100vw - ${sx(64)}px)); ` +
+      `max-height:calc(100vh - ${sx(64)}px); ` +
+      `overflow-y:auto; overflow-x:hidden; ` +
+      `z-index:70001; ` +
+      `border:1px solid rgba(255,255,255,.14); border-radius:${sx(14)}px; ` +
+      `background:rgba(0,0,0,1); ` +                 // ✅ 완전 불투명
+      `backdrop-filter:none; ` +
+      `padding:${sx(12)}px;`;
+
+    panel.addEventListener("click", (ev) => ev.stopPropagation());
+    panel.addEventListener("wheel", (ev) => ev.stopPropagation(), { passive: true });
+
+    // ✅ 바깥 클릭 닫기 (panel 밖 클릭 감지)
+    const onDocPointerDown = (ev: PointerEvent) => {
+      const t = ev.target as Node | null;
+      if (t && panel.contains(t)) return;      // 패널 내부 클릭은 무시
+      mapDetailOverlayOpen = false;
+      document.removeEventListener("pointerdown", onDocPointerDown, true);
+      render(g, actions);
+    };
+ 
+    const head = div("");
+    head.style.cssText = `display:flex; align-items:center; justify-content:space-between; gap:${sx(10)}px;`;
+
+    const hTitle = divText("", "지도 상세");
+    hTitle.style.cssText = `font-weight:700; opacity:.95;`;
+    head.appendChild(hTitle);
+
+    const btnClose = mkButton("닫기", () => {
+      mapDetailOverlayOpen = false;
+      render(g, actions);
+    });
+    btnClose.style.cssText = `padding:${sx(6)}px ${sx(10)}px; opacity:.9;`;
+    head.appendChild(btnClose);
+
+    panel.appendChild(head);
+
+    const neighBox = div("");
+    neighBox.style.cssText =
+      `margin-top:${sx(10)}px; padding:${sx(10)}px; ` +
+      `border:1px solid rgba(255,255,255,.10); border-radius:${sx(12)}px; background:rgba(255,255,255,.03);`;
+
+    const neighTitle = h3("이동 가능한 이웃");
+    neighTitle.style.margin = `0 0 ${sx(6)}px 0`;
+    neighBox.appendChild(neighTitle);
+
+    const ns = map.edges[map.pos] ?? [];
+    if (ns.length === 0) neighBox.appendChild(p("이웃이 없습니다."));
+
+    for (let i = 0; i < ns.length; i++) {
+      const toId = ns[i];
+      const n = map.nodes[toId];
+      const actual = (n?.kind ?? "BATTLE") as MapNodeKind;
+
+      const revealNow: RevealLevel = (vp.presenceR >= 1) ? (revealLevelForDist(1, vp) as RevealLevel) : 0;
+      const lv = seenLevel(map, toId);
+
+      const pk =
+        revealNow > 0
+          ? perceivedKindForNode(g, toId, actual, revealNow as any, vp)
+          : (lv >= 2
+              ? (actual === "START"
+                  ? ({ shown: null, label: "입구", certainty: (lv === 3 ? "DETAIL" : "TYPE") as any } as any)
+                  : ({ shown: actual as any, label: nodeLabelParts(actual as any, false).text, certainty: (lv === 3 ? "DETAIL" : "TYPE") as any } as any))
+              : (lv === 1
+                  ? ({ shown: null, label: "무언가", certainty: "PRESENCE" as any } as any)
+                  : ({ shown: null, label: "보이지 않음", certainty: "HIDDEN" as any } as any)));
+
+      const row = div("");
+      row.style.cssText =
+        `display:flex; align-items:center; gap:${sx(10)}px; ` +
+        `padding:${sx(8)}px ${sx(10)}px; border-radius:${sx(10)}px; ` +
+        `border:1px solid rgba(255,255,255,.10); background:rgba(0,0,0,.20);` +
+        `margin-top:${sx(6)}px;`;
+
+      const badge = divText("", (revealNow > 0 || lv > 0) ? `${toId}` : `출구 ${i + 1}`);
+      badge.style.cssText =
+        `flex:0 0 auto; padding:${sx(4)}px ${sx(8)}px; border-radius:${sx(10)}px; ` +
+        `border:1px solid rgba(255,255,255,.14); background:rgba(0,0,0,.25); opacity:.9;`;
+      row.appendChild(badge);
+
+      const mid = div("");
+      mid.style.cssText = "flex:1 1 auto; min-width:0;";
+      renderPerceivedLabel(mid, pk);
+      row.appendChild(mid);
+
+      neighBox.appendChild(row);
+    }
+
+    panel.appendChild(neighBox);
+
+    if (vp.presenceR >= 2) {
+      const dist = bfsDistances(map, map.pos, vp.presenceR);
+      const farIds = Object.keys(dist)
+        .filter((id) => (dist[id] ?? 999) >= 2 && (dist[id] ?? 999) <= vp.presenceR)
+        .sort((a, b) => (dist[a] - dist[b]) || a.localeCompare(b));
+
+      if (farIds.length) {
+        const scout = div("");
+        scout.style.cssText =
+          `margin-top:${sx(10)}px; padding:${sx(10)}px; ` +
+          `border:1px solid rgba(255,255,255,.10); border-radius:${sx(12)}px; background:rgba(255,255,255,.03);`;
+
+        const t = h3("멀리 보이는 곳");
+        t.style.margin = `0 0 ${sx(6)}px 0`;
+        scout.appendChild(t);
+
+        const buckets = new Map<number, Record<string, number>>();
+        for (const id of farIds) {
+          const d = dist[id] ?? 0;
+          const n = map.nodes[id];
+          const actual = n?.kind ?? "BATTLE";
+          const reveal = revealLevelForDist(d, vp);
+          const pk = perceivedKindForNode(g, id, actual, reveal as any, vp);
+          const key = (pk.certainty === "PRESENCE") ? "무언가" : pk.label;
+
+          const m = buckets.get(d) ?? {};
+          m[key] = (m[key] ?? 0) + 1;
+          buckets.set(d, m);
+        }
+
+        const ds = Array.from(buckets.keys()).sort((a, b) => a - b);
+        for (const d of ds) {
+          const m = buckets.get(d)!;
+          const parts = Object.keys(m).map((k) => `${k}×${m[k]}`);
+          scout.appendChild(divText("", `거리 ${d}: ${parts.join(" · ")}`));
+        }
+
+        panel.appendChild(scout);
+      }
+    }
+    document.addEventListener("pointerdown", onDocPointerDown, true);
+    root.appendChild(panel);
+  }
+
+  root.appendChild(wrap);
+}
+function renderNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
+  ensureGraphRuntime(g);
+  renderMapNodeSelect(root, g, actions);
+}
 
 function hr() {
   return document.createElement("hr");
@@ -1384,11 +2662,9 @@ function hr() {
 
 
 
-/* =========================
-   CHOICE SYSTEM — overlay choice context
-   ========================= */
 
-// Choice types
+
+
 
 type ChoiceKind = "EVENT" | "REWARD" | "PICK_CARD" | "VIEW_PILE" | "UPGRADE_PICK" | "RELIC";
 
@@ -1480,7 +2756,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         return;
       }
 
-      // 손패 <-> 슬롯 스왑
+      
 
       slots[idx] = null;
 
@@ -1594,295 +2870,213 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       render(g, actions);
     },
 
-    // Node 선택
-    getNodeOffers: (): NodeOffer[] => {
-      const g = getG();
-      ensureBossSchedule(g);
-
-      if (!g.run.branchOffer) g.run.branchOffer = rollBranchOffer(g);
-
-      const runAny = g.run as any;
-      const T = totalTime(g);
-
-      if (runAny.forcedNext === "BOSS") {
-        runAny.nodeExtra01 = 0;
-        return [
-          { id: "A", type: "BATTLE" },
-          { id: "B", type: "BATTLE" },
-        ];
-      }
-
-      if (runAny.nodeExtra01 == null) {
-        runAny.nodeExtra01 = rollExtraTime01FromDeck(g.deck.length).extra;
-      }
-
-      const afterT = T + 1 + runAny.nodeExtra01;
-      const willHitBoss = afterT >= runAny.nextBossTime;
-
-      if (willHitBoss) {
-        return [
-          { id: "A", type: "REST" },
-          { id: "B", type: "REST" },
-        ];
-      }
-
-      const ELITE_RATE = 0.05;
-
-      const root = g.run.branchOffer.root;
-
-      if (runAny.nodeEliteAB == null) {
-        const aIsElite = root[0].type === "BATTLE" && Math.random() < ELITE_RATE;
-        const bIsElite = root[1].type === "BATTLE" && Math.random() < ELITE_RATE;
-        runAny.nodeEliteAB = { A: aIsElite, B: bIsElite };
-      }
-
-      return [
-        { ...root[0], type: (runAny.nodeEliteAB.A ? "ELITE" : root[0].type) },
-        { ...root[1], type: (runAny.nodeEliteAB.B ? "ELITE" : root[1].type) },
-      ];
-    },
-
-    getNodeOffer: (id: "A" | "B"): NodeOffer => {
-      const offers = actions.getNodeOffers();
-      const a = offers[0] ?? { id: "A", type: "BATTLE" as const };
-      const b = offers[1] ?? a;
-      return id === "A" ? a : b;
-    },
     
-
-    onChooseNode: (id: "A" | "B") => {
+    
+    onMoveToNode: (toId: string) => {
       const g = getG();
-      if (nodePickLock) return;
-      nodePickLock = true;
-      queueMicrotask(() => (nodePickLock = false));
-
       if (g.run.finished) return;
+      if (g.choice) return;
       if (g.phase !== "NODE") return;
 
-      ensureBossSchedule(g);
-      if (!g.run.branchOffer) g.run.branchOffer = rollBranchOffer(g);
+      if (nodePickLock) return;
+      nodePickLock = true;
+      setTimeout(() => (nodePickLock = false), 180);
 
       const runAny = g.run as any;
+      const { map, pursuit, vision } = ensureGraphRuntime(g);
 
-      const offers = actions.getNodeOffers();
-      const basePicked = (id === "A" ? offers[0].type : offers[1].type);
+      const from = map.pos;
+      const neigh = map.edges[from] ?? [];
+      if (!neigh.includes(toId)) return;
 
-      const beforeT = totalTime(g);
+      
+      runAny.timeMove = Number(runAny.timeMove ?? 0) + 1;
+      map.visionNonce = Number(map.visionNonce ?? 0) + 1;
 
-      const forcedBossNow = runAny.forcedNext === "BOSS";
+      
+      map.pos = toId;
 
-      let extra = 0;
-      if (!forcedBossNow) {
-        if (runAny.nodeExtra01 == null) runAny.nodeExtra01 = rollExtraTime01FromDeck(g.deck.length).extra;
-        extra = runAny.nodeExtra01;
+      
+      const node = map.nodes[toId] ?? (map.nodes[toId] = { id: toId, kind: "BATTLE" });
+      const firstVisit = !node.visited;
+      if (firstVisit) {
+        node.visited = true;
+        g.run.nodePickCount = (g.run.nodePickCount ?? 0) + 1;
       }
 
-      const afterT = beforeT + 1 + extra;
+      
+      if (g.run.treasureObtained) {
+        pursuit.heat = Number(pursuit.heat ?? 0) + 1;
+        const tier = pursuitTier(pursuit.heat);
 
-      const nextIndex = g.run.nodePickCount + 1;
-      g.run.nodePickCount = nextIndex;
+        maybeShiftTopology(g);
 
-      runAny.nodeExtra01 = null;
-      runAny.nodeEliteAB = null;
-
-      const willHitBoss = !forcedBossNow && afterT >= runAny.nextBossTime;
-
-      const actual =
-        forcedBossNow
-          ? ("BATTLE" as const)
-          : willHitBoss
-          ? ("REST" as const)
-          : (basePicked as typeof basePicked);
-      const battleTime = (actual === "BATTLE" || actual === "ELITE") ? 1 : 0;
-      const afterT2 = afterT + battleTime;
-
-      g.time = (g.time ?? 0) + extra + battleTime;
-      if (battleTime) logMsg(g, "전투를 선택해 시간이 더 소모된다. (시간 +1)");
-
-      advanceBranchOffer(g, id);
-
-      g.run.nodePickByType[actual] = (g.run.nodePickByType[actual] ?? 0) + 1;
-
-      if (g.run.treasureObtained && actual !== "TREASURE") {
-        g.run.afterTreasureNodePicks += 1;
-
-        const snap = g.run.deckSizeAtTreasure ?? currentTotalDeckLikeSize(g);
-        const req = escapeRequiredNodePicks(snap);
-  
-        if (g.run.afterTreasureNodePicks >= req) {
+        if (map.pos === map.startId) {
           g.run.finished = true;
-          logMsg(g, `승리! 보물 획득 후 ${req}번의 탐험을 버티고 탈출했습니다.`);
+          logMsg(g, "보물을 들고 입구로 돌아왔다! 탈출에 성공했습니다!");
           render(g, actions);
           return;
         }
+
+        if (firstVisit && node.kind !== "TREASURE" && node.kind !== "START") {
+          g.run.afterTreasureNodePicks = (g.run.afterTreasureNodePicks ?? 0) + 1;
+        }
       }
 
-      if (forcedBossNow) {
+      
+      ensureBossSchedule(g);
+      const T = totalTimeOnMap(g);
+      if (Number(runAny.nextBossTime ?? 0) > 0 && T >= Number(runAny.nextBossTime ?? 0)) {
         runAny.forcedNext = null;
-        runAny.nextBossTime += 40;
+        runAny.nextBossTime = Number(runAny.nextBossTime ?? 0) + 40;
         g.run.bossOmenText = null;
 
-        logMsg(g, `=== 시간 ${afterT2}: 보스 전투 ===`);
+        node.cleared = true;
+        node.kind = "EMPTY";
+        (node as any).noRespawn = true;
+        (node as any).lastClearedMove = Number(runAny.timeMove ?? 0);
+
+        logMsg(g, "시간이 다 되어 보스가 나타납니다. (시간 +1)");
+
         spawnEncounter(g, { forceBoss: true });
         startCombat(g);
-        (g as any)._justStartedCombat = false
         render(g, actions);
         return;
       }
 
-      if (!forcedBossNow && afterT2 >= runAny.nextBossTime) {
-        runAny.forcedNext = "BOSS";
-        logMsg(g, `시간이 흘러 보스가 다가옵니다!`);
+      
+
+      const tmNow = Number(runAny.timeMove ?? 0) || 0;
+
+      if (node.cleared && (node.kind === "BATTLE" || node.kind === "EVENT" || node.kind === "REST" || node.kind === "ELITE")) {
+        if (node.kind === "ELITE") (node as any).noRespawn = true;
+        node.kind = "EMPTY";
+        (node as any).lastClearedMove = Number((node as any).lastClearedMove ?? tmNow);
       }
 
-      if (actual === "BATTLE" || actual === "ELITE") {
-        if (actual === "ELITE") {
-          (g.run as any).pendingElite = true;
-          logMsg(g, "정예가 나타났다!");
+      let actualKind: MapNodeKind = node.kind;
+
+      if (actualKind === "EMPTY") {
+        const noRespawn = !!(node as any).noRespawn;
+        const last = Number((node as any).lastClearedMove ?? -999);
+        const cd = Number((runAny.respawnCooldownMoves ?? 2)) || 2;
+        const inCooldown = tmNow - last <= cd;
+
+        if (!noRespawn && !inCooldown) {
+          const tier = g.run.treasureObtained ? pursuitTier(pursuit.heat) : 0;
+          const f = Math.max(0, Number(g.player.fatigue ?? 0) || 0);
+          const fBoost = clamp01(f / 25) * 0.18;
+
+          const base = g.run.treasureObtained ? 0.22 : 0.12;
+          const tierBoost = g.run.treasureObtained ? 0.10 : 0.08;
+          const p = clamp01(base + tier * tierBoost + fBoost);
+
+          if (Math.random() < p) {
+            const r = Math.random();
+            const pBattle = g.run.treasureObtained ? 0.72 : 0.55;
+            const pEvent = g.run.treasureObtained ? 0.90 : 0.85;
+            actualKind = r < pBattle ? "BATTLE" : r < pEvent ? "EVENT" : "REST";
+            node.kind = actualKind;
+            node.cleared = false;
+            (node as any).respawnCount = Number((node as any).respawnCount ?? 0) + 1;
+            logMsg(g, "재발동: 이곳에서 다시 무언가가 일어납니다...");
+          }
         }
+      }
 
-        spawnEncounter(g, { forceBoss: false });
-        startCombat(g);
-        (g as any)._justStartedCombat = false
+      if (actualKind === "START") {
         render(g, actions);
         return;
       }
 
-      if (actual === "REST") {
-
-        function applyRestHighFatigueCost(g: GameState) {
-          const f = g.player.fatigue ?? 0;
-          if (f < 10) return;
-
-          g.player.fatigue = Math.max(0, f - 2);
-          g.time = (g.time ?? 0) + 1;
-          logMsg(g, "피로가 너무 높아 휴식이 더 오래 걸립니다. (F -2, 시간 +1)");
-        }
-
-        const openRestMenu = () => {
-          const highF = (g.player.fatigue ?? 0) >= 10;
-
-          const restTitle = highF ? "피로도가 너무 높아 더 쉬어야 합니다." : "휴식";
-          const restSuffix = highF ? " (피로도 10 이상: F -2, 시간 +1)" : "";
-
-          g.choice = {
-            kind: "EVENT",
-            title: restTitle,
-            prompt: "무엇을 하시겠습니까?",
-            art: "assets/events/event_rest.png",   
-            options: [
-              { key: "rest:heal",    label: `HP +15 ${restSuffix}` },
-              { key: "rest:clear_f", label: `F -3 ${restSuffix}` },
-              { key: "rest:upgrade", label: `강화 ${restSuffix}` },
-              { key: "rest:skip",    label: `생략` },
-            ],
-          };
-
-          choiceHandler = (key: string) => {
-            if (key === "rest:heal") {
-              applyRestHighFatigueCost(g);
-              g.player.hp = Math.min(g.player.maxHp, g.player.hp + 15);
-              logMsg(g, "휴식: HP +15");
-              closeChoiceOrPop(g);
-              g.phase = "NODE";
-              render(g, actions);
-              return;
-            }
-
-            if (key === "rest:clear_f") {
-              applyRestHighFatigueCost(g);
-              g.player.fatigue = Math.max(0, g.player.fatigue - 3);
-              logMsg(g, "휴식: 피로 F-=3");
-              closeChoiceOrPop(g);
-              g.phase = "NODE";
-              render(g, actions);
-              return;
-            }
-
-            if (key === "rest:upgrade") {
-              openUpgradePick(g, actions, "강화", "강화할 카드 1장을 선택하세요.", {
-                onDone: () => {
-                  applyRestHighFatigueCost(g);
-                  g.phase = "NODE";
-                  render(g, actions);
-                },
-                onSkip: () => {
-                  openRestMenu();
-                  render(g, actions);
-                },
-              });
-              return;
-            }
-
-            logMsg(g, "휴식: 생략");
-            closeChoiceOrPop(g);
-            g.phase = "NODE";
-            render(g, actions);
-            return;
-          };
-        };
-
-        openRestMenu();
-        render(g, actions);
-        return;
-      }
-
-
-      if (actual === "TREASURE") {
+      if (actualKind === "TREASURE") {
+        node.cleared = true;
+        node.kind = "EMPTY";
+        (node as any).noRespawn = true;
+        (node as any).lastClearedMove = tmNow;
         obtainTreasure(g);
-
-        const snap = (g.run as any).deckSizeAtTreasure;
-        const req = escapeRequiredNodePicks(snap);
-        logMsg(g, `저주받은 보물을 얻었습니다! 이제부터 ${req}번의 탐험을 버티면 탈출합니다.`);
-
         render(g, actions);
         return;
       }
 
-      if (actual === "EVENT") {
-        const runAny = g.run;
-        runAny.ominousProphecySeen ??= false;
+      if (actualKind === "REST") {
+        node.cleared = true;
+        node.kind = "EMPTY";
+        (node as any).lastClearedMove = tmNow;
+        const highF = (g.player.fatigue ?? 0) >= 10;
+
+        g.choice = {
+          kind: "EVENT",
+          title: "휴식",
+          art: assetUrl("assets/events/event_rest.png"),
+          prompt: highF ? "피로가 너무 높아 시간이 더 걸릴 수 있습니다." : "캠프에 잠시 머문다.",
+          options: [
+            { key: "rest:heal", label: "회복", detail: "HP +15" },
+            { key: "rest:clear_f", label: "정비", detail: "F -3" },
+            { key: "rest:upgrade", label: "강화", detail: "카드 1장 강화" },
+            { key: "rest:skip", label: "떠나기" },
+          ],
+        } as any;
+
+        g.choiceCtx = { kind: "REST", highF } as any;
+        render(g, actions);
+        return;
+      }
+
+      if (actualKind === "EVENT") {
+        node.cleared = true;
+        node.kind = "EMPTY";
+        (node as any).lastClearedMove = tmNow;
+        const runAny2: any = g.run;
+        runAny2.ominousProphecySeen ??= false;
 
         const OMEN_CHANCE = 0.3;
         let ev = pickEventByMadness(g);
-        if (runAny.ominousProphecySeen === true) {
 
+        if (runAny2.ominousProphecySeen === true) {
           for (let i = 0; i < 50 && (ev as any).id === "ominous_prophecy"; i++) {
             ev = pickEventByMadness(g);
           }
         } else {
           if (Math.random() < OMEN_CHANCE) {
             ev = getEventById("ominous_prophecy") ?? ev;
-            runAny.ominousProphecySeen = true
+            runAny2.ominousProphecySeen = true;
           }
         }
-      
-        const opts = ev.options(g);
 
-        const { tier } = madnessP(g);
-        if (tier >= 2) {
-          opts.push({
-            key: "mad:whisper",
-            label: "속삭임에 귀 기울인다.",
-            detail: "무언가를 얻는다. 그리고 무언가를 잃는다.",
-            apply: (g: GameState) => {
-              // 보상: 강화/카드/회복 중 하나
-              const r = Math.random();
-              if (r < 0.34) {
-                g.player.hp = Math.min(g.player.maxHp, g.player.hp + 10);
-                logMsg(g, "속삭임: HP +10");
-              } else if (r < 0.67) {
-                g.player.fatigue += 1;
-                logMsg(g, "속삭임: F +1 (대가)");
-              } else {
-                // 광기 전용 카드 확률적으로 지급
-                addCardToDeck(g, "mad_echo", { upgrade: 0 });
-                logMsg(g, "속삭임: [메아리]를 얻었다.");
-              }
-              return "NONE" as any;
-            },
-          });
+        if (!ev) {
+          render(g, actions);
+          return;
         }
+
+        let opts = ev.options(g);
+
+        
+        /*const { tier } = madnessP(g);
+        if (tier >= 2 && !opts.some((o) => o.key === "mad:whisper")) {
+          opts = [
+            ...opts,
+            {
+              key: "mad:whisper",
+              label: "속삭임에 귀 기울인다.",
+              detail: "무언가를 얻는다. 그리고 무언가를 잃는다.",
+              apply: (gg: GameState) => {
+                const r = Math.random();
+                if (r < 0.34) {
+                  gg.player.hp = Math.min(gg.player.maxHp, gg.player.hp + 10);
+                  logMsg(gg, "속삭임: HP +10");
+                } else if (r < 0.67) {
+                  gg.player.fatigue += 1;
+                  logMsg(gg, "속삭임: F +1 (대가)");
+                } else {
+                  addCardToDeck(gg, "mad_echo", { upgrade: 0 });
+                  logMsg(gg, "속삭임: [메아리]를 얻었다.");
+                }
+                return "NONE" as any;
+              },
+            } as any,
+          ];
+        }*/
 
         g.choice = {
           kind: "EVENT",
@@ -1896,6 +3090,11 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
           const picked = opts.find((o) => o.key === key);
           if (!picked) return;
 
+          
+          const up = getUnlockProgress(g);
+          up.eventPicks += 1;
+          checkRelicUnlocks(g);
+
           const outcome: EventOutcome = picked.apply(g);
 
           if (typeof outcome === "object" && outcome.kind === "UPGRADE_PICK") {
@@ -1904,7 +3103,6 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
           }
 
           if (typeof outcome === "object" && outcome.kind === "REMOVE_PICK") {
-
             const candidates = Object.values(g.cards)
               .filter((c) => c.zone === "deck" || c.zone === "hand" || c.zone === "discard")
               .map((c) => c.uid);
@@ -1958,7 +3156,6 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
                 return;
               }
 
-
               if (then === "REWARD_PICK") {
                 clearChoiceStack(g);
                 openRewardPick(g, actions, "카드 보상", "두 장 중 한 장을 선택하거나 생략합니다.");
@@ -1970,9 +3167,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
               g.phase = "NODE";
               render(g, actions);
               return;
-
             });
-
 
             render(g, actions);
             return;
@@ -1983,6 +3178,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
             logMsg(g, outcome.title ? `이벤트 전투: ${outcome.title}` : "이벤트 전투 발생!");
             g.phase = "NODE";
             spawnEncounter(g, { forcePatternIds: outcome.enemyIds });
+            g._justStartedCombat = true;
             startCombat(g);
             render(g, actions);
             return;
@@ -1992,6 +3188,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
             clearChoiceStack(g);
             g.phase = "NODE";
             spawnEncounter(g);
+            g._justStartedCombat = true;
             startCombat(g);
             render(g, actions);
             return;
@@ -2012,7 +3209,29 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         render(g, actions);
         return;
       }
+
+      
+      if (actualKind === "BATTLE" || actualKind === "ELITE") {
+        node.cleared = true;
+        node.kind = "EMPTY";
+        (node as any).lastClearedMove = tmNow;
+        if (actualKind === "ELITE") (node as any).noRespawn = true;
+
+        logMsg(g, "이동 후 전투 시작 (시간 +1)");
+
+        if (actualKind === "ELITE") {
+          spawnEncounter(g, { forceBoss: false, forceElite: true });
+        } else {
+          spawnEncounter(g, { forceBoss: false });
+        }
+        startCombat(g);
+        render(g, actions);
+        return;
+      }
+
+      render(g, actions);
     },
+
 
     onChooseChoice: (key: string) => {
       const g = getG();
@@ -2145,7 +3364,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
     },
   };
 
-  // 보상/강화 창 열기
+  
   function openRewardPick(g: GameState, actions: any, title: string, prompt: string) {
 
 
@@ -2257,7 +3476,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
     };
 
     choiceHandler = (k: string) => {
-      // 취소
+      
       if (k === "skip") {
         logMsg(g, "강화 취소");
         closeChoiceOrPop(g);
@@ -2267,7 +3486,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         return;
       }
 
-      // 강화 선택
+      
       if (k.startsWith("up:")) {
         const uid = k.slice("up:".length);
         const ok = upgradeCardByUid(g, uid);
@@ -2280,7 +3499,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         return;
       }
 
-      // 예상 못한 키: 그냥 닫기
+      
       closeChoiceOrPop(g);
       render(g, actions);
     };
@@ -2302,6 +3521,7 @@ function normalizePlacementCounters(g: GameState) {
 }
 
 export function mountRoot(): HTMLDivElement {
+  applyAssetVarsOnce(); 
   const app = document.querySelector<HTMLDivElement>("#app")!;
   app.innerHTML = "";
   return app;
@@ -2320,7 +3540,7 @@ function normalizeEnemyNameWidth() {
   const names = Array.from(document.querySelectorAll<HTMLElement>(".enemyName"));
   if (names.length === 0) return;
 
-  // 한 번 폭 제한 풀고 실제 필요한 폭을 측정
+  
   names.forEach((el) => {
     el.style.display = "inline-block";
     el.style.width = "auto";
@@ -2330,11 +3550,11 @@ function normalizeEnemyNameWidth() {
   let maxW = 0;
   for (const el of names) maxW = Math.max(maxW, el.scrollWidth);
 
-  // 너무 길어질 때 UI 깨지는 것 방지
-  const cap = 320; // px
+  
+  const cap = 320; 
   const w = Math.min(maxW, cap);
 
-  // 전부 동일 폭 적용
+  
   names.forEach((el) => {
     el.style.width = `${w}px`;
     el.style.overflow = "hidden";
@@ -2389,7 +3609,7 @@ function renderFloatFxLayer() {
 }
 
 export function ensureFloatingNewRunButton() {
-  // 이미 있으면 끝
+  
   if (document.querySelector(".floatingNewRun")) return;
 
   const btn = document.createElement("button");
@@ -2427,9 +3647,7 @@ export function ensureFloatingNewRunButton() {
 
 
 
-/* =========================
-   RENDER ENTRYPOINT
-   ========================= */
+
 
 export function render(g: GameState, actions: UIActions) {
 
@@ -2447,7 +3665,7 @@ export function render(g: GameState, actions: UIActions) {
     log: (msg) => logMsg((currentG ?? g), msg),
   });
 
-  // 콘솔이 켜져있으면 DOM 유지/갱신
+  
   renderDevConsole();
 
   floatingNewRunHandler = () => actions.onNewRun();
@@ -2500,7 +3718,7 @@ export function render(g: GameState, actions: UIActions) {
 
   main.appendChild(renderBattleTitleRow(g));
 
-  if (g.run.finished) main.appendChild(p("런 종료"));
+  if (g.run.finished) main.appendChild(p("런 종료. 새로운 런을 원하시면 버튼을 누르거나 키보드 P를 입력하십시오."));
   else if (g.phase === "NODE") renderNodeSelect(main, g, actions);
   else renderCombat(main, g, actions);
 
@@ -2572,7 +3790,7 @@ function getRelicView(g: GameState, id: string) {
     id,
     name: disp.name,
     desc: disp.text,
-    state: disp.state, // 필요하면 UI에서 PENDING 표시용
+    state: disp.state, 
     icon,
     art,
   };
@@ -2754,7 +3972,7 @@ function renderRelicModal(g: GameState, actions: UIActions) {
 
   const artImg = document.createElement("div");
   artImg.className = "relicModalArtImg";
-  if (v.art) artImg.style.backgroundImage = `url(${v.art})`;
+  if (v.art) artImg.style.backgroundImage = `url("${assetUrl(v.art)}")`;
   art.appendChild(artImg);
 
   const desc = document.createElement("pre");
@@ -2867,7 +4085,7 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
   const wrap = div("settingsPanel");
   wrap.style.cssText = "display:flex; flex-direction:column; gap:12px;";
 
-  // --- UI 스케일 ---
+  
   const row = div("settingsRow");
   row.style.cssText = "display:flex; align-items:center; gap:12px; flex-wrap:wrap;";
 
@@ -2899,7 +4117,7 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
   row.appendChild(val);
   wrap.appendChild(row);
 
-  // 프리셋
+  
   const presets = div("settingsPresets");
   presets.style.cssText = "display:flex; gap:8px; flex-wrap:wrap;";
 
@@ -2922,7 +4140,7 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
   presets.appendChild(makePreset("더 크게 120%", 1.20));
   wrap.appendChild(presets);
 
-  // 초기화
+  
   const resetRow = div("settingsResetRow");
   resetRow.style.cssText = "display:flex; justify-content:flex-end; margin-top:6px;";
   const reset = mkButton("초기화", () => {
@@ -2937,7 +4155,7 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
   resetRow.appendChild(reset);
   wrap.appendChild(resetRow);
 
-  // --- 슬롯 카드 표시 모드 ---
+  
   const modeRow = div("settingsRow");
   modeRow.style.cssText = "display:flex; align-items:center; gap:12px; flex-wrap:wrap;";
 
@@ -2976,7 +4194,7 @@ function positionPlayerHudByStage() {
 
   const r = stage.getBoundingClientRect();
 
-  // stage 기준점만 CSS 변수로 전달 (px)
+  
   const x = Math.round(r.left);
   const y = Math.round(r.top);
 
@@ -3001,9 +4219,7 @@ function applyUiScaleVars() {
 
 
 
-/* =========================
-   OVERLAYS — choice/event/relic/settings
-   ========================= */
+
 
 function renderOverlayLayer(
   g: GameState,
@@ -3018,7 +4234,7 @@ function renderOverlayLayer(
   const layer = div("overlay-layer");
   layer.style.cssText = isFull
     ? "position:fixed; inset:0;" +
-      "background:rgba(0,0,0,1);" +          // 불투명
+      "background:rgba(0,0,0,1);" +          
       "display:flex; justify-content:center; align-items:flex-start;" +
       "padding:24px; box-sizing:border-box;"
     : "position:fixed; inset:0;" +
@@ -3162,7 +4378,7 @@ function renderOverlayLayer(
       "line-height:1.45;";
     side.appendChild(sidePre);
 
-    // 선택 처리
+    
     let selectedUid: string | null = sortedUids[0] ?? null;
 
     const renderSide = () => {
@@ -3201,7 +4417,7 @@ function renderOverlayLayer(
 
         const setSelected = () => {
           selectedUid = uid;
-          // 선택 강조(간단 링)
+          
           grid.querySelectorAll(".pileSelected").forEach((el) => el.classList.remove("pileSelected"));
           thumb.classList.add("pileSelected");
           renderSide();
@@ -3292,7 +4508,6 @@ function renderRelicTray(g: GameState, actions: UIActions) {
 
     if (def.art) {
       const img = document.createElement("img");
-      img.src = def.art;
       img.className = "relicIconImg";
       img.alt = disp.name;
       btn.appendChild(img);
@@ -3322,7 +4537,7 @@ function renderRelicTray(g: GameState, actions: UIActions) {
 
 
 function renderChoiceLayer(g: GameState, actions: UIActions) {
-  // remove existing
+  
   document.querySelector(".choice-overlay")?.remove();
 
   const c = g.choice;
@@ -3497,7 +4712,7 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
     const art = (c as any).art as string | undefined;
     if (art) {
       const img = document.createElement("img");
-      img.src = art;
+      img.src = assetUrl(art);
       img.alt = c.title ?? "illustration";
       const ZOOM = 1.5;
       (img.style as any).imageRendering = "pixelated";
@@ -3584,11 +4799,9 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
 
 
 
-/* =========================
-   COMBAT UI — top HUD + battlefield + hand
-   ========================= */
 
-// Top HUD (Player left + Enemies center + Top-right controls)
+
+
 function renderTopHud(g: GameState, actions: UIActions) {
   document.querySelectorAll(".topHud").forEach((el) => el.remove());
   document.querySelectorAll(".enemyHudCenter").forEach((el) => el.remove());
@@ -3688,10 +4901,9 @@ function renderTopHud(g: GameState, actions: UIActions) {
       const artWrap = div("enemyArtWrap");
       const artCard = div("enemyArtCard");
 
-      // CSS var로 URL 주입
-      const base = import.meta.env.BASE_URL; // "/<repo>/"
-      artWrap.style.setProperty("--frameImg", `url("${base}assets/enemies/enemies_frame.png")`);
-      artWrap.style.setProperty("--artImg", `url("${base}${enemyArtUrl(e.id)}")`);
+      
+      artWrap.style.setProperty("--frameImg", `url("${assetUrl("assets/enemies/enemies_frame.png")}")`);
+      artWrap.style.setProperty("--artImg", `url("${enemyArtUrl(e.id)}")`);
       artWrap.appendChild(artCard);
 
       const mini = div("enemyMiniHud");
@@ -3784,7 +4996,11 @@ function buildResourceText(g: GameState): string {
   }
 
   parts.push(`💤 F ${g.player.fatigue}`);
-  parts.push(`| ⏳ 시간 ${Math.max(0, (g.run.nodePickCount ?? 0) + (g.time ?? 0))}`);
+  const runAny = g.run as any;
+  const timeMove = Number(runAny.timeMove ?? 0) || 0;
+  const timeAct = Number(g.time ?? 0) || 0;
+  const timeTotal = timeMove + timeAct;
+parts.push(`| ⏳ 총 ${timeTotal}`);
   parts.push(`| 🃏 덱 ${g.deck.length}`);
 
   return parts.join(" ");
@@ -4046,7 +5262,7 @@ function enableHorizontalWheelScroll(el: HTMLElement) {
   (el as any).dataset.wheelX = "1";
   el.addEventListener(
     "wheel", (e) => {
-      // shift+휠은 원래대로(세로 스크롤)
+      
       if (e.shiftKey) return;
       const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
       el.scrollLeft += dx;
@@ -4056,7 +5272,7 @@ function enableHorizontalWheelScroll(el: HTMLElement) {
   );
 }
 
-//손패 UI
+
 
 
 
@@ -4156,7 +5372,7 @@ function alignHandToBoardAnchor(_g: GameState) {
   if (next > maxScroll) next = maxScroll;
 
   hand.scrollLeft = Math.round(next);
-  row.style.transform = ""; // 스크롤 모드에서는 transform 끄기
+  row.style.transform = ""; 
 }
 
 function applySlotCardScale(slotEl: HTMLElement, scalerEl: HTMLElement) {
@@ -4240,11 +5456,9 @@ function renderSlotsGrid(g: GameState, actions: UIActions, side: Side) {
 
 
 
-/* =========================
-   INPUT — drag, targeting, global handlers
-   ========================= */
 
-// Drag + Keyboard
+
+
 
 function updateSlotHoverUI() {
 
@@ -4377,18 +5591,18 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
       return;
     }
 
-    // 새로운 런: P
+    
     if (ev.code === "KeyP") {
       ev.preventDefault();
       actions.onNewRun();
       return;
     }
 
-    // 취소: 4
+    
     if (ev.code === "Digit4") {
       ev.preventDefault();
 
-      // 타겟 선택 중이면 타겟 선택 자체 취소
+      
       if (isTargeting(g)) {
         g.pendingTarget = null;
         g.pendingTargetQueue = [];
@@ -4398,12 +5612,12 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
         return;
       }
 
-      // 그냥 선택 해제
+      
       actions.onClearSelected();
       return;
     }
   
-    // 카드 교체: Tab
+    
     if (ev.key === "Tab") {
       ev.preventDefault();
       if (g.hand.length === 0) return;
@@ -4417,7 +5631,7 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
       return;
     }
 
-    // 턴 넘기기: Space
+    
     if (ev.code === "Space") {
       ev.preventDefault();
       const g = getG();
@@ -4429,14 +5643,14 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
       return;
     }
 
-    // 전열 배치(또는 타겟 선택): 1,2,3
+    
     if (ev.code === "Digit1" || ev.code === "Digit2" || ev.code === "Digit3") {
       ev.preventDefault();
       const idx = ev.code === "Digit1" ? 0 : ev.code === "Digit2" ? 1 : 2;
 
-      // 1) 타겟 선택 상태면: 적 선택(1~3)
+      
       if (isTargeting(g)) {
-        // 살아있는 적만 선택 허용
+        
         const e = g.enemies[idx];
         if (!e || e.hp <= 0) {
           logMsg(g, `대상 선택 실패: ${idx + 1}번 적이 없습니다.`);
@@ -4448,12 +5662,12 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
         return;
       }
 
-      // 2) 전열 핫키
+      
       actions.onHotkeySlot("front", idx);
       return;
     }
 
-    // 후열 배치: Q,W,E
+    
     if (ev.code === "KeyQ" || ev.code === "KeyW" || ev.code === "KeyE") {
       ev.preventDefault();
       const idx = ev.code === "KeyQ" ? 0 : ev.code === "KeyW" ? 1 : 2;
@@ -4490,7 +5704,7 @@ function beginDrag(
   const grabDX = r ? (ev.clientX - r.left) : 20;
   const grabDY = r ? (ev.clientY - r.top) : 20;
 
-  // 손패 카드 크기 fallback: CSS 변수 기반으로라도 고정되게
+  
   const css = getComputedStyle(document.documentElement);
   const handW = parseFloat(css.getPropertyValue("--handCardW")) || undefined;
   const handH = parseFloat(css.getPropertyValue("--handCardH")) || undefined;

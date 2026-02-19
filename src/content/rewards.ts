@@ -16,6 +16,44 @@ export function obtainTreasure(g: GameState) {
   g.deck = shuffle(g.deck);
 
   logMsg(g, "저주받은 보물을 획득했습니다! 덱에 [저주받은 보물] 추가");
+
+  repopulateDungeonAfterTreasure(g);
+  logMsg(g, "보물이 울부짖자, 던전의 모든 방이 다시 채워집니다...");
+}
+
+function repopulateDungeonAfterTreasure(g: GameState) {
+  const map: any = (g.run as any)?.map;
+  if (!map || !map.nodes) return;
+
+  const startId = map.startId;
+  const treasureId = map.treasureId;
+
+  const ids = Object.keys(map.nodes);
+  for (const id of ids) {
+    if (id === startId) continue;
+    if (id === treasureId) continue;
+
+    const node: any = map.nodes[id];
+    if (!node) continue;
+
+    node.cleared = false;
+    delete node.noRespawn;
+    delete node.lastClearedMove;
+
+    node.reprocCount = Number(node.reprocCount ?? 0) + 1;
+
+    const depth = Number(node.depth ?? 0);
+
+    if (node.kind === "ELITE") continue;
+    if (node.kind === "START" || node.kind === "TREASURE") continue;
+
+    // 깊을수록 전투 확률 ↑ (보물 이후 전체적으로 더 위험)
+    const pBattle = Math.min(0.88, 0.72 + depth * 0.01);
+    const pEvent = 0.18;
+    const r = Math.random();
+
+    node.kind = r < pBattle ? "BATTLE" : r < pBattle + pEvent ? "EVENT" : "REST";
+  }
 }
 
 export type RewardEntry = { id: string; weight: number };
@@ -37,7 +75,7 @@ const JUNK_REWARD_POOL: string[] = [
 ] as any;
 
 const MAD_REWARD_POOL: RewardEntry[] = [
-  { id: "mad_echo", weight: 20 },
+  { id: "mad_echo", weight: 12 },
   { id: "mad_insight", weight: 12 },
   { id: "mad_bargain", weight: 3 },
 ];
@@ -60,6 +98,8 @@ export const REWARD_POOL: RewardEntry[] = [
   { id: "vital_shot", weight: 12 },
   { id: "taunt", weight: 12 },
   { id: "rapid_fire", weight: 20 },
+  { id: "blood_contract", weight: 20 },
+  { id: "cloth_scrap_armor", weight: 12 },
 
 ];
 
@@ -253,13 +293,13 @@ export function removeRandomCardFromDeck(g: GameState) {
 
 const CURSED_TREASURE_ID = "goal_treasure";
 
-export function removeCardByUid(g: GameState, uid: string) {
+export function removeCardByUid(g: GameState, uid: string): boolean {
   const inst = g.cards[uid];
-  if (!inst) return;
+  if (!inst) return false;
 
   if (inst.defId === CURSED_TREASURE_ID) {
     logMsg(g, "저주받은 보물은 덱에서 제거할 수 없습니다.");
-    return;
+    return false;
   }  
 
   g.deck = g.deck.filter((x) => x !== uid);
@@ -273,6 +313,8 @@ export function removeCardByUid(g: GameState, uid: string) {
   g.vanished.push(uid);
 
   logMsg(g, `카드 제거: [${getCardDefFor(g, inst.uid).name} +${g.cards[inst.uid].upgrade ?? 0}]`);
+
+  return true;
 }
 
 export function canUpgradeUid(g: GameState, uid: string): boolean {

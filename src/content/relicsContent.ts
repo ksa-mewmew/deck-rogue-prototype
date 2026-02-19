@@ -42,11 +42,11 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
     unlock: (g) => (g.run as any).unlock?.rest >= 1,
 
     name: "먹을 수 있는 사각형",
-    text: "전투 시작 시 🌾 S +1",
+    text: "전투 시작 시 🌾 S +2",
     unlockFlavor: "먹을 수는 있다. 일단은.",
     onCombatStart(g) {
-      g.player.supplies += 1;
-      logMsg(g, "유물[먹을 수 있는 사각형]: S +1");
+      g.player.supplies += 2;
+      logMsg(g, "유물[먹을 수 있는 사각형]: S +2");
     },
   },
 
@@ -81,9 +81,9 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
 
     name: "연막탄",
     text: "활성화 시 연막 카드(소실) 1장 획득",
-    unlockFlavor: "비상 탈출 버튼!",
+    unlockFlavor: "비상 탈출!",
     onActivate(g) {
-      const SMOKE_DEF_ID = "smoke_vanish";
+      const SMOKE_DEF_ID = "smoke";
 
       g.uidSeq += 1;
       const uid = String(g.uidSeq);
@@ -124,7 +124,7 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
     unlock: (g) => ((g.run as any).unlock?.kills ?? 0) >= 3,
 
     name: "속살을 찾는 숫돌",
-    text: "전투에서 첫 공격이 주는 🗡️ 피해 +2",
+    text: "전투에서 첫 공격이 주는 🗡️ 피해 +3",
     unlockFlavor: "밤마다 무언가 갈고 있다.",
     onCombatStart(g) {
       (g as any)._firstPlayerAttackDoneThisCombat = false;
@@ -135,7 +135,7 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
         const anyG = g as any;
         if (!anyG._firstPlayerAttackDoneThisCombat) {
           anyG._firstPlayerAttackDoneThisCombat = true;
-          return ctx.current + 2;
+          return ctx.current + 3;
         }
       }
       return ctx.current;
@@ -174,11 +174,11 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
     unlock: (g) => ((g.run as any).unlock?.eventPicks ?? 0) >= 2,
 
     name: "돌아온 길의 기억",
-    text: "전투 승리 시 HP +2",
+    text: "전투 승리 시 HP +3",
     unlockFlavor: "왔기에 갈 수 없다.",
     onVictory(g) {
-      healPlayer(g, 2);
-      logMsg(g, "유물[돌아온 길의 기억]: 승리 회복 +2");
+      healPlayer(g, 3);
+      logMsg(g, "유물[돌아온 길의 기억]: 승리 회복 +3");
     },
   },
 
@@ -193,11 +193,11 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
     unlock: (g) => !!(g.run as any).unlock?.hpLeq15,
 
     name: "상처로 기어가는 약병",
-    text: "전투 시작 시 HP +2",
+    text: "전투 시작 시 HP +3",
     unlockFlavor: "씨앗이 있었나?",
     onCombatStart(g) {
-      healPlayer(g, 2);
-      logMsg(g, "유물[상처로 기어가는 약병]: 전투 시작 회복 +2");
+      healPlayer(g, 3);
+      logMsg(g, "유물[상처로 기어가는 약병]: 전투 시작 회복 +3");
     },
   },
 
@@ -239,6 +239,102 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
     },
     onVictory(g) {
       delete (g as any)._bleedBonusPerApply;
+    },
+  },
+
+  relic_broken_millstone: {
+    id: "relic_broken_millstone",
+    dormantName: "금 간 맷돌",
+    dormantText: "갈고 있으면 시간 가는 줄 모르겠다.",
+    unlockHint: "조건: 시간 10 흘려보내기",
+
+    art: "assets/relics/relic_broken_millstone.png",
+
+    unlock: (g) => {
+      const runAny = g.run as any;
+      const tm = Number(runAny.timeMove ?? 0) || 0;
+      const ta = Number(g.time ?? 0) || 0;
+      return (tm + ta) >= 10;
+    },
+
+    name: "깨진 맷돌",
+    text: "매 턴 모든 적에게 🗡️ 2 피해",
+    unlockFlavor: "돌이 닳는다. 적도 닳는다.",
+
+    onUpkeepEnd(g) {
+      const targets: any[] = aliveEnemies(g) as any;
+      if (!targets?.length) return;
+
+      for (const e of targets) {
+        let dmg = 2;
+        const blk = Number((e as any).block ?? 0);
+        if (blk > 0) {
+          const used = Math.min(blk, dmg);
+          (e as any).block = blk - used;
+          dmg -= used;
+        }
+        if (dmg > 0) {
+          const hp = Number((e as any).hp ?? 0);
+          (e as any).hp = Math.max(0, hp - dmg);
+        }
+      }
+
+      logMsg(g, "유물[깨진 맷돌]: 모든 적에게 2 피해");
+    },
+  },
+  
+  relic_bloody_spoon: {
+    id: "relic_bloody_spoon",
+    dormantName: "붉은 숟가락",
+    dormantText: "쇠 냄새가 진하다.",
+    unlockHint: "조건: 💤 F 10 이상",
+
+    art: "assets/relics/relic_bloody_spoon.png",
+
+    unlock: (g) => {
+      return g.player.fatigue > 9;
+    },
+
+    name: "피 묻은 숟가락",
+    text: "회복 시 1 추가 회복",
+    unlockFlavor: "이런, 피였다.",
+
+  },
+
+  relic_black_ledger_shard: {
+    id: "relic_black_ledger_shard",
+    dormantName: "검댕 묻은 종이",
+    dormantText: "검은 종이다. 타고 남은 조각일지도 모르겠다.",
+    unlockHint: "조건: 🌾S = 0",
+
+    art: "assets/relics/relic_black_ledger_shard.png",
+
+    unlock: (g) => {
+      return g.player.supplies === 0;
+    },
+
+    name: "검은 장부 조각",
+    text: "🌾S = 0으로 턴을 종료하면, 🌾S +2, 💤 F +1",
+    unlockFlavor: "장부. 무엇의?",
+    onUpkeepEnd(g) {
+      const targets: any[] = aliveEnemies(g) as any;
+      if (!targets?.length) return;
+
+      for (const e of targets) {
+        let dmg = 2;
+        const blk = Number((e as any).block ?? 0);
+        if (blk > 0) {
+          const used = Math.min(blk, dmg);
+          (e as any).block = blk - used;
+          dmg -= used;
+        }
+        if (dmg > 0) {
+          const hp = Number((e as any).hp ?? 0);
+          (e as any).hp = Math.max(0, hp - dmg);
+        }
+      }
+
+      logMsg(g, "유물[검은 장부 조각]: S +2, F +1");
     },
   },
 };

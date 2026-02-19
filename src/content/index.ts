@@ -22,10 +22,10 @@ export {
   ENEMIES,
 
   EVENTS,
-  MAD_EVENTS,          // 악몽 풀도 외부에서 디버그/표시
+  MAD_EVENTS,
   BOSS_OMEN_HINT,
 
-  pickRandomEvent,     // 유지
+  pickRandomEvent,
   pickEventByMadness,
 
   offerRewardPair,

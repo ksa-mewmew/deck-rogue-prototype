@@ -18,7 +18,7 @@ export function applyStatusTo(target: HasStatus, key: StatusKey, n: number, g?: 
     const bonus = Number((g as any)._bleedBonusPerApply ?? 0);
     if (bonus) amount += bonus;
   }
-  target.status[key] = Math.max(0, (target.status[key] ?? 0) + n);
+  target.status[key] = Math.max(0, (target.status[key] ?? 0) + amount);
 }
 
 
