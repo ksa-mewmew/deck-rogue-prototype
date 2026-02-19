@@ -229,12 +229,14 @@ export type PlayerEffect =
   | { op: "statusEnemiesAttackingThisTurn"; key: StatusKey; n: number }
   | { op: "maxHp"; n: number }
   | { op: "hp"; n: number }
-  | { op: "clearStatusSelf"; key: StatusKey };
+  | { op: "clearStatusSelf"; key: StatusKey }
+  | { op: "damageEnemyFormula"; target: "select" | "random" | "all"; kind: string };
 
 export type PendingTarget =
   | {
       kind: "damageSelect";
       amount: number;
+      formulaKind?: string
       sourceCardUid?: string;
       sourceLabel?: string;
       reason?: "FRONT" | "BACK" | "ENEMY" | "EVENT" | "RELIC" | "OTHER";

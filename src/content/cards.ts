@@ -529,6 +529,44 @@ export const CARDS: CardData[] = [
     ]
   },
 
+  // 13) 사냥감 표시
+  {
+    id: "prey_mark",
+    name: "사냥감 표시",
+    frontText: "지정 피해 7, 대상의 HP가 플레이어보다 높으면 대신 피해 12",
+    backText: "지정 취약 +2",
+    front: [{ op: "damageEnemyFormula", target: "select", kind: "prey_mark" }],
+    back: [{ op: "statusEnemy", target: "select", key: "vuln", n: 2 }],
+    upgrades: [
+      {
+        frontText: "지정 피해 9, 대상의 HP가 플레이어보다 높으면 대신 피해 15",
+        front: [{ op: "damageEnemyFormula", target: "select", kind: "prey_mark_u1" }],
+        backText: "지정 취약 +3",
+        back: [{ op: "statusEnemy", target: "select", key: "vuln", n: 3 }],
+      },
+    ],
+  },
+
+  // 14) 난전 정리
+
+  {
+    id: "brawl_cleaver",
+    name: "난전 정리",
+    frontText: "지정 피해 8, 남은 적이 3명이면 대신 피해 16",
+    backText: "방어 +6",
+    front: [{ op: "damageEnemyFormula", target: "select", kind: "triple_bounty" }],
+    back: [{ op: "block", n: 6 }],
+    upgrades: [
+      {
+        frontText: "지정 피해 10, 남은 적이 3명이면 대신 20",
+        front: [{ op: "damageEnemyFormula", target: "select", kind: "triple_bounty_u1" }],
+        backText: "방어 +7",
+        back: [{ op: "block", n: 7 }],
+      },
+    ],
+  },
+
+
 // 광기 카드
   {
     id: "mad_echo",

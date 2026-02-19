@@ -2240,20 +2240,6 @@ function renderMapMiniGraph(
   svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
   svg.style.display = "block";
 
-  const MAP_BG_HREF = assetUrl("assets/ui/background/map_bg.png");
-
-  const bg = document.createElementNS("http://www.w3.org/2000/svg", "image");
-  bg.setAttribute("href", MAP_BG_HREF);
-  bg.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", MAP_BG_HREF);
-
-  bg.setAttribute("x", String(viewX));
-  bg.setAttribute("y", String(viewY));
-  bg.setAttribute("width", String(viewW));
-  bg.setAttribute("height", String(viewH));
-  bg.setAttribute("preserveAspectRatio", "none");
-  bg.setAttribute("opacity", "0.22");
-  svg.appendChild(bg);
-
   const gEdges = document.createElementNS("http://www.w3.org/2000/svg", "g");
   const gNodes = document.createElementNS("http://www.w3.org/2000/svg", "g");
   svg.appendChild(gEdges);

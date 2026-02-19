@@ -100,6 +100,8 @@ export const REWARD_POOL: RewardEntry[] = [
   { id: "rapid_fire", weight: 20 },
   { id: "blood_contract", weight: 20 },
   { id: "cloth_scrap_armor", weight: 12 },
+  { id: "prey_mark", weight: 12 },
+  { id: "brawl_cleaver", weight: 20 },
 
 ];
 

@@ -8,6 +8,26 @@ export function isTargeting(g: GameState) {
   return g.pendingTarget != null || (g.pendingTargetQueue?.length ?? 0) > 0;
 }
 
+function calcDamageForTargetSelection(g: GameState, req: any, target: any): number {
+  const base = Number(req.amount ?? 0) | 0;
+  const kind = req.formulaKind as string | undefined;
+  if (!kind) return base;
+
+  switch (kind) {
+    case "prey_mark": {
+      const bonus = 5;
+      return target.hp > g.player.hp ? base + bonus : base;
+    }
+    case "triple_bounty": {
+      const bonus = 4;
+      const alive = aliveEnemies(g).length;
+      return alive >= 3 ? base + bonus : base;
+    }
+    default:
+      return base;
+  }
+}
+
 export function resolveTargetSelection(g: GameState, enemyIndex: number): boolean {
   if (!g.pendingTarget) return false;
 
@@ -25,10 +45,10 @@ export function resolveTargetSelection(g: GameState, enemyIndex: number): boolea
   const req = g.pendingTarget as any;
 
   if (req.kind === "damageSelect") {
-    applyDamageToEnemy(g, target, req.amount);
+    const amount = calcDamageForTargetSelection(g, req, target);
+    applyDamageToEnemy(g, target, amount);
   } else if (req.kind === "statusSelect") {
     applyStatusTo(target, req.key, req.n, g, "PLAYER");
-    // 유물 해금 진행도: 출혈 부여 횟수
     if (req.key === "bleed" && req.n > 0) {
       const up = getUnlockProgress(g);
       up.bleedApplied += 1;
