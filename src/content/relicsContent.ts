@@ -43,19 +43,11 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
     id: "relic_monster_leather_helm",
     dormantName: "들러붙는 가죽",
     dormantText: "털과 피가 뒤섞인 가죽이 손에 들러붙는다.",
-    unlockHint: "조건: 엘리트 전투 승리 1회(획득 후)",
+    unlockHint: "조건: 엘리트 전투 승리 1회",
 
     art: "assets/relics/relic_monster_leather_helm.png",
 
-    // NOTE: '획득 후' 추가 엘리트 1회가 필요하도록, 획득 시점의 eliteWins를 스냅샷으로 저장
-    unlock: (g) => {
-      const runAny: any = g.run;
-      const eliteWins = Number((runAny?.unlock?.eliteWins ?? 0) as any) || 0;
-      const rt = runAny?.relicRuntime?.["relic_monster_leather_helm"] as any;
-      if (rt && rt.eliteWinsAtObtain == null) rt.eliteWinsAtObtain = eliteWins;
-      const base = Number.isFinite(rt?.eliteWinsAtObtain) ? rt.eliteWinsAtObtain : eliteWins;
-      return eliteWins >= base + 1;
-    },
+    unlock: (g) => (g.run as any).unlock?.eliteWins >= 1,
 
     name: "몬스터 가죽 투구",
     text: "첫 턴에 🛡️ 방어 +4",
@@ -98,7 +90,11 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
 
     art: "assets/relics/relic_bone_compass.png",
 
-    unlock: (g) => (g.run?.nodePickCount ?? 0) >= 5,
+    unlock: (g) => {
+      const runAny = g.run as any;
+      const moves = Number(runAny.timeMove ?? g.run?.nodePickCount ?? 0) || 0;
+      return moves >= 5;
+    },
 
     name: "뼈가 만든 나침반",
     text: "전투 시작 시 🃏 드로우 +1",
@@ -314,11 +310,22 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
     text: "🌾S = 0으로 턴을 종료하면, 🌾S +2, 💤 F +1",
     unlockFlavor: "장부. 무엇의?",
     onUpkeepEnd(g) {
-      // S=0으로 턴을 종료했을 때만 발동
-      if ((g.player.supplies ?? 0) !== 0) return;
+      const targets: any[] = aliveEnemies(g) as any;
+      if (!targets?.length) return;
 
-      g.player.supplies = (g.player.supplies ?? 0) + 2;
-      g.player.fatigue = Math.max(0, (g.player.fatigue ?? 0) + 1);
+      for (const e of targets) {
+        let dmg = 2;
+        const blk = Number((e as any).block ?? 0);
+        if (blk > 0) {
+          const used = Math.min(blk, dmg);
+          (e as any).block = blk - used;
+          dmg -= used;
+        }
+        if (dmg > 0) {
+          const hp = Number((e as any).hp ?? 0);
+          (e as any).hp = Math.max(0, hp - dmg);
+        }
+      }
 
       logMsg(g, "유물[검은 장부 조각]: S +2, F +1");
     },

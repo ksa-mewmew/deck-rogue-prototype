@@ -23,7 +23,7 @@ import { logMsg } from "../engine/rules";
 import { createInitialState } from "../engine/state";
 import { applyChoiceKey } from "../engine/choiceApply";
 import type { EventOutcome } from "../content/events";
-import { pickEventByMadness, getEventById, type EventDef, type EventOption } from "../content/events";
+import { pickEventByMadness, getEventById } from "../content/events";
 import { removeCardByUid, addCardToDeck, offerRewardsByFatigue, canUpgradeUid, upgradeCardByUid, obtainTreasure } from "../content/rewards";
 import { getCardDefByIdWithUpgrade } from "../content/cards";
 
@@ -140,6 +140,26 @@ function applyAssetVarsOnce() {
   root.style.setProperty("--cardUrl", `url("${assetUrl("assets/ui/cards/card_parchment.png")}")`);
 
   root.style.setProperty("--mapBgUrl", `url("${assetUrl("assets/ui/background/map_bg.png")}")`);
+
+  // 폰트: 다른 PC에서도 동일하게 적용되도록 웹폰트를 강제로 로드
+  if (!document.getElementById("deck-fontfaces")) {
+    const st = document.createElement("style");
+    st.id = "deck-fontfaces";
+    const w2 = assetUrl("assets/fonts/Mulmaru.woff2");
+    const w1 = assetUrl("assets/fonts/Mulmaru.woff");
+    st.textContent = `\
+@font-face {\
+  font-family: "Mulmaru";\
+  src: url("${w2}") format("woff2"), url("${w1}") format("woff");\
+  font-weight: 400;\
+  font-style: normal;\
+  font-display: swap;\
+}\
+:root { --gameFont: "Mulmaru", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; }\
+body { font-family: var(--gameFont); }\
+`;
+    document.head.appendChild(st);
+  }
 }
 
 
@@ -2319,6 +2339,30 @@ function renderMapMiniGraph(
     const isAdj = neigh.has(id);
     const isStart = actual === "START";
 
+    // 현재 위치 강조(후광)
+    if (isCur) {
+      const halo1 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      halo1.setAttribute("cx", String(p.x));
+      halo1.setAttribute("cy", String(p.y));
+      halo1.setAttribute("r", String(detailMode ? 20 : 22));
+      halo1.setAttribute("fill", "none");
+      halo1.setAttribute("stroke", C_ACCENT);
+      halo1.setAttribute("stroke-width", String(detailMode ? 3 : 3.5));
+      halo1.setAttribute("opacity", "0.55");
+      (halo1.style as any).filter = "drop-shadow(0 0 6px rgba(179,74,70,.65))";
+      gNodes.appendChild(halo1);
+
+      const halo2 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      halo2.setAttribute("cx", String(p.x));
+      halo2.setAttribute("cy", String(p.y));
+      halo2.setAttribute("r", String(detailMode ? 28 : 32));
+      halo2.setAttribute("fill", "none");
+      halo2.setAttribute("stroke", C_ACCENT);
+      halo2.setAttribute("stroke-width", "2");
+      halo2.setAttribute("opacity", "0.18");
+      gNodes.appendChild(halo2);
+    }
+
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     circle.setAttribute("cx", String(p.x));
     circle.setAttribute("cy", String(p.y));
@@ -3014,42 +3058,28 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         node.kind = "EMPTY";
         (node as any).lastClearedMove = tmNow;
         const runAny2: any = g.run;
-
-        // 1회성 이벤트 / 보스 전까지 잠금 이벤트 관리
-        runAny2.seenOneTimeEvents ??= {};
-        runAny2.ominousProphecyLockedUntilBossKill ??= false;
-
-        const isOneTime = (id: string) => id === "goblin_ambush_low_supplies" || id === "rat_circle";
-        const isBlocked = (id: string) =>
-          (id === "ominous_prophecy" && runAny2.ominousProphecyLockedUntilBossKill === true) ||
-          (isOneTime(id) && runAny2.seenOneTimeEvents?.[id] === true);
+        runAny2.ominousProphecySeen ??= false;
 
         const OMEN_CHANCE = 0.3;
-        let ev: EventDef | null = null;
+        let ev = pickEventByMadness(g);
 
-        if (runAny2.ominousProphecyLockedUntilBossKill !== true && Math.random() < OMEN_CHANCE) {
-          ev = getEventById("ominous_prophecy");
+        if (runAny2.ominousProphecySeen === true) {
+          for (let i = 0; i < 50 && (ev as any).id === "ominous_prophecy"; i++) {
+            ev = pickEventByMadness(g);
+          }
+        } else {
+          if (Math.random() < OMEN_CHANCE) {
+            ev = getEventById("ominous_prophecy") ?? ev;
+            runAny2.ominousProphecySeen = true;
+          }
         }
-
-        if (!ev) ev = pickEventByMadness(g);
-
-        for (let i = 0; i < 80 && ev && isBlocked(ev.id); i++) {
-          ev = pickEventByMadness(g);
-        }
-
-        if (ev && isBlocked(ev.id)) {
-          ev = getEventById("drop_bag") ?? ev;
-        }
-
-        if (ev?.id === "ominous_prophecy") runAny2.ominousProphecyLockedUntilBossKill = true;
-        if (ev?.id && isOneTime(ev.id)) runAny2.seenOneTimeEvents[ev.id] = true;
 
         if (!ev) {
           render(g, actions);
           return;
         }
 
-        const opts: EventOption[] = ev.options(g);
+        let opts = ev.options(g);
 
         
         /*const { tier } = madnessP(g);
@@ -3825,8 +3855,7 @@ function renderRelicHud(g: GameState, actions: UIActions) {
     if (v.icon) {
       const img = document.createElement("img");
       img.className = "relicIconImg";
-      // assetUrl을 거치지 않으면(상대경로) 아이콘이 안 보일 수 있음
-      img.src = assetUrl(v.icon);
+      img.src = v.icon;
       img.alt = v.name ?? v.id ?? "relic";
       icon.appendChild(img);
     } else {
@@ -4518,7 +4547,6 @@ function renderRelicTray(g: GameState, actions: UIActions) {
     if (def.art) {
       const img = document.createElement("img");
       img.className = "relicIconImg";
-      img.src = assetUrl(def.art);
       img.alt = disp.name;
       btn.appendChild(img);
     } else {
@@ -4637,9 +4665,11 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
   }
 
 
-  const fixPreviewSize = (cardEl: HTMLElement) => {
-    cardEl.style.width = "var(--handCardW)";
-    cardEl.style.height = "var(--handCardH)";
+  const fixPreviewSize = (cardEl: HTMLElement, scale = 1) => {
+    const w = scale === 1 ? "var(--handCardW)" : `calc(var(--handCardW) * ${scale})`;
+    const h = scale === 1 ? "var(--handCardH)" : `calc(var(--handCardH) * ${scale})`;
+    cardEl.style.width = w;
+    cardEl.style.height = h;
     cardEl.style.boxSizing = "border-box";
   };
 
@@ -4759,19 +4789,37 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
       if (uid) {
         const isUpgradePick = g.choice?.kind === ("UPGRADE_PICK" as any);
         const card = g.cards[uid];
-        const nextUp = (card.upgrade ?? 0) + 1;
+        const curUp = (card?.upgrade ?? 0) || 0;
+        const nextUp = curUp + 1;
 
-        let el: HTMLElement;
-        try {
-          el = isUpgradePick
-            ? renderCardPreviewByUidWithUpgrade(g, uid, nextUp)
-            : (renderRealCardForOverlay(g, uid) as HTMLElement);
-        } catch {
-          el = renderRealCardForOverlay(g, uid) as HTMLElement;
+        if (isUpgradePick) {
+          const pair = div("upgradePair");
+          pair.style.cssText = `display:flex; gap:${sx(10)}px; align-items:flex-start;`;
+
+          let elCur: HTMLElement;
+          let elNext: HTMLElement;
+          try { elCur = renderCardPreviewByUidWithUpgrade(g, uid, curUp); }
+          catch { elCur = renderRealCardForOverlay(g, uid) as HTMLElement; }
+          try { elNext = renderCardPreviewByUidWithUpgrade(g, uid, nextUp); }
+          catch { elNext = renderRealCardForOverlay(g, uid) as HTMLElement; }
+
+          fixPreviewSize(elCur, 0.78);
+          fixPreviewSize(elNext, 0.78);
+
+          const arrow = divText("upgradeArrow", "→");
+          arrow.style.cssText = `align-self:center; font-weight:900; opacity:.85; margin-top:${sx(6)}px;`;
+
+          pair.appendChild(elCur);
+          pair.appendChild(arrow);
+          pair.appendChild(elNext);
+          left.appendChild(pair);
+        } else {
+          let el: HTMLElement;
+          try { el = renderRealCardForOverlay(g, uid) as HTMLElement; }
+          catch { el = renderRealCardForOverlay(g, uid) as HTMLElement; }
+          fixPreviewSize(el);
+          left.appendChild(el);
         }
-
-        fixPreviewSize(el);
-        left.appendChild(el);
       } else if (typeof opt.key === "string" && opt.key.startsWith("pick:")) {
         const payload = opt.key.slice("pick:".length);
         const [defId, upStr] = payload.split(":");

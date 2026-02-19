@@ -182,6 +182,7 @@ export function openRelicOfferChoice(
     prompt: string;
     allowSkip?: boolean;
     source?: "BOSS" | "ELITE" | "PAID" | string;
+    artKeyOrPath?: string;
   }
 ) {
   const roll = offerRelicSingleContent(g, opt.count);
@@ -217,6 +218,13 @@ export function openRelicOfferChoice(
     options,
   };
 
+  // 선택 화면 일러스트 (예: 보스 유물 선택)
+  if (opt.artKeyOrPath) {
+    const k = String(opt.artKeyOrPath);
+    const art = (k.includes("/") || k.includes("\\") || k.includes(".")) ? k : `assets/ui/${k}.png`;
+    (choice as any).art = art;
+  }
+
   enqueueChoice(g, choice, { kind: "RELIC_OFFER", offerIds, source: opt.source });
   return offerIds;
 }
@@ -228,5 +236,6 @@ export function openBossRelicOfferChoice(g: GameState) {
     prompt: "유물 1개를 선택합니다.",
     allowSkip: false,
     source: "BOSS",
+    artKeyOrPath: "what_to_do",
   });
 }
