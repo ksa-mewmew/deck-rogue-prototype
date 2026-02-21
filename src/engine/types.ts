@@ -5,15 +5,25 @@ export type Side = "front" | "back";
 
 export type StatusKey = "vuln" | "weak" | "bleed" | "disrupt";
 export type CardTag = "EXHAUST" | "VANISH";
+export type CardRarity = "BASIC" | "COMMON" | "SPECIAL" | "RARE" | "MADNESS";
 export type RelicId = string;
+export type ItemId = string;
 
-export type NodeType = "BATTLE" | "ELITE" | "REST" | "TREASURE" | "EVENT";
+export type UiToastKind = "INFO" | "WARN" | "GOLD" | "RELIC";
+export type UiToast = {
+  kind: UiToastKind;
+  text: string;
+  ms?: number; // 표시 시간(ms). UI 쪽에서 animMul을 곱해 늘려줌
+};
+
+
+export type NodeType = "BATTLE" | "ELITE" | "REST" | "TREASURE" | "EVENT" | "SHOP";
 
 // =========================
 // Map / Dungeon graph
 // =========================
 export type MapNodeId = string;
-export type MapNodeKind = "START" | NodeType;
+export type MapNodeKind = "START" | NodeType | "EMPTY";
 
 export type MapNode = {
   id: MapNodeId;
@@ -93,6 +103,7 @@ export type PileKind = "deck" | "discard" | "exhausted" | "vanished" | "hand";
 export type CardData = {
   id: string;
   name: string;
+  rarity?: CardRarity;
   tags?: CardTag[];
   frontText: string;
   backText: string;
@@ -232,6 +243,18 @@ export type PlayerEffect =
   | { op: "clearStatusSelf"; key: StatusKey }
   | { op: "damageEnemyFormula"; target: "select" | "random" | "all"; kind: string };
 
+export type ItemData = {
+  id: ItemId;
+  name: string;
+  text: string;
+  art: string;
+  effects: PlayerEffect[];
+  priceGold?: number;
+  tags?: string[];
+  consumable?: boolean;
+};
+
+
 export type PendingTarget =
   | {
       kind: "damageSelect";
@@ -292,15 +315,16 @@ export type EnemyEffect =
 
 
 export type UnlockProgress = {
-  rest: number;          // 휴식 횟수
-  eliteWins: number;     // 엘리트 승리
-  tookBigHit10: boolean; // 한 번에 10+ 피해
-  kills: number;         // 처치 횟수
-  endedTurnWeak: boolean;// 약화 상태로 턴 종료
-  eventPicks: number;    // 이벤트 선택 횟수
-  hpLeq15: boolean;      // HP<=15 경험
-  skippedTurn: boolean;  // 아무 행동도 안 하고 턴 종료
-  bleedApplied: number;  // 출혈 부여 횟수
+  rest: number;                 // 휴식 횟수
+  eliteWins: number;            // 엘리트 승리
+  tookBigHit10: number;         // 한 번에 10+ 피해 받은 횟수
+  kills: number;                // 처치 횟수
+  endedTurnWeak: number;         // 약화 상태로 턴 종료한 횟수
+  eventPicks: number;            // 이벤트 선택 횟수
+  hpLeq15: number;              // HP<=15 경험 횟수
+  skippedTurn: number;           // 아무 행동도 안 하고 턴 종료한 횟수
+  bleedApplied: number;          // 출혈 부여 횟수
+  endedTurnSupplyZero: number;   // S=0으로 턴 종료한 횟수
 };
 
 export type RelicRuntime = {
@@ -319,6 +343,32 @@ export type PlayerState = {
   status: Record<StatusKey, number>;
   immuneToDisruptThisTurn: boolean;
   nullifyDamageThisTurn: boolean;
+};
+
+
+export type ShopCardOffer = {
+  defId: string;
+  upgrade: number;
+  priceGold: number;
+  sold?: boolean;
+};
+
+export type ShopItemOffer = {
+  itemId: ItemId;
+  priceGold: number;
+  sold?: boolean;
+};
+
+export type ShopState = {
+  nodeId: MapNodeId;
+  cards: ShopCardOffer[];
+  items?: ShopItemOffer[];
+  usedUpgrade: boolean;
+  usedRemove: boolean;
+  // 선택 화면 오른쪽 칸(illuBox)에 표시할 이미지 경로(assets/..). 필요하면 설정.
+  art?: string;
+  // 디버그/추적용
+  createdAtMove?: number;
 };
 
 export type RunState = {
@@ -340,7 +390,7 @@ export type RunState = {
 
   finished: boolean;
   nodePickCount: number;
-  nodePickByType: Record<"BATTLE" | "ELITE" | "REST" | "EVENT" | "TREASURE", number>;
+  nodePickByType: Record<"BATTLE" | "ELITE" | "REST" | "EVENT" | "TREASURE" | "SHOP", number>;
   currentNodeOffers: NodeType[] | null;
   nextBattleSuppliesBonus: number;
   bossPool: string[];
@@ -357,29 +407,61 @@ export type RunState = {
 
   ominousProphecySeen: boolean;
 
+  // 이벤트/토스트 관련(런 상태)
+  eventsSeen?: Record<string, number>;
+  pendingEventWinRelicId?: string | null;
+  pendingEventWinGold?: number;
+  bossApproachToastBossTime?: number;
+
   relics: RelicId[];
+
+  // 아이템(소모품)
+  items?: ItemId[];
 
   pendingElite: boolean;
   lastBattleWasElite: boolean;
+  lastBattleWasBoss: boolean;
   eliteRelicOfferedThisBattle: boolean;
+
+  itemOfferedThisBattle?: boolean;
+
+  // 카드 보상 희귀도 가중치(pity) — 일반 전투(비정예)에서 특별/희귀가 안 뜬 횟수
+  rewardPityNonElite?: number;
 
   relicRuntime?: Record<RelicId, RelicRuntime>;
   pendingRelicActivations?: RelicId[];
   unlock?: UnlockProgress;
+
+  // 상점 재고/서비스 상태(노드별로 유지, 재진입해도 리필되지 않음)
+  shops?: Record<MapNodeId, ShopState>;
+
+  gold?: number;
 };
 
 export type Content = {
   cardsById: Record<string, CardData>;
   enemiesById: Record<string, EnemyData>;
+  itemsById?: Record<string, ItemData>;
 };
 
 export type ChoiceCtx =
   | null
+  | {
+      kind: "BATTLE_REWARD";
+      offers: Array<{ defId: string; upgrade: number }>;
+      itemOfferId?: ItemId;
+      itemSource?: "BATTLE" | "ELITE" | "BOSS" | string;
+      itemDecision?: "TAKEN" | "SKIPPED";
+    }
   | { kind: "BATTLE_CARD_REWARD"; offers: Array<{ defId: string; upgrade: number }> }
   | { kind: "ELITE_RELIC"; offerIds: string[] }
+  | { kind: "ITEM_REWARD"; offerId: ItemId; source?: "BATTLE" | "ELITE" | "BOSS" | string }
   | { kind: "REST"; highF?: boolean }
   | { kind: "EVENT"; eventId: string }
-  | { kind: "RELIC_OFFER"; offerIds: string[]; source?: "BOSS" | "ELITE" | "PAID" | string };
+  | { kind: "RELIC_OFFER"; offerIds: string[]; source?: "BOSS" | "ELITE" | "PAID" | string }
+  | { kind: "SHOP"; nodeId: string }
+  | { kind: "UPGRADE_PICK"; returnTo?: { kind: "SHOP"; nodeId: string }; priceGold?: number }
+  | { kind: "REMOVE_PICK"; returnTo?: { kind: "SHOP"; nodeId: string }; priceGold?: number };
   
 export type ChoiceFrame = { choice: ChoiceState; ctx: ChoiceCtx };
 
@@ -395,6 +477,9 @@ export type GameState = {
 
   phase: CombatPhase;
   log: string[];
+
+  // UI 전용 토스트(로그 아님). 저장에는 포함되지 않도록 persist에서 제거함.
+  uiToasts?: UiToast[];
 
   run: RunState;
   player: PlayerState;

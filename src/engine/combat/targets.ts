@@ -13,14 +13,25 @@ function calcDamageForTargetSelection(g: GameState, req: any, target: any): numb
   const kind = req.formulaKind as string | undefined;
   if (!kind) return base;
 
+  const aliveNow = aliveEnemies(g).length;
+  const aliveSnapRaw = req.aliveCountSnap;
+  const alive = Number.isFinite(Number(aliveSnapRaw)) ? Number(aliveSnapRaw) : aliveNow;
+
   switch (kind) {
     case "prey_mark": {
       const bonus = 5;
       return target.hp > g.player.hp ? base + bonus : base;
     }
+    case "prey_mark_u1": {
+      const bonus = 6;
+      return target.hp > g.player.hp ? base + bonus : base;
+    }
     case "triple_bounty": {
-      const bonus = 4;
-      const alive = aliveEnemies(g).length;
+      const bonus = 8;
+      return alive >= 3 ? base + bonus : base;
+    }
+    case "triple_bounty_u1": {
+      const bonus = 10;
       return alive >= 3 ? base + bonus : base;
     }
     default:

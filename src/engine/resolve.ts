@@ -9,6 +9,8 @@ export type ResolveCtx = {
   game: GameState;
   side: Side;
   cardUid: string;
+  sourceLabel?: string;
+  reason?: "FRONT" | "BACK" | "ENEMY" | "EVENT" | "RELIC" | "OTHER";
 };
 
 function enqueueTargetSelectDamage(ctx: ResolveCtx, amount: number, formulaKind?: string) {
@@ -17,8 +19,10 @@ function enqueueTargetSelectDamage(ctx: ResolveCtx, amount: number, formulaKind?
     kind: "damageSelect" as const,
     amount,
     formulaKind,
-    sourceCardUid: ctx.cardUid,
-    reason: ctx.side === "front" ? "FRONT" : "BACK",
+    aliveCountSnap: aliveEnemies(g).length,
+    sourceCardUid: ctx.cardUid || undefined,
+    sourceLabel: ctx.sourceLabel,
+    reason: ctx.reason ?? (ctx.side === "front" ? "FRONT" : "BACK"),
   } as const;
 
   g.pendingTargetQueue ??= [];
@@ -34,8 +38,9 @@ function enqueueTargetSelectStatus(ctx: ResolveCtx, key: "vuln" | "weak" | "blee
     kind: "statusSelect" as const,
     key,
     n,
-    sourceCardUid: ctx.cardUid,
-    reason: ctx.side === "front" ? "FRONT" : "BACK",
+    sourceCardUid: ctx.cardUid || undefined,
+    sourceLabel: ctx.sourceLabel,
+    reason: ctx.reason ?? (ctx.side === "front" ? "FRONT" : "BACK"),
   } as const;
 
   g.pendingTargetQueue ??= [];
@@ -67,7 +72,7 @@ function calcDamageEnemyFormulaBase(ctx: ResolveCtx, kind: string): number {
   }
 }
 
-function calcDamageEnemyFormulaForTarget(g: GameState, kind: string, target: EnemyState, base: number): number {
+function calcDamageEnemyFormulaForTarget(g: GameState, kind: string, target: EnemyState, base: number, aliveCountSnapshot?: number): number {
   switch (kind) {
     case "prey_mark": {
       const bonus = 5;
@@ -81,12 +86,12 @@ function calcDamageEnemyFormulaForTarget(g: GameState, kind: string, target: Ene
 
     case "triple_bounty": {
       const bonus = 8;
-      const alive = aliveEnemies(g).length;
+      const alive = (aliveCountSnapshot ?? aliveEnemies(g).length);
       return alive >= 3 ? base + bonus : base;
     }
     case "triple_bounty_u1": {
       const bonus = 10;
-      const alive = aliveEnemies(g).length;
+      const alive = (aliveCountSnapshot ?? aliveEnemies(g).length);
       return alive >= 3 ? base + bonus : base;
     }
     default:
@@ -210,14 +215,16 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
           const alive = aliveEnemies(g);
           if (alive.length === 0) break;
           const en = pickOne(alive);
-          const amount = calcDamageEnemyFormulaForTarget(g, e.kind, en, base);
+          const amount = calcDamageEnemyFormulaForTarget(g, e.kind, en, base, alive.length);
           applyDamageToEnemy(g, en, amount);
           break;
         }
 
         if (e.target === "all") {
-          for (const en of aliveEnemies(g)) {
-            const amount = calcDamageEnemyFormulaForTarget(g, e.kind, en, base);
+          const targets = aliveEnemies(g);
+          const aliveCountSnap = targets.length;
+          for (const en of targets) {
+            const amount = calcDamageEnemyFormulaForTarget(g, e.kind, en, base, aliveCountSnap);
             applyDamageToEnemy(g, en, amount);
           }
           break;

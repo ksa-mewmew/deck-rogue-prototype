@@ -30,6 +30,7 @@ export const CARDS: CardData[] = [
   {
     id: "field_ration",
     name: "야전 식량",
+    rarity: "BASIC",
     frontText: "방어 +3",
     backText: "S +2",
     front: [{ op: "block", n: 3 }],
@@ -49,6 +50,7 @@ export const CARDS: CardData[] = [
   {
     id: "maintenance",
     name: "정비 도구",
+    rarity: "BASIC",
     exhaustWhen: "BACK",
     frontText: "방어 +3",
     backText: "F -1, 소모",
@@ -69,6 +71,7 @@ export const CARDS: CardData[] = [
   {
     id: "scout",
     name: "정찰",
+    rarity: "BASIC",
     frontText: "지정 피해 3, 방어 +1",
     backText: "드로우 1, S +2",
     front: [
@@ -92,6 +95,7 @@ export const CARDS: CardData[] = [
   {
     id: "shield",
     name: "방패",
+    rarity: "BASIC",
     frontText: "방어 +5",
     backText: "방어 +3",
     front: [{ op: "block", n: 5 }],
@@ -111,6 +115,7 @@ export const CARDS: CardData[] = [
   {
     id: "power_arrow",
     name: "강력한 화살",
+    rarity: "BASIC",
     frontText: "무작위 피해 10, S -2",
     backText: "무작위 피해 7, S -2",
     front: [{ op: "supplies", n: -2 }, { op: "damageEnemy", target: "random", n: 10 }],
@@ -130,6 +135,7 @@ export const CARDS: CardData[] = [
   {
     id: "arrow",
     name: "화살",
+    rarity: "BASIC",
     frontText: "지정 피해 5",
     backText: "지정 피해 5, S -1",
     front: [{ op: "damageEnemy", target: "select", n: 5 }],
@@ -148,6 +154,7 @@ export const CARDS: CardData[] = [
   {
     id: "goal_treasure",
     name: "저주받은 보물",
+    rarity: "BASIC",
     exhaustWhen: "BOTH",
     frontText: "F +1, 소모",
     backText: "S -1, F +1, 소모",
@@ -159,6 +166,7 @@ export const CARDS: CardData[] = [
   {
     id: "berserk",
     name: "광폭화",
+    rarity: "COMMON",
     frontText: "무작위 피해 15, S -3",
     backText: "S +4, F +1",
     front: [{ op: "damageEnemy", target: "random", n: 15 }, { op: "supplies", n: -3 }],
@@ -177,6 +185,7 @@ export const CARDS: CardData[] = [
   {
     id: "bandage",
     name: "붕대",
+    rarity: "SPECIAL",
     exhaustWhen: "BOTH",
     frontText: "HP +4, 소모",
     backText: "HP +4, S -1, 소모",
@@ -196,6 +205,7 @@ export const CARDS: CardData[] = [
   {
     id: "arrow_rain",
     name: "화살의 비",
+    rarity: "COMMON",
     exhaustWhen: "BOTH",
     frontText: "전체 피해 10, S -2 소모",
     backText: "드로우 2, S +2, F +1, 소모",
@@ -221,6 +231,7 @@ export const CARDS: CardData[] = [
   {
     id: "smoke",
     name: "연막",
+    rarity: "SPECIAL",
     vanishWhen: "FRONT",
     frontText: "이번 턴 적 공격 피해 무효, 소실",
     backText: "F +1",
@@ -234,6 +245,7 @@ export const CARDS: CardData[] = [
   {
     id: "redeploy",
     name: "재배치",
+    rarity: "SPECIAL",
     frontText: "S +2",
     backText: "3번 슬롯에 있는 후열 카드의 전열 효과 발동",
     front: [{ op: "supplies", n: 2 }],
@@ -259,6 +271,7 @@ export const CARDS: CardData[] = [
   {
     id: "secret_strike",
     name: "비장의 일격",
+    rarity: "RARE",
     exhaustWhen: "BOTH",
     frontText: "무작위 피해 (F의 2배), 소모",
     backText: "전체 취약 +3 및 약화 +3, 소모",
@@ -286,6 +299,7 @@ export const CARDS: CardData[] = [
   {
     id: "fire_scroll",
     name: "화염 두루마리",
+    rarity: "RARE",
     exhaustWhen: "FRONT",
     vanishWhen: "BACK",
     frontText: "전체 피해 6, 소모",
@@ -308,6 +322,7 @@ export const CARDS: CardData[] = [
   {
     id: "caltrops",
     name: "마름쇠",
+    rarity: "SPECIAL",
     frontText: "전체 출혈 4 부여",
     backText: "이번 턴에 자신을 공격하려는 적에게 출혈 3 부여",
     front: [{ op: "statusEnemy", target: "all", key: "bleed", n: 4 }],
@@ -327,6 +342,7 @@ export const CARDS: CardData[] = [
   {
     id: "emergency_rations",
     name: "비상식량",
+    rarity: "RARE",
     vanishWhen: "BACK",
     frontText: "S +2",
     backText: "S를 7로 만듦. 소실",
@@ -349,6 +365,7 @@ export const CARDS: CardData[] = [
   {
     id: "painkiller",
     name: "진통제",
+    rarity: "SPECIAL",
     exhaustWhen: "FRONT",
     vanishWhen: "BACK",
     frontText: "HP -8, F -3, 소모",
@@ -371,6 +388,7 @@ export const CARDS: CardData[] = [
   {
     id: "field_experience",
     name: "실전 경험",
+    rarity: "RARE",
     exhaustWhen: "BACK",
     frontText: "전체 피해 3",
     backText: "이 카드가 후열에 있는 턴에 승리하면 최대 체력 +2, 소모",
@@ -393,6 +411,7 @@ export const CARDS: CardData[] = [
   {
     id: "camp_prep",
     name: "야영 준비",
+    rarity: "COMMON",
     frontText: "방어 +4, S +1",
     backText: "S +3",
     front: [{ op: "block", n: 4 }, { op: "supplies", n: 1 }],
@@ -414,6 +433,7 @@ export const CARDS: CardData[] = [
   {
     id: "vital_shot",
     name: "급소 사격",
+    rarity: "SPECIAL",
     frontText: "지정 피해 8",
     backText: "지정 피해 5, 출혈 2 부여, S -1",
     front: [{ op: "damageEnemy", target: "select", n: 8 }],
@@ -442,6 +462,7 @@ export const CARDS: CardData[] = [
   {
     id: "taunt",
     name: "독설",
+    rarity: "SPECIAL",
     frontText: "지정 약화 +4",
     backText: "전체 취약 +2 및 약화 +2",
     front: [{ op: "statusEnemy", target: "select", key: "weak", n: 4 }],
@@ -468,6 +489,7 @@ export const CARDS: CardData[] = [
   {
     id: "rapid_fire",
     name: "연속 사격",
+    rarity: "COMMON",
     frontText: "지정 피해 2, 3번 발동",
     backText: "이번 턴에 카드를 뽑았으면 무작위 피해 8",
     front: [
@@ -496,6 +518,7 @@ export const CARDS: CardData[] = [
   {
     id: "blood_contract",
     name: "피의 계약",
+    rarity: "COMMON",
     frontText: "지정 피해 12, HP -3",
     backText: "S +3, F +1",
     front: [{ op: "damageEnemy", target: "select", n: 12 }, { op: "hp", n: -3 }],
@@ -515,6 +538,7 @@ export const CARDS: CardData[] = [
   {
     id: "cloth_scrap_armor",
     name: "천 조각 갑옷",
+    rarity: "SPECIAL",
     frontText: "방어 +8, S -1",
     backText: "방어 +4",
     front: [{ op: "supplies", n: -1 }, { op: "block", n: 8 }],
@@ -533,6 +557,7 @@ export const CARDS: CardData[] = [
   {
     id: "prey_mark",
     name: "사냥감 표시",
+    rarity: "SPECIAL",
     frontText: "지정 피해 7, 대상의 HP가 플레이어보다 높으면 대신 피해 12",
     backText: "지정 취약 +2",
     front: [{ op: "damageEnemyFormula", target: "select", kind: "prey_mark" }],
@@ -552,6 +577,7 @@ export const CARDS: CardData[] = [
   {
     id: "brawl_cleaver",
     name: "난전 정리",
+    rarity: "COMMON",
     frontText: "지정 피해 8, 남은 적이 3명이면 대신 피해 16",
     backText: "방어 +6",
     front: [{ op: "damageEnemyFormula", target: "select", kind: "triple_bounty" }],
@@ -571,6 +597,7 @@ export const CARDS: CardData[] = [
   {
     id: "mad_echo",
     name: "메아리",
+    rarity: "MADNESS",
     frontText: "무작위 피해 (F의 절반 (버림))",
     backText: "드로우 1, S +2, F +1",
     front: [{ op: "damageEnemyByPlayerFatigue", target: "random", mult: 0.5 }],
@@ -588,6 +615,7 @@ export const CARDS: CardData[] = [
   {
     id: "mad_insight",
     name: "금단의 통찰",
+    rarity: "MADNESS",
     exhaustWhen: "BOTH",
     frontText: "방어 +8, 드로우 1, F +1, 소모",
     backText: "드로우 3, S +2, F +2, 소모",
@@ -606,6 +634,7 @@ export const CARDS: CardData[] = [
   {
     id: "mad_bargain",
     name: "거래의 잔재",
+    rarity: "MADNESS",
     exhaustWhen: "BOTH",
     frontText: "지정 12 피해, S -1, F +1, 소모",
     backText: "HP +5, F +2, 소모",

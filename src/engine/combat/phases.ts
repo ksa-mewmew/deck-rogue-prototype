@@ -40,9 +40,10 @@ export function startCombat(g: GameState) {
   g.victoryResolvedThisCombat = false;
 
   g.run.eliteRelicOfferedThisBattle = false;
+  (g.run as any).itemOfferedThisBattle = false;
 
   const bonus = g.run.nextBattleSuppliesBonus ?? 0;
-  g.player.supplies = 7 + bonus;
+  g.player.supplies = Math.max(0, 7 + bonus);
   if (bonus !== 0) {
     logMsg(g, `다음 전투 S 변동: ${bonus}`);
     g.run.nextBattleSuppliesBonus = 0;
@@ -337,11 +338,14 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
 
     case "damagePlayerByDeckSize": {
       const deckSize = getCombatDeckSize(g);
-      const { dmg, scale } = calcDeckSizeDamage(act, deckSize);
+      const { dmg: rawDmg, scale } = calcDeckSizeDamage(act, deckSize);
       const ew = enemy.status.weak ?? 0;
 
-      applyDamageToPlayer(g, dmg, "ENEMY_ATTACK", enemy.name, ew);
-      logMsg(g, `중력 피해: base ${act.base} + per ${act.per} * ceil(${deckSize}/${act.div})=${scale} => ${dmg}`);
+      const applied = applyDamageToPlayer(g, rawDmg, "ENEMY_ATTACK", enemy.name, ew);
+      logMsg(
+        g,
+        `중력 피해(공식): base ${act.base} + per ${act.per} * ceil(${deckSize}/${act.div})=${scale} => raw ${rawDmg}, 적용 ${applied}`
+      );
       return;
     }
 
@@ -394,13 +398,13 @@ export function upkeepEndTurn(g: GameState) {
   if (g.phase !== "UPKEEP") return;
   logMsg(g, "=== 유지비 / 상태 처리 ===");
 
-  // 유물 해금 진행도: 약화 상태로 턴 종료 / 턴 스킵
+  // Unlock progress for relic activation: end turn with weak / skip turn
   {
     const up = getUnlockProgress(g);
     let changed = false;
 
-    if ((g.player.status.weak ?? 0) > 0 && !up.endedTurnWeak) {
-      up.endedTurnWeak = true;
+    if ((g.player.status.weak ?? 0) > 0) {
+      up.endedTurnWeak += 1;
       changed = true;
     }
 
@@ -409,8 +413,8 @@ export function upkeepEndTurn(g: GameState) {
       (g.frontPlacedThisTurn ?? 0) === 0 &&
       (g.backUidsThisTurn?.length ?? 0) === 0;
 
-    if (didNothing && !up.skippedTurn) {
-      up.skippedTurn = true;
+    if (didNothing) {
+      up.skippedTurn += 1;
       changed = true;
     }
 
@@ -421,22 +425,30 @@ export function upkeepEndTurn(g: GameState) {
   const frontCount = g.frontPlacedThisTurn;
   if (frontCount > 0) logMsg(g, `전열 유지비 처리: 전열 ${frontCount}장`);
 
-  let lackedSupply = false;
+  {
+    const hadS = g.player.supplies ?? 0;
+    const pay = Math.min(hadS, frontCount); // 실제 낸 S
+    g.player.supplies = hadS - pay;
 
-  for (let i = 0; i < frontCount; i++) {
-    if (g.player.supplies > 0) g.player.supplies -= 1;
-    else lackedSupply = true;
-  }
-
-  if (lackedSupply) {
-    g.player.fatigue += 1;
-    logMsg(g, "전열 유지비 부족! (F +1)");
+    const shortfall = frontCount - pay; // 부족분 = 전열 수 - 낸 S
+    if (shortfall > 0) {
+      g.player.fatigue += shortfall;
+      logMsg(g, `전열 유지비 부족! (부족 ${shortfall} → F +${shortfall})`);
+    }
   }
 
   if (g.player.supplies === 0) {
     g.player.zeroSupplyTurns += 1;
+
+    // Unlock progress for relic activation: ended turn with S=0
+    {
+      const up = getUnlockProgress(g);
+      up.endedTurnSupplyZero += 1;
+      checkRelicUnlocks(g);
+    }
+
     const f = g.player.fatigue;
-    applyDamageToPlayer(g, f, "ZERO_SUPPLY", `보급 없이 턴 종료! 피해 ${f}`);
+    applyDamageToPlayer(g, f, "ZERO_SUPPLY", "보급 없이 턴 종료! 피해 " + f);
   }
 
   const bleed = g.player.status.bleed ?? 0;

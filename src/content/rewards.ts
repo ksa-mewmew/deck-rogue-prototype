@@ -197,6 +197,8 @@ function pickWeightedOne(items: Array<{ id: string; w: number }>): string {
 
 export type OfferedCard = { defId: string; upgrade: number };
 
+export type RewardPickContext = "BATTLE" | "ELITE" | "BOSS";
+
 export function rollOfferedUpgrade(g?: GameState): number {
   const f = g?.player?.fatigue ?? 0;
   const n = g?.run.nodePickCount ?? 999;
@@ -264,6 +266,107 @@ export function offerRewardPair(g: GameState): [OfferedCard, OfferedCard] {
   const a = r[0] ?? { defId: "arrow", upgrade: 0 };
   const b = r[1] ?? { defId: "shield", upgrade: 0 };
   return [a, b];
+}
+
+function offerNFromPool(
+  g: GameState,
+  pool: RewardEntry[],
+  n: number,
+  opt?: Parameters<typeof buildWeightMapBiased>[1]
+): OfferedCard[] {
+  const out: OfferedCard[] = [];
+  let map = opt ? buildWeightMapBiased(pool, opt) : buildWeightMap(pool);
+  const isMad = pool === MAD_REWARD_POOL;
+
+  for (let i = 0; i < n; i++) {
+    if (map.length <= 0) break;
+    const id = pickWeightedOne(map);
+    out.push({ defId: id, upgrade: isMad ? 0 : rollOfferedUpgrade(g) });
+    map = map.filter((x) => x.id !== id);
+  }
+  return out;
+}
+
+function isHighRarity(g: GameState, defId: string): boolean {
+  const r = (g.content.cardsById[defId] as any)?.rarity as string | undefined;
+  return r === "SPECIAL" || r === "RARE";
+}
+
+function rewardBiasForContext(g: GameState, ctx: RewardPickContext): Parameters<typeof buildWeightMapBiased>[1] {
+  // 기존 풀의 weight는 사실상 희귀도 슬롯
+  // 20=일반, 12=특별, 3=희귀
+
+  if (ctx === "BOSS") {
+    // a) 보스는 레어만 남기기
+    return { drop12: true, drop20: true };
+  }
+
+  if (ctx === "ELITE") {
+    // b) 엘리트는 특별/희귀 확률 ↑
+    return { mult3: 2.7, mult12: 1.8, mult20: 0.8 };
+  }
+
+  // c) 일반 전투: 특별/희귀 pity
+  const pity = Math.max(0, Math.min(10, Number((g.run as any).rewardPityNonElite ?? 0) || 0));
+  const mult12 = 1 + pity * 0.18; // 특별 상승
+  const mult3  = 1 + pity * 0.30; // 희귀 상승
+  const mult20 = Math.max(0.65, 1 - pity * 0.04); // 일반은 조금씩 눌러줌
+  return { mult3, mult12, mult20 };
+}
+
+export function offerRewardTrio(g: GameState, ctx: RewardPickContext): [OfferedCard, OfferedCard, OfferedCard] {
+  const f = g.player?.fatigue ?? 0;
+
+  const junk: OfferedCard = { defId: pickOne(JUNK_REWARD_POOL) as any, upgrade: 0 };
+
+  const pickNormalTrio = (): OfferedCard[] => {
+    const opt = rewardBiasForContext(g, ctx);
+    return offerNFromPool(g, REWARD_POOL, 3, opt);
+  };
+
+  const maybeMad = (c: OfferedCard): OfferedCard => {
+    if (ctx === "BOSS") return c; // 보스는 "레어만" 고정
+    if (!shouldOfferMadCard(g)) return c;
+    return offerOneFromPool(g, MAD_REWARD_POOL);
+  };
+
+  let picks: OfferedCard[] = pickNormalTrio();
+  while (picks.length < 3) picks.push({ defId: "arrow", upgrade: 0 });
+
+  // 피로도에 따른 정크/붕괴(기존 감각 유지, 3슬롯 버전)
+  if (f >= 12) {
+    const a = offerOneFromPool(g, MAD_REWARD_POOL);
+    const b = offerOneFromPool(g, MAD_REWARD_POOL);
+    const c = Math.random() < 0.55 ? offerOneFromPool(g, MAD_REWARD_POOL) : junk;
+    picks = [a, b, c];
+  } else if (f >= 9) {
+    // 9~11: 정크 1칸 고정
+    const idx = Math.floor(Math.random() * 3);
+    picks[idx] = junk;
+    picks = picks.map(maybeMad);
+  } else if (f >= 7) {
+    // 7~8: 정크 오염 확률
+    const pJunk = f === 7 ? 0.25 : 0.45;
+    if (Math.random() < pJunk) {
+      const idx = Math.floor(Math.random() * 3);
+      picks[idx] = junk;
+    }
+    picks = picks.map(maybeMad);
+  } else {
+    picks = picks.map(maybeMad);
+  }
+
+  // pity 업데이트
+  // - 특별/희귀가 "등장"하면 즉시 초기화
+  // - 일반 전투에서만(비정예) 미등장 시 누적
+  const hasHigh = picks.some((x) => isHighRarity(g, x.defId));
+  if (hasHigh) {
+    (g.run as any).rewardPityNonElite = 0;
+  } else if (ctx === "BATTLE") {
+    (g.run as any).rewardPityNonElite = (Number((g.run as any).rewardPityNonElite ?? 0) || 0) + 1;
+  }
+
+  return [picks[0], picks[1], picks[2]] as any;
 }
 
 

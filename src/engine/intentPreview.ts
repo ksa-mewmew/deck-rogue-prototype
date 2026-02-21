@@ -70,13 +70,17 @@ function previewDeckSizeDamage(g: GameState, act: any): number {
   const div = Math.max(1, Number(act.div ?? 1));
   const cap = act.cap == null ? Infinity : Number(act.cap);
 
+  // phases.ts(getCombatDeckSize)와 동일한 정의로 통일
   const deckSize =
     (g.deck?.length ?? 0) +
+    (g.hand?.length ?? 0) +
     (g.discard?.length ?? 0) +
-    (g.hand?.length ?? 0);
+    (g.frontSlots?.filter(Boolean).length ?? 0) +
+    (g.backSlots?.filter(Boolean).length ?? 0) +
+    (g.exhausted?.length ?? 0);
 
-  const steps = Math.floor(deckSize / div);
-  const raw = base + per * steps;
+  const scale = Math.ceil(deckSize / div);
+  const raw = base + per * scale;
   return Math.min(cap, Math.max(0, raw));
 }
 

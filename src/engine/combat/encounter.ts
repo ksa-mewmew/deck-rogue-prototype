@@ -57,12 +57,14 @@ export function spawnEncounter(
     for (const id of chosen) g.run.enemyLastSeenBattle[id] = battleNo;
     g.enemies = chosen.map((id) => enemyStateFromId(g, id));
     g.run.lastBattleWasElite = false;
+    (g.run as any).lastBattleWasBoss = false;
     logMsg(g, `전투 시작! (노드 ${nodeNo}, 전투 ${battleNo}회차) 적: ${g.enemies.map((e) => e.name).join(", ")}`);
     return;
   }
 
   if (forceBoss) {
     g.run.lastBattleWasElite = false;
+    (g.run as any).lastBattleWasBoss = true;
 
     g.run.bossPool ??= ["boss_gravity_master", "boss_cursed_wall", "boss_giant_orc", "boss_soul_stealer"];
 
@@ -167,6 +169,7 @@ export function spawnEncounter(
   g.enemies = chosen.map((id) => enemyStateFromId(g, id));
 
   g.run.lastBattleWasElite = forceElite;
+  (g.run as any).lastBattleWasBoss = false;
   const eliteTag = forceElite ? " [정예]" : "";
   logMsg(g, `전투 시작!${eliteTag} (노드 ${nodeNo}, 전투 ${battleNo}회차) 적: ${g.enemies.map((e) => e.name).join(", ")}`);
 }

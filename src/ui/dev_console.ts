@@ -44,7 +44,21 @@ function startsWithCI(s: string, pref: string) {
   return s.toLowerCase().startsWith(pref.toLowerCase());
 }
 
+function listAllItemIdsFromG(g: GameState): string[] {
+  const byId =
+    ((g as any).content?.itemsById) ??
+    ((g as any).content?.ITEMS_BY_ID) ??
+    {};
+  return Object.keys(byId).sort((a, b) => a.localeCompare(b));
+}
 
+function hasItemId(g: GameState, id: string): boolean {
+  const byId =
+    ((g as any).content?.itemsById) ??
+    ((g as any).content?.ITEMS_BY_ID) ??
+    {};
+  return !!byId[id];
+}
 
 function getCmdSpecs(): CmdSpec[] {
   return [
@@ -92,6 +106,17 @@ function getCmdSpecs(): CmdSpec[] {
       },
     },
     { name: "relicapply", desc: "apply pending relic activations" },
+    { name: "gold", args: "<n>", desc: "set gold" },
+
+    {
+      name: "additem",
+      args: "<itemId> [n=1]",
+      desc: "add item(s) to inventory",
+      suggest: (g, parts) => {
+        if (parts.length <= 2) return listAllItemIdsFromG(g);
+        return [];
+      },
+    },
   ];
 }
 
@@ -440,6 +465,8 @@ function runDevCommand(raw: string) {
       "relicapply  (apply pending relic activations)",
       "win | lose",
       "log <text...>",
+      "gold <n>",
+      "additem <itemId> [n=1]",
     ].join("\n"));
     return;
   }
@@ -454,7 +481,10 @@ function runDevCommand(raw: string) {
       hand: g.hand.length,
       discard: g.discard.length,
       enemies: g.enemies.map(e => ({ id: e.id, hp: `${e.hp}/${e.maxHp}`, intent: e.intentIndex })),
+      gold: ((g.run as any).gold ?? 0),
+      items: ((g.run as any).items ?? []),
     }, null, 2));
+    
     return;
   }
 
@@ -589,6 +619,33 @@ function runDevCommand(raw: string) {
     c.log?.("[DEV] relicapply");
     c.rerender();
     out("OK: relicapply");
+    return;
+  }
+
+  if (cmd === "gold") {
+    return setNum("gold", (n) => {
+      const runAny = g.run as any;
+      runAny.gold = Math.max(0, n | 0);
+    });
+  }
+
+  if (cmd === "additem") {
+    const itemId = a1;
+    const n = Math.max(1, Number(a2 ?? "1") || 1);
+
+    if (!itemId) { out("ERR: additem <itemId> [n=1]"); return; }
+
+    if (!hasItemId(g, itemId)) {
+      out(`WARN: unknown itemId (still adding): ${itemId}`);
+    }
+
+    const runAny = g.run as any;
+    runAny.items ??= [];
+    for (let i = 0; i < n; i++) runAny.items.push(itemId);
+
+    c.log?.(`[DEV] additem ${itemId} x${n}`);
+    c.rerender();
+    out(`OK: additem ${itemId} x${n}`);
     return;
   }
 

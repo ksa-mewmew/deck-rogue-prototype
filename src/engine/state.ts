@@ -14,13 +14,14 @@ export function createInitialRunState(): RunState {
     unlock: {
       rest: 0,
       eliteWins: 0,
-      tookBigHit10: false,
+      tookBigHit10: 0,
       kills: 0,
-      endedTurnWeak: false,
+      endedTurnWeak: 0,
       eventPicks: 0,
-      hpLeq15: false,
-      skippedTurn: false,
+      hpLeq15: 0,
+      skippedTurn: 0,
       bleedApplied: 0,
+      endedTurnSupplyZero: 0,
     },
 
     timeMove: 0,
@@ -36,7 +37,7 @@ export function createInitialRunState(): RunState {
 
     finished: false,
     nodePickCount: 0,
-    nodePickByType: { BATTLE: 0, ELITE: 0, REST: 0, EVENT: 0, TREASURE: 0 },
+    nodePickByType: { BATTLE: 0, ELITE: 0, REST: 0, EVENT: 0, TREASURE: 0, SHOP: 0 },
     currentNodeOffers: null,
     nextBattleSuppliesBonus: 0,
     bossPool: ["boss_gravity_master", "boss_cursed_wall", "boss_giant_orc", "boss_soul_stealer"],
@@ -56,9 +57,19 @@ export function createInitialRunState(): RunState {
 
     relics: [],
 
+    items: [],
+
     lastBattleWasElite: false,
+    lastBattleWasBoss: false,
     eliteRelicOfferedThisBattle: false,
-    pendingElite: false
+    itemOfferedThisBattle: false,
+    pendingElite: false,
+
+    rewardPityNonElite: 0,
+
+    gold: 0,
+
+    shops: {},
   };
 }
 

@@ -257,8 +257,30 @@ export function generateDungeonMap(opt?: Partial<MapGenOptions>): DungeonMap {
 
   const others = Object.keys(nodes).filter((id) => id !== map.startId && id !== treasureId);
   shuffleInPlace(others);
+  // ===== forced battle columns (depths) =====
+  const FORCE_BATTLE_COLS = 5;
 
-  const elitePool = others.filter((id) => (nodes[id]?.depth ?? 0) >= 2);
+  // depth=1(START 다음 열)은 무조건 포함
+  const forcedBattleDepths = new Set<number>();
+  if (layers.length > 1) forcedBattleDepths.add(1);
+
+  // 나머지 후보 depth들 (원하면 범위 조절 가능)
+  const depthCandidates: number[] = [];
+  for (let d = 2; d < layers.length; d++) {
+    depthCandidates.push(d);
+  }
+  shuffleInPlace(depthCandidates);
+
+  // 총 5개가 될 때까지 추가
+  for (const d of depthCandidates) {
+    if (forcedBattleDepths.size >= Math.min(FORCE_BATTLE_COLS, Math.max(0, layers.length - 1))) break;
+    forcedBattleDepths.add(d);
+  }
+
+
+  const elitePool = others
+    .filter((id) => (nodes[id]?.depth ?? 0) >= 2)
+    .filter((id) => !forcedBattleDepths.has(nodes[id]?.depth ?? 0));
   shuffleInPlace(elitePool);
   const elites = new Set(elitePool.slice(0, Math.min(eliteCount, elitePool.length)));
   const deadEndMinDepth = opt?.deadEndMinDepth ?? 4;
@@ -276,30 +298,57 @@ export function generateDungeonMap(opt?: Partial<MapGenOptions>): DungeonMap {
   );
 
   const rollKind = (d: number, isDeadEnd: boolean): MapNode["kind"] => {
-    let wB = 0.5, wE = 0.25, wR = 0.25;
-    if (d <= 1) { wB = 0.72; wE = 0.14; wR = 0.14; }
-    else if (d <= 3) { wB = 0.6; wE = 0.2; wR = 0.2; }
+    let wB = 0.5, wE = 0.25, wR = 0.20, wS = 0.05;
+    if (d <= 1) { wB = 0.8; wE = 0.14; wR = 0.04; wS = 0.02; }
+    else if (d <= 3) { wB = 0.7; wE = 0.16; wR = 0.08; wS = 0.06; }
+    else { wB = 0.6; wE = 0.2; wR = 0.12; wS = 0.08; }
 
     if (isDeadEnd) {
       wB *= (deadEndBias.battleMul ?? 0.25);
       wE *= (deadEndBias.eventMul ?? 1.35);
-      wR *= (deadEndBias.restMul ?? 1.55);
+      wR *= (deadEndBias.restMul ?? 1.8);
+      wS *= 0.8;
     }
 
-    const sum = wB + wE + wR;
+    const sum = wB + wE + wR + wS;
     const r = Math.random() * sum;
     if (r < wB) return "BATTLE";
     if (r < wB + wE) return "EVENT";
-    return "REST";
+    if (r < wB + wE + wR) return "REST";
+    return "SHOP";
   };
   for (const id of others) {
+    const d = nodes[id]?.depth ?? 0;
+
+    if (forcedBattleDepths.has(d)) {
+      nodes[id].kind = "BATTLE";
+      continue;
+    }
+
     if (elites.has(id)) {
       nodes[id].kind = "ELITE";
       continue;
     }
 
-    const d = nodes[id]?.depth ?? 0;
     nodes[id].kind = rollKind(d, deadEnds.has(id));
+  }
+
+
+  // ensure at least one SHOP exists (디버그/테스트 편의)
+  {
+    const anyShop = Object.values(nodes).some((n) => n.kind === "SHOP");
+    if (!anyShop) {
+      const cand = Object.keys(nodes)
+        .filter((id) => id !== map.startId && id !== treasureId)
+        .filter((id) => (nodes[id]?.depth ?? 0) >= 2)
+        .filter((id) => nodes[id].kind !== "ELITE" && nodes[id].kind !== "TREASURE")
+        .filter((id) => !forcedBattleDepths.has(nodes[id]?.depth ?? 0))
+      ;
+      if (cand.length) {
+        const id = pickOne(cand);
+        nodes[id].kind = "SHOP";
+      }
+    }
   }
 
   return map;

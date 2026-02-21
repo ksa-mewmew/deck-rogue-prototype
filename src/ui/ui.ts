@@ -19,13 +19,16 @@ import {
   isTargeting,
   currentTotalDeckLikeSize,
 } from "../engine/combat";
-import { logMsg } from "../engine/rules";
+import { logMsg, pushUiToast } from "../engine/rules";
 import { createInitialState } from "../engine/state";
 import { applyChoiceKey } from "../engine/choiceApply";
+import { openShopChoice } from "../engine/engineRewards";
+import { useItemAt } from "../engine/items";
 import type { EventOutcome } from "../content/events";
 import { pickEventByMadness, getEventById } from "../content/events";
 import { removeCardByUid, addCardToDeck, offerRewardsByFatigue, canUpgradeUid, upgradeCardByUid, obtainTreasure } from "../content/rewards";
 import { getCardDefByIdWithUpgrade } from "../content/cards";
+import { getItemDefById } from "../content/items";
 
 import { saveGame, hasSave, loadGame, clearSave } from "../persist";
 
@@ -96,6 +99,82 @@ const RULEBOOK_TEXT = `# Deck Rogue Prototype — 룰북 (플레이어용)
 
 
 let _ASSET_BASE: string | null = null;
+
+let _itemTip: HTMLDivElement | null = null;
+
+function ensureItemTip(): HTMLDivElement {
+  if (_itemTip) return _itemTip;
+  const tip = document.createElement("div");
+  tip.id = "itemHoverTip";
+  tip.className = "itemHoverTip relicHoverTip"; // relic 룩 재사용
+  tip.style.pointerEvents = "none";
+  tip.style.position = "fixed";
+  tip.style.left = "0px";
+  tip.style.top = "0px";
+  tip.style.zIndex = "70000"; // zChoice(52000)보다 위
+  document.body.appendChild(tip);
+  _itemTip = tip;
+  return tip;
+}
+
+function setItemTipContent(itemId: string) {
+  const tip = ensureItemTip();
+  const def = getItemDefById(itemId);
+
+  tip.innerHTML = "";
+  const t = document.createElement("div");
+  t.className = "relicTipTitle";
+  t.textContent = def?.name ?? itemId;
+
+  const b = document.createElement("div");
+  b.className = "relicTipBody";
+  b.textContent = def?.text ?? "";
+
+  tip.appendChild(t);
+  tip.appendChild(b);
+}
+
+function moveItemTip(clientX: number, clientY: number) {
+  const tip = ensureItemTip();
+  const pad = 12;
+  const off = 14;
+
+  // 먼저 대략 위치
+  tip.style.left = `${clientX + off}px`;
+  tip.style.top = `${clientY + off}px`;
+
+  // 화면 밖 나가면 클램프 (내용 반영된 후 크기 기준)
+  const r = tip.getBoundingClientRect();
+  let x = clientX + off;
+  let y = clientY + off;
+  if (x + r.width + pad > window.innerWidth) x = window.innerWidth - r.width - pad;
+  if (y + r.height + pad > window.innerHeight) y = window.innerHeight - r.height - pad;
+  if (x < pad) x = pad;
+  if (y < pad) y = pad;
+
+  tip.style.left = `${Math.round(x)}px`;
+  tip.style.top = `${Math.round(y)}px`;
+}
+
+function showItemTip(itemId: string, e: MouseEvent) {
+  setItemTipContent(itemId);
+  const tip = ensureItemTip();
+  tip.classList.add("show");
+  moveItemTip(e.clientX, e.clientY);
+  // 한 번 더(레이아웃 계산 후) 클램프
+  requestAnimationFrame(() => moveItemTip(e.clientX, e.clientY));
+}
+
+function hideItemTip() {
+  const tip = ensureItemTip();
+  tip.classList.remove("show");
+}
+
+function wireItemHover(el: HTMLElement, itemId: string) {
+  el.addEventListener("mouseenter", (ev) => showItemTip(itemId, ev as MouseEvent));
+  el.addEventListener("mousemove", (ev) => moveItemTip((ev as MouseEvent).clientX, (ev as MouseEvent).clientY));
+  el.addEventListener("mouseleave", () => hideItemTip());
+}
 
 function getAssetBase(): string {
   if (_ASSET_BASE) return _ASSET_BASE;
@@ -215,6 +294,62 @@ function schedulePostLayout(g: GameState) {
 let fxIdSeq = 1;
 let floatFx: FloatFx[] = [];
 
+type UiToastRuntime = {
+  id: number;
+  kind: string;
+  text: string;
+  born: number;
+  ms: number;
+};
+
+let toastSeq = 1;
+let uiToastsRt: UiToastRuntime[] = [];
+
+function pullUiToastsFromState(g: GameState) {
+  const anyG = g as any;
+  const q = (anyG.uiToasts as any[]) ?? [];
+  if (!q || q.length === 0) return;
+
+  const now = performance.now();
+  for (const t of q) {
+    const kind = String((t as any).kind ?? "INFO");
+    const text = String((t as any).text ?? "");
+    const ms = Math.max(200, Number((t as any).ms ?? 1600) || 1600);
+    uiToastsRt.push({ id: toastSeq++, kind, text, born: now, ms });
+  }
+
+  // ✅ 저장에 섞이지 않도록 즉시 비움
+  anyG.uiToasts = [];
+}
+
+function cleanupUiToastsRt() {
+  const now = performance.now();
+  const mul = animMulNow();
+  uiToastsRt = uiToastsRt.filter((t) => now - t.born < t.ms * mul);
+}
+
+function renderUiToastLayer(g: GameState) {
+  pullUiToastsFromState(g);
+  cleanupUiToastsRt();
+
+  let layer = document.querySelector<HTMLElement>(".toastLayer");
+  if (!layer) {
+    layer = document.createElement("div");
+    layer.className = "toastLayer";
+    document.body.appendChild(layer);
+  }
+
+  // 재구성(토스트 개수가 많지 않아서 단순 rebuild가 안전)
+  layer.innerHTML = "";
+  for (const t of uiToastsRt) {
+    const el = document.createElement("div");
+    el.className = `toast toast-${t.kind.toLowerCase()}`;
+    el.textContent = t.text;
+    layer.appendChild(el);
+  }
+}
+
+
 let floatingNewRunHandler: null | (() => void) = null;
 let phaseBannerText: string | null = null;
 let phaseBannerUntil = 0;
@@ -227,7 +362,7 @@ function pushFloatFx(kind: FloatFx["kind"], text: string, x: number, y: number) 
 function cleanupFloatFx() {
   const now = performance.now();
   
-  floatFx = floatFx.filter((f) => now - f.born < 700);
+  floatFx = floatFx.filter((f) => now - f.born < animMs(700));
 }
 
 let prevPlayerHp: number | null = null;
@@ -277,7 +412,7 @@ function emitPlayerDelta(dhp: number) {
   else pushFloatFx("heal", `+${dhp}`, x, y);
 
   box.classList.add("fxFlash");
-  setTimeout(() => box.classList.remove("fxFlash"), 240);
+  setTimeout(() => box.classList.remove("fxFlash"), animMs(240));
 }
 
 function emitPlayerBlockDelta(d: number) {
@@ -306,7 +441,7 @@ function emitEnemyDelta(i: number, dhp: number) {
   else pushFloatFx("heal", `+${dhp}`, x, y);
 
   el.classList.add("fxFlash");
-  setTimeout(() => el.classList.remove("fxFlash"), 240);
+  setTimeout(() => el.classList.remove("fxFlash"), animMs(240));
 }
 
 
@@ -318,9 +453,10 @@ function emitEnemyDelta(i: number, dhp: number) {
 
 
 type UiSettings = {
-  uiScaleDesktop: number; 
-  uiScaleMobile: number;  
+  uiScaleDesktop: number;
+  uiScaleMobile: number;
   slotCardMode: "FULL" | "NAME_ONLY";
+  animMul: number; // 0=즉시, 1=기본, 2=느림
 };
 
 const UISET_KEY = "deckrogue_uiSettings_v1";
@@ -337,6 +473,7 @@ function loadUiSettings(): UiSettings {
         uiScaleDesktop: 1.0,
         uiScaleMobile: 1.0,
         slotCardMode: "FULL",
+        animMul: 1.0,
       };
     }
 
@@ -349,12 +486,14 @@ function loadUiSettings(): UiSettings {
       uiScaleDesktop: clamp(Number(j.uiScaleDesktop ?? 1.0) || 1.0, 0.75, 1.5),
       uiScaleMobile:  clamp(Number(j.uiScaleMobile  ?? 1.0) || 1.0, 0.75, 1.5),
       slotCardMode,
+      animMul: clamp(Number(j.animMul ?? 1.0) || 1.0, 0.0, 2.0),
     };
   } catch {
     return {
       uiScaleDesktop: 1.0,
       uiScaleMobile: 1.0,
       slotCardMode: "FULL",
+      animMul: 1.0,
     };
   }
 }
@@ -369,6 +508,14 @@ function getUiScaleNow() {
 function sx(px: number) {
   return Math.round(px * getUiScaleNow());
 }
+
+function animMulNow() {
+  return clamp(Number(uiSettings.animMul ?? 1.0) || 1.0, 0.0, 2.0);
+}
+function animMs(ms: number) {
+  return Math.max(0, Math.round(ms * animMulNow()));
+}
+
 
 
 
@@ -456,7 +603,7 @@ async function runAutoAdvanceRAF(g: GameState, actions: UIActions) {
       if (g.phase === "PLACE") break;
 
       const ms = tickMsForPhase(beforePhase);
-      if (ms > 0) await sleep(ms);
+      if (ms > 0) await sleep(animMs(ms));
     }
   } finally {
     autoAdvancing = false;
@@ -498,6 +645,14 @@ function hydrateLoadedState(loaded: any, content: any) {
   g.run.nodePickByType ??= { BATTLE: 0, ELITE: 0, REST: 0, EVENT: 0, TREASURE: 0 };
   g.run.bossPool ??= ["boss_gravity_master","boss_cursed_wall", "boss_giant_orc", "boss_soul_stealer"];
   g.run.nextBossId ??= null;
+  g.run.lastBattleWasElite ??= false;
+  (g.run as any).lastBattleWasBoss ??= false;
+  (g.run as any).rewardPityNonElite ??= 0;
+  g.run.gold ??= 0;
+  (g.run as any).pendingEventWinGold ??= 0;
+
+  (g.run as any).items ??= [];
+  (g.run as any).itemOfferedThisBattle ??= false;
 
   g.run.afterTreasureNodePicks ??= 0;
   (g.run as any).deckSizeAtTreasure ??= null;
@@ -763,6 +918,13 @@ function renderCard(
   const mode: CardRenderMode = opt?.mode ?? "FULL";
 
   const d = div("card");
+
+  // rarity frame
+  const rarity =
+    (def as any).rarity
+    ?? (String(c.defId).startsWith("mad_") ? "MADNESS" : undefined)
+    ?? (["arrow","shield","scout","field_ration","maintenance","power_arrow","goal_treasure"].includes(String(c.defId)) ? "BASIC" : "COMMON");
+  d.classList.add(`rarity-${String(rarity).toLowerCase()}`);
 
   if (g.selectedHandCardUid === cardUid) d.classList.add("selected");
   if (def.tags?.includes("EXHAUST")) d.classList.add("exhaust");
@@ -1207,7 +1369,7 @@ function renderCardPreviewByDef(g: GameState, defId: string, upgrade: number): H
 
 
 
-type NodeType = "BATTLE" | "ELITE" | "REST" | "TREASURE" | "EVENT";
+type NodeType = "BATTLE" | "ELITE" | "REST" | "TREASURE" | "EVENT" | "SHOP";
 
 const VS15 = "\uFE0E"; 
 
@@ -1227,7 +1389,7 @@ function nodeLabelParts(t: NodeType, isBoss: boolean) {
   if (t === "ELITE") return { icon: "☠" + VS15, text: "정예", kind: "elite" as const };
   if (t === "REST")  return { icon: "⛺︎" + VS15, text: "휴식", kind: "rest" as const };
   if (t === "EVENT") return { icon: "❔︎" + VS15, text: "미지", kind: "event" as const };
-
+  if (t === "SHOP")  return { icon: "¤" + VS15, text: "상점", kind: "shop" as const };
 
   return { icon: "✦", text: "보물", kind: "treasure" as const };
 }
@@ -2044,7 +2206,7 @@ function computeGraphLayout(map: GraphMapLite): GraphLayout {
   const hasUnreach = depthKeysRaw.some((d) => d >= 900);
   const maxDepthForWidth = effectiveMaxDepth + (hasUnreach ? 1 : 0);
 
-  const STEP_X = 110;
+  const STEP_X = 80;
   const STEP_Y = 64;
   const PAD_X = 54;
   const PAD_Y = 40;
@@ -2227,8 +2389,8 @@ function renderMapMiniGraph(
   const box = div("mapMiniBox");
   box.style.cssText =
     `margin-top:${sx(12)}px; ` +
-    `border:1px solid rgba(255,255,255,.12); border-radius:${sx(12)}px; ` +
-    `background:rgba(0,0,0,.18); ` +
+    `border:0px solid rgba(255,255,255,.12); border-radius:${sx(12)}px; ` +
+    `background:rgba(0,0,0,0); ` +
     `padding:${sx(10)}px;`;
 
   const title = divText("", "지도");
@@ -2244,7 +2406,7 @@ function renderMapMiniGraph(
     `overflow:auto; ` +
     `max-height:${sx(scrollerH)}px; ` +
     `border-radius:${sx(10)}px; ` +
-    `background:rgba(255,255,255,.02);`;
+    `background:rgba(255,255,255,.0);`;
 
   viewport.addEventListener("wheel", (ev) => {
     if (Math.abs(ev.deltaY) > Math.abs(ev.deltaX)) {
@@ -2351,16 +2513,6 @@ function renderMapMiniGraph(
       halo1.setAttribute("opacity", "0.55");
       (halo1.style as any).filter = "drop-shadow(0 0 6px rgba(179,74,70,.65))";
       gNodes.appendChild(halo1);
-
-      const halo2 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      halo2.setAttribute("cx", String(p.x));
-      halo2.setAttribute("cy", String(p.y));
-      halo2.setAttribute("r", String(detailMode ? 28 : 32));
-      halo2.setAttribute("fill", "none");
-      halo2.setAttribute("stroke", C_ACCENT);
-      halo2.setAttribute("stroke-width", "2");
-      halo2.setAttribute("opacity", "0.18");
-      gNodes.appendChild(halo2);
     }
 
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
@@ -2368,11 +2520,10 @@ function renderMapMiniGraph(
     circle.setAttribute("cy", String(p.y));
     circle.setAttribute("r", String(isCur ? (detailMode ? 12 : 13) : (detailMode ? 9 : 10)));
 
-    // ✅ 색 적용 (WHITE/BLACK/ACCENT)
     const useAccent = isCur || isAdj;
     circle.setAttribute("fill", useAccent ? NODE_FILL_ACCENT : NODE_FILL_BASE);
-    circle.setAttribute("stroke", useAccent ? NODE_STROKE_ACCENT : NODE_STROKE_BASE);
-    circle.setAttribute("stroke-width", String(isCur ? 3 : 2));
+    circle.setAttribute("stroke", "none");
+    circle.setAttribute("stroke-width", "0");
     circle.style.cursor = isAdj && !isCur ? "pointer" : "default";
 
     if (isAdj && !isCur) {
@@ -2392,12 +2543,10 @@ function renderMapMiniGraph(
     const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
     label.setAttribute("x", String(p.x));
     label.setAttribute("y", String(p.y));
-    label.setAttribute("dy", "0.05em"); // ✅ 살짝 쏠림 보정
     label.setAttribute("dominant-baseline", "central");
     label.setAttribute("text-anchor", "middle");
     label.setAttribute("font-size", detailMode ? "12" : "14");
 
-    // ✅ 색 적용 (아이콘은 잉크 블랙)
     label.setAttribute("fill", ICON_FILL);
 
     label.style.pointerEvents = "none";
@@ -2476,7 +2625,7 @@ function renderMapMiniGraph(
     "",
     detailMode
       ? "상세: 지도 위에 요약 정보가 표시됩니다. 이동은 인접 노드 클릭으로만 가능합니다."
-      : "관측 가능한 곳만 지도에 드러납니다. 인접 노드를 클릭해 이동할 수 있습니다."
+      : ""
   );
   tip.style.cssText = `margin-top:${sx(8)}px; font-size:12px; opacity:.8; line-height:1.3;`;
   box.appendChild(tip);
@@ -2511,6 +2660,15 @@ function renderMapNodeSelect(root: HTMLElement, g: GameState, actions: UIActions
 
   left.appendChild(divText("", `다음 보스까지 ${remainingBoss} · ${omenText}`));
 
+  if (remainingBoss <= 3) {
+    const runAnyBoss = g.run as any;
+    const stamp = Number(runAnyBoss.bossApproachToastBossTime ?? -1) || -1;
+    if (stamp !== nextBossTime) {
+      runAnyBoss.bossApproachToastBossTime = nextBossTime;
+      pushUiToast(g, "WARN", `보스가 다가옵니다 (남은 이동 ${remainingBoss})`, 2200);
+    }
+  }
+
   if (g.run.treasureObtained) {
     const distToStart = bfsDistances(map, map.pos, 9999)[map.startId];
     const distTxt = distToStart == null ? "?" : String(distToStart);
@@ -2521,7 +2679,7 @@ function renderMapNodeSelect(root: HTMLElement, g: GameState, actions: UIActions
 
   const right = div("nodeSelectHeaderRight");
 
-  const hint = divText("", `오류 ${Math.round(vp.noise * 100)}%`);
+  const hint = divText("", `오류 ${Math.round(vp.noise * 100)}%.`);
   hint.style.opacity = "0.8";
   right.appendChild(hint);
 
@@ -2529,7 +2687,7 @@ function renderMapNodeSelect(root: HTMLElement, g: GameState, actions: UIActions
     mapDetailOverlayOpen = !mapDetailOverlayOpen;
     render(g, actions);
   });
-  btnDetail.style.cssText = `margin-left:${sx(-10)}px; padding:${sx(2)}px ${sx(5)}px; opacity:.9;`;
+  btnDetail.style.cssText = `margin-left:${sx(-30)}px; padding:${sx(2)}px ${sx(5)}px; opacity:.9;`;
   right.appendChild(btnDetail);
 
   hdr.appendChild(left);
@@ -2555,7 +2713,6 @@ function renderMapNodeSelect(root: HTMLElement, g: GameState, actions: UIActions
     panel.addEventListener("click", (ev) => ev.stopPropagation());
     panel.addEventListener("wheel", (ev) => ev.stopPropagation(), { passive: true });
 
-    // ✅ 바깥 클릭 닫기 (panel 밖 클릭 감지)
     const onDocPointerDown = (ev: PointerEvent) => {
       const t = ev.target as Node | null;
       if (t && panel.contains(t)) return;      // 패널 내부 클릭은 무시
@@ -2815,6 +2972,16 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       render(getG(), actions);
     },
 
+    onUseItem: (idx: number) => {
+      const g = getG();
+      if (g.run.finished) return;
+      if (g.choice || overlay) return;
+      if (isTargeting(g)) return;
+
+      const ok = useItemAt(g, idx);
+      if (ok) render(g, actions);
+    },
+
     onCloseOverlay: () => {
       const g = getG();
       overlay = null;        
@@ -3053,6 +3220,20 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         return;
       }
 
+      
+
+      if (actualKind === "SHOP") {
+        // 상점은 EMPTY로 바뀌지 않습니다. (노드에 계속 상점으로 남음)
+        node.visited = true;
+        node.cleared = true;
+        (node as any).noRespawn = true;
+        (node as any).lastClearedMove = tmNow;
+
+        openShopChoice(g, toId);
+        render(g, actions);
+        return;
+      }
+
       if (actualKind === "EVENT") {
         node.cleared = true;
         node.kind = "EMPTY";
@@ -3077,6 +3258,14 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         if (!ev) {
           render(g, actions);
           return;
+        }
+
+        // ✅ 런 1회 이벤트 처리를 위해, 이벤트 선택 시점에 기록
+        {
+          const runAnyEv = g.run as any;
+          runAnyEv.eventsSeen ??= {};
+          const cur = Number(runAnyEv.eventsSeen[ev.id] ?? 0) || 0;
+          runAnyEv.eventsSeen[ev.id] = cur + 1;
         }
 
         let opts = ev.options(g);
@@ -3212,6 +3401,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
           
             const runAny = g.run as any;
             runAny.pendingEventWinRelicId = outcome.onWinGrantRelicId ?? null;
+            runAny.pendingEventWinGold = Number(outcome.onWinGrantGold ?? 0) || 0;
 
             g.phase = "NODE";
             spawnEncounter(g, { forcePatternIds: outcome.enemyIds });
@@ -3802,12 +3992,15 @@ export function render(g: GameState, actions: UIActions) {
   renderChoiceLayer(g, actions);
   renderLogOverlay(g, actions);
 
+  renderItemTray(g, actions);
+
   renderRelicTray(g, actions);
   renderRelicModal(g, actions);
 
   detectAndEmitDeltas(g);
   renderPhaseBanner();
   renderFloatFxLayer();
+  renderUiToastLayer(g);
   renderRelicHud(g, actions);
   scheduleSave(g);
   schedulePostLayout(g);
@@ -3820,8 +4013,9 @@ function getRelicView(g: GameState, id: string) {
 
   const disp = getRelicDisplay(g, id);
 
-  const art = def?.art ?? def?.icon ?? null;
-  const icon = art ?? null;
+  const artRaw = def?.art ?? def?.icon ?? null;
+  const art = artRaw ? assetUrl(String(artRaw)) : null;
+  const icon = art;
 
   return {
     id,
@@ -4036,19 +4230,28 @@ function renderStageCornerResourceHud(g: GameState) {
 
   const hud = document.createElement("div");
   hud.className = "stageCornerHud";
-  hud.textContent = buildResourceText(g);
+
+  const top = document.createElement("div");
+  top.className = "stageCornerHudTop";
+  top.textContent = buildResourceTopText(g);
+
+  const bottom = document.createElement("div");
+  bottom.className = "stageCornerHudBottom";
+  bottom.textContent = buildResourceBottomText(g);
+
+  hud.appendChild(top);
+  hud.appendChild(bottom);
+
   document.body.appendChild(hud);
 
   const r = anchor.getBoundingClientRect();
 
   const padTop = -56;
-
   const centerX = (r.left + r.right) / 2;
 
   hud.style.right = "";
   hud.style.left = `${Math.round(centerX)}px`;
-  hud.style.top  = `${Math.round(r.top + padTop)}px`;
-
+  hud.style.top = `${Math.round(r.top + padTop)}px`;
 
   hud.style.transform = "translateX(-50%)";
 }
@@ -4123,7 +4326,9 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
   const wrap = div("settingsPanel");
   wrap.style.cssText = "display:flex; flex-direction:column; gap:12px;";
 
-  
+  // =========================
+  // UI 스케일
+  // =========================
   const row = div("settingsRow");
   row.style.cssText = "display:flex; align-items:center; gap:12px; flex-wrap:wrap;";
 
@@ -4155,7 +4360,6 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
   row.appendChild(val);
   wrap.appendChild(row);
 
-  
   const presets = div("settingsPresets");
   presets.style.cssText = "display:flex; gap:8px; flex-wrap:wrap;";
 
@@ -4178,10 +4382,9 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
   presets.appendChild(makePreset("더 크게 120%", 1.20));
   wrap.appendChild(presets);
 
-  
   const resetRow = div("settingsResetRow");
   resetRow.style.cssText = "display:flex; justify-content:flex-end; margin-top:6px;";
-  const reset = mkButton("초기화", () => {
+  const reset = mkButton("스케일 초기화", () => {
     setUiScaleNow(1.0);
     slider.value = String(getNow());
     val.textContent = `${Math.round(getNow() * 100)}%`;
@@ -4193,7 +4396,84 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
   resetRow.appendChild(reset);
   wrap.appendChild(resetRow);
 
-  
+  // =========================
+  // 애니메이션 속도
+  // =========================
+  const animRow = div("settingsRow");
+  animRow.style.cssText = "display:flex; align-items:center; gap:12px; flex-wrap:wrap;";
+
+  const animLabel = divText("", "애니메이션 속도");
+  animLabel.style.cssText = "font-weight:800;";
+
+  const animVal = divText("", `x${animMulNow().toFixed(2)}`);
+  animVal.style.cssText = "opacity:.9; min-width:64px; text-align:right;";
+
+  const animSlider = document.createElement("input");
+  animSlider.type = "range";
+  animSlider.min = "0";
+  animSlider.max = "2";
+  animSlider.step = "0.05";
+  animSlider.value = String(animMulNow());
+  animSlider.style.cssText = "flex:1 1 260px;";
+
+  const setAnim = (v: number) => {
+    uiSettings.animMul = clamp(v, 0.0, 2.0);
+    saveUiSettings();
+    applyUiScaleVars(); // --animMul도 같이 적용됨
+  };
+
+  animSlider.oninput = () => {
+    const v = Number(animSlider.value);
+    setAnim(v);
+    animVal.textContent = `x${animMulNow().toFixed(2)}`;
+    onChange();
+  };
+
+  animRow.appendChild(animLabel);
+  animRow.appendChild(animSlider);
+  animRow.appendChild(animVal);
+  wrap.appendChild(animRow);
+
+  const animPresets = div("settingsPresets");
+  animPresets.style.cssText = "display:flex; gap:8px; flex-wrap:wrap;";
+
+  const makeAnimPreset = (txt: string, v: number) => {
+    const b = mkButton(txt, () => {
+      setAnim(v);
+      animSlider.value = String(animMulNow());
+      animVal.textContent = `x${animMulNow().toFixed(2)}`;
+      onChange();
+    });
+    b.style.cssText =
+      "padding:8px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.16);" +
+      "background:rgba(255,255,255,.06); color:#fff; cursor:pointer;";
+    return b;
+  };
+
+  animPresets.appendChild(makeAnimPreset("즉시", 0.0));
+  animPresets.appendChild(makeAnimPreset("빠름", 0.70));
+  animPresets.appendChild(makeAnimPreset("기본", 1.00));
+  animPresets.appendChild(makeAnimPreset("느림", 1.40));
+  animPresets.appendChild(makeAnimPreset("아주 느림", 1.80));
+  wrap.appendChild(animPresets);
+
+  const animResetRow = div("settingsResetRow");
+  animResetRow.style.cssText = "display:flex; justify-content:flex-end; margin-top:6px;";
+  const animReset = mkButton("애니 초기화", () => {
+    setAnim(1.0);
+    animSlider.value = String(animMulNow());
+    animVal.textContent = `x${animMulNow().toFixed(2)}`;
+    onChange();
+  });
+  animReset.style.cssText =
+    "padding:8px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.16);" +
+    "background:rgba(255,255,255,.06); color:#fff; cursor:pointer;";
+  animResetRow.appendChild(animReset);
+  wrap.appendChild(animResetRow);
+
+  // =========================
+  // 슬롯 카드 표시
+  // =========================
   const modeRow = div("settingsRow");
   modeRow.style.cssText = "display:flex; align-items:center; gap:12px; flex-wrap:wrap;";
 
@@ -4226,6 +4506,7 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
   return wrap;
 }
 
+
 function positionPlayerHudByStage() {
   const stage = document.querySelector<HTMLElement>(".stageInner");
   if (!stage) return;
@@ -4252,6 +4533,7 @@ function applyUiScaleVars() {
   root.style.setProperty("--uiScale", String(scale));
   root.style.setProperty("--uiScaleDesktop", String(uiSettings.uiScaleDesktop));
   root.style.setProperty("--uiScaleMobile", String(uiSettings.uiScaleMobile));
+  root.style.setProperty("--animMul", String(animMulNow()));
 }
 
 
@@ -4489,6 +4771,88 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string) {
   return e;
 }
 
+function renderItemTray(g: GameState, actions: UIActions) {
+  document.querySelector(".itemTray")?.remove();
+
+  const items = ((g.run as any).items as string[]) ?? [];
+  if (!items || items.length === 0) return;
+
+  const inCombat = g.enemies.length > 0 && g.phase !== "NODE";
+
+  const tray = document.createElement("div");
+  tray.className = "itemTray";
+
+  let itemHoverId: string | null = null;
+
+  const tip = document.createElement("div");
+  // 유물 tooltip 스타일 그대로 재사용
+  tip.className = "relicHoverTip itemHoverTip";
+  tray.appendChild(tip);
+
+  const updateTip = () => {
+    const id = itemHoverId;
+    if (!id) {
+      tip.classList.remove("show");
+      tip.innerHTML = "";
+      return;
+    }
+
+    const def = getItemDefById(id);
+    tip.innerHTML = "";
+
+    const t = document.createElement("div");
+    t.className = "relicTipTitle";
+    t.textContent = def?.name ?? id;
+
+    const b = document.createElement("div");
+    b.className = "relicTipBody";
+    b.textContent = def?.text ?? "";
+
+    tip.appendChild(t);
+    tip.appendChild(b);
+
+    tip.classList.add("show");
+  };
+
+  for (let i = 0; i < items.length; i++) {
+    const id = String(items[i]);
+    const def = getItemDefById(id);
+
+    const slot = document.createElement("div");
+    slot.className = "itemSlot";
+    wireItemHover(slot, id);
+    const img = document.createElement("img");
+    img.alt = def?.name ?? id;
+    if (def?.art) img.src = assetUrl(def.art);
+    slot.appendChild(img);
+
+    // 툴팁(간단)
+
+    const disabled = !inCombat || !!g.choice || !!overlay || isTargeting(g);
+    if (disabled) slot.classList.add("disabled");
+
+    slot.onclick = (e) => {
+      e.stopPropagation();
+      if (disabled) return;
+      actions.onUseItem(i);
+    };
+
+    slot.onmouseenter = () => {
+      itemHoverId = id;
+      updateTip();
+    };
+    slot.onmouseleave = () => {
+      itemHoverId = null;
+      updateTip();
+    };
+
+    tray.appendChild(slot);
+  }
+
+  document.body.appendChild(tray);
+}
+
+
 function renderRelicTray(g: GameState, actions: UIActions) {
   const prev = document.getElementById("relicTray");
   if (prev) prev.remove();
@@ -4548,6 +4912,7 @@ function renderRelicTray(g: GameState, actions: UIActions) {
       const img = document.createElement("img");
       img.className = "relicIconImg";
       img.alt = disp.name;
+      img.src = assetUrl(def.art);
       btn.appendChild(img);
     } else {
       btn.textContent = disp.name.slice(0, 1);
@@ -4588,17 +4953,19 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
   main.classList.add("choiceOpen");
 
 
+  const isShopChoice = (g.choiceCtx as any)?.kind === "SHOP";
+
   const CHOICE_DROP = sx(70);
   const PAD_TOP = sx(20) + CHOICE_DROP;
   const PAD_R   = sx(36);
   const PAD_B   = sx(16);
   const PAD_L   = sx(16);
 
-  const GAP_ROW   = sx(18);
+  const GAP_ROW   = sx(isShopChoice ? 12 : 18);
   const GAP_LIST  = sx(10);
 
-  const ILLU_SIZE = sx(260);
-  const ILLU_MIN  = sx(200);
+  const ILLU_SIZE = sx(isShopChoice ? 220 : 260);
+  const ILLU_MIN  = sx(isShopChoice ? 170 : 200);
 
   const ITEM_R    = sx(14);
   const ITEM_PAD  = sx(12);
@@ -4680,7 +5047,7 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
     pre.style.cssText =
       `margin:${sx(10)}px 0 0 0; padding:${DETAIL_PAD}px;` +
       "white-space:pre-wrap;" +
-      `border-radius:${DETAIL_R}px; border:1px solid rgba(255,255,255,.10);` +
+      `border-radius: 0px; border:1px solid rgba(255,255,255,.10);` +
       "background:rgba(0,0,0,.22);" +
       `font-size:${DETAIL_FS}px; line-height:1.45;` +
       `max-height:${DETAIL_MAXH}px; overflow:auto;`;
@@ -4701,7 +5068,10 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
 
   const hasCardPreview = c.options.some((opt) => {
     if ((opt as any).cardUid) return true;
-    return typeof opt.key === "string" && opt.key.startsWith("pick:");
+    if (typeof opt.key === "string" && opt.key.startsWith("pick:")) return true;
+    // shop: 카드 구매도 실제 카드 프리뷰로 보여준다.
+    if (isShopChoice && typeof opt.key === "string" && opt.key.startsWith("shop:card:")) return true;
+    return false;
   });
 
 
@@ -4714,7 +5084,7 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
 
     const leftCol = div("choice-leftCol");
     leftCol.style.cssText =
-      `flex:1 1 ${sx(640)}px; max-width:${sx(720)}px; min-width:0;` +
+      `flex:1 1 ${sx(isShopChoice ? 560 : 640)}px; max-width:${sx(isShopChoice ? 640 : 720)}px; min-width:0;` +
       "display:flex; flex-direction:column;";
 
     const list = div("choice-list");
@@ -4770,16 +5140,347 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
     contentRow.appendChild(leftCol);
     contentRow.appendChild(illuCol);
     panel.appendChild(contentRow);
+
+    padWrap.appendChild(panel);
+    overlayEl.appendChild(backdrop);
+    overlayEl.appendChild(padWrap);
+    document.body.appendChild(overlayEl);
+    return;
   }
 
+  if (isShopChoice) {
+    panel.classList.add("shopPanel");
+    panel.style.overflow = "hidden"; // choice-panel 기본 overflow:auto 제거
 
-  else {
+    const nodeId = String((g.choiceCtx as any)?.nodeId ?? "");
+    const shop = (g.run as any)?.shops?.[nodeId];
+
+    if (!shop) {
+    } else {
+      const cardsGrid = div("shopCardsGrid");
+      for (let i = 0; i < (shop.cards?.length ?? 0); i++) {
+        const offer = shop.cards[i];
+        if (!offer?.defId) continue;
+
+        const tile = div("shopCardTile");
+        if (offer.sold) tile.classList.add("sold");
+
+        const cardEl = renderCardPreviewByDef(
+          g,
+          String(offer.defId),
+          Number(offer.upgrade ?? 0) || 0
+        ) as HTMLElement;
+
+        fixPreviewSize(cardEl, 1);
+        tile.appendChild(cardEl);
+
+        const price = divText(
+          "shopTilePrice",
+          offer.sold ? "품절" : `🪙${Number(offer.priceGold ?? 0) || 0}`
+        );
+        tile.appendChild(price);
+
+        if (!offer.sold) {
+          tile.onclick = () => actions.onChooseChoice(`shop:card:${i}`);
+        }
+
+        cardsGrid.appendChild(tile);
+      }
+
+      const bottomRow = div("shopBottomRow");
+
+      const itemsCol = div("shopItemsCol");
+      const itemsGrid = div("shopItemsGrid");
+
+      for (let i = 0; i < (shop.items?.length ?? 0); i++) {
+        const offer = shop.items[i];
+        if (!offer?.itemId) continue;
+
+        const tile = div("shopItemTile");
+        if (offer.sold) tile.classList.add("sold");
+        wireItemHover(tile, String(offer.itemId));
+
+        const def = getItemDefById(String(offer.itemId));
+        const img = document.createElement("img");
+        img.alt = def?.name ?? String(offer.itemId);
+        if (def?.art) img.src = assetUrl(def.art);
+        tile.appendChild(img);
+
+        const price = divText(
+          "shopTilePrice",
+          offer.sold ? "품절" : `🪙${Number(offer.priceGold ?? 0) || 0}`
+        );
+        tile.appendChild(price);
+
+        if (!offer.sold) {
+          tile.onclick = () => actions.onChooseChoice(`shop:item:${i}`);
+        }
+
+        itemsGrid.appendChild(tile);
+      }
+
+      itemsCol.appendChild(itemsGrid);
+
+      const svcCol = div("shopSvcCol");
+      const svcGrid = div("shopSvcGrid");
+
+      const mkSvc = (key: string, label: string, note: string, disabled: boolean) => {
+        const box = div("shopSvcTile");
+        const b = button(label, () => actions.onChooseChoice(key), disabled);
+        b.classList.add("primary");
+        box.appendChild(b);
+
+        const n = divText("shopSvcNote", note);
+        box.appendChild(n);
+        return box;
+      };
+
+      svcGrid.appendChild(
+        mkSvc(
+          "shop:service:upgrade",
+          shop.usedUpgrade ? "강화" : "강화",
+          shop.usedUpgrade ? "사용 완료" : "🪙25",
+          !!shop.usedUpgrade
+        )
+      );
+      svcGrid.appendChild(
+        mkSvc(
+          "shop:service:remove",
+          shop.usedRemove ? "제거" : "제거",
+          shop.usedRemove ? "사용 완료" : "🪙25",
+          !!shop.usedRemove
+        )
+      );
+      svcGrid.appendChild(mkSvc("shop:supply:buy", "보급 구매", "-🪙6 / 🌾+3", false));
+      svcGrid.appendChild(mkSvc("shop:supply:sell", "보급 판매", "+🪙4 / 🌾-3", false));
+
+      svcCol.appendChild(svcGrid);
+
+      bottomRow.appendChild(itemsCol);
+      bottomRow.appendChild(svcCol);
+
+      const leaveLabel =
+        (c.options.find((o) => o.key === "shop:leave")?.label) ?? "나가기";
+
+      const leaveBtn = button(leaveLabel, () => actions.onChooseChoice("shop:leave"), false);
+      leaveBtn.classList.add("shopLeaveBtn");
+      leaveBtn.style.cssText =
+        "position:absolute;" +
+        `top:${sx(16)}px; right:${sx(16)}px;` +
+        "z-index: 2;" +
+        "border-radius:0px;" +
+        `padding:${sx(10)}px ${sx(14)}px;` +
+        `font-size:${sx(13)}px; font-weight:900;`;
+
+      panel.appendChild(leaveBtn);
+
+      const contentRow = div("choice-contentRow");
+      contentRow.classList.add("shopContentRow");
+
+      const leftCol = div("choice-leftCol");
+      leftCol.classList.add("shopLeftCol");
+      leftCol.appendChild(cardsGrid);
+      leftCol.appendChild(bottomRow);
+
+      const illuCol = div("choice-illuCol");
+      illuCol.style.cssText =
+        `flex:0 0 ${ILLU_SIZE}px; min-width:${ILLU_MIN}px;` +
+        "display:flex; align-items:center; justify-content:center;";
+
+      const illuBox = div("choice-illuBox");
+      illuBox.style.cssText =
+        "width:100%; aspect-ratio:1/1;" +
+        `border-radius:${sx(18)}px; border:1px solid rgba(255,255,255,.16);` +
+        "background:rgba(0,0,0,.35);" +
+        "position:relative; overflow:hidden;" +
+        "box-shadow: 0 10px 30px rgba(0,0,0,.35);";
+
+      const art = (c as any).art as string | undefined;
+      if (art) {
+        const img = document.createElement("img");
+        img.src = assetUrl(art);
+        img.alt = c.title ?? "illustration";
+        const ZOOM = 1.5;
+        (img.style as any).imageRendering = "pixelated";
+        img.style.cssText =
+          "position:absolute; inset:0;" +
+          `width:${ZOOM * 100}%; height:${ZOOM * 100}%;` +
+          `left:${-(ZOOM - 1) * 50}%; top:${-(ZOOM - 1) * 50}%;` +
+          "object-fit:cover; object-position:50% 50%;" +
+          "image-rendering: pixelated; image-rendering: crisp-edges;";
+        illuBox.appendChild(img);
+      }
+
+      illuCol.appendChild(illuBox);
+
+      contentRow.appendChild(leftCol);
+      contentRow.appendChild(illuCol);
+      panel.appendChild(contentRow);
+
+      // ✅ 여기서 끝 (아래 기존 리스트 렌더는 타지 않게)
+      padWrap.appendChild(panel);
+      overlayEl.appendChild(backdrop);
+      overlayEl.appendChild(padWrap);
+      document.body.appendChild(overlayEl);
+      return;
+    }
+  } else {
+    const ck = (g.choiceCtx as any)?.kind;
+    const isBattleCardReward = !isShopChoice && (ck === "BATTLE_CARD_REWARD" || ck === "BATTLE_REWARD");
+
+    const renderClickablePreviewByDef = (defId: string, upgrade: number, onPick: () => void): HTMLElement => {
+      const tmpUid = `__choice_preview:${defId}:${upgrade}:${Math.random().toString(36).slice(2)}`;
+      const prev = g.cards[tmpUid];
+      (g.cards as any)[tmpUid] = { uid: tmpUid, defId, upgrade, zone: "preview" };
+
+      const el = renderCard(g, tmpUid, true, () => onPick(), { draggable: false }) as HTMLElement;
+      el.classList.add("overlayCard", "choicePickCard");
+      el.draggable = false;
+      el.style.cursor = "pointer";
+
+      if (prev) g.cards[tmpUid] = prev;
+      else delete (g.cards as any)[tmpUid];
+      return el;
+    };
+
+    // =========================
+    // Battle card reward: 3 cards horizontal, click card to pick, no side details
+    // =========================
+    if (isBattleCardReward) {
+      const pickOpts = c.options.filter((opt) => typeof opt.key === "string" && opt.key.startsWith("pick:"));
+      const skipOpt = c.options.find((opt) => opt.key === "skip") ?? null;
+
+      // Optional item reward (combined into this screen)
+      {
+        const ctx: any = g.choiceCtx as any;
+        const itemId = String(ctx?.itemOfferId ?? "");
+        const itemDecision = ctx?.itemDecision as ("TAKEN" | "SKIPPED" | undefined);
+        if (itemId) {
+          const def = getItemDefById(itemId);
+          const row = div("choice-rewardItemRow");
+          row.style.cssText =
+            "display:flex; justify-content:center; align-items:flex-start;" +
+            `gap:${sx(14)}px; margin-bottom:${sx(16)}px;`;
+
+          const card = div("itemOfferCard");
+          card.style.cssText =
+            `width:${sx(170)}px; aspect-ratio:3/4;` +
+            `border-radius: 0px;` +
+            "border:1px solid rgba(255,255,255,.14);" +
+            "background:rgba(0,0,0,.35);" +
+            "box-shadow: 0 10px 30px rgba(0,0,0,.35);" +
+            "display:flex; flex-direction:column; align-items:center; justify-content:flex-start;" +
+            `padding:${sx(12)}px; gap:${sx(10)}px;` +
+            "cursor:pointer; user-select:none;";
+
+          if (itemDecision) {
+            card.style.opacity = ".55";
+            card.style.cursor = "default";
+          } else {
+            card.onclick = () => actions.onChooseChoice("take_item");
+          }
+
+          const title = divText("itemOfferTitle", "아이템 보상");
+          title.style.cssText = `font-weight:900; font-size:${sx(14)}px; opacity:.92;`;
+
+          if (def?.art) {
+            const img = document.createElement("img");
+            img.src = assetUrl(def.art);
+            img.alt = def.name;
+            (img.style as any).imageRendering = "pixelated";
+            img.style.cssText =
+              `width:${sx(96)}px; height:${sx(96)}px;` +
+              "object-fit:contain;" +
+              "image-rendering: pixelated; image-rendering: crisp-edges;";
+            card.appendChild(img);
+          }
+
+          const nm = divText("itemOfferName", def?.name ?? itemId);
+          nm.style.cssText = `font-weight:800; font-size:${sx(14)}px; text-align:center;`;
+          const hint = divText(
+            "itemOfferHint",
+            itemDecision === "TAKEN" ? "획득함" : itemDecision === "SKIPPED" ? "생략함" : "클릭하면 받습니다"
+          );
+          hint.style.cssText = `opacity:.75; font-size:${sx(12)}px; text-align:center;`;
+
+          // Put title above card contents
+          const wrap = div("itemOfferWrap");
+          wrap.style.cssText = "display:flex; flex-direction:column; align-items:center;";
+          wrap.appendChild(title);
+          wrap.appendChild(card);
+          card.appendChild(nm);
+          card.appendChild(hint);
+
+          row.appendChild(wrap);
+
+          // Explicit skip button (optional)
+          if (!itemDecision) {
+            const skipB = button("아이템 생략", () => actions.onChooseChoice("skip_item"), false);
+            skipB.classList.add("ghost");
+            skipB.style.fontSize = `${sx(13)}px`;
+            skipB.style.padding = `${sx(10)}px ${sx(14)}px`;
+            skipB.style.borderRadius = `${sx(10)}px`;
+            row.appendChild(skipB);
+          }
+
+          panel.appendChild(row);
+        }
+      }
+
+      const row = div("choice-rewardCardRow");
+      row.style.cssText =
+        "display:flex;" +
+        `gap:${sx(18)}px;` +
+        "justify-content:center; align-items:flex-start;" +
+        "flex-wrap:nowrap;";
+
+      for (const opt of pickOpts) {
+        const payload = opt.key.slice("pick:".length);
+        const [defId, upStr] = payload.split(":");
+        const upgrade = Number(upStr ?? "0") || 0;
+        const el = renderClickablePreviewByDef(defId, upgrade, () => actions.onChooseChoice(opt.key));
+        fixPreviewSize(el, 1);
+        row.appendChild(el);
+      }
+
+      panel.appendChild(row);
+
+      if (skipOpt) {
+        const skipWrap = div("choice-rewardSkipRow");
+        skipWrap.style.cssText = `margin-top:${sx(18)}px; display:flex; justify-content:center;`;
+        const b = button(skipOpt.label || "생략", () => actions.onChooseChoice("skip"), false);
+        b.classList.add("primary");
+        b.style.fontSize = `${sx(14)}px`;
+        b.style.padding = `${sx(10)}px ${sx(16)}px`;
+        b.style.borderRadius = `${sx(10)}px`;
+        skipWrap.appendChild(b);
+        panel.appendChild(skipWrap);
+      }
+
+      padWrap.appendChild(panel);
+      overlayEl.appendChild(backdrop);
+      overlayEl.appendChild(padWrap);
+      document.body.appendChild(overlayEl);
+      return;
+    }
+
     const list = div("choice-list");
     list.style.cssText =
       "display:flex; flex-direction:column;" +
       `gap:${GAP_LIST}px; margin-top:${sx(12)}px;`;
 
     c.options.forEach((opt) => {
+      // 상점 구분선은 버튼이 아니라 라인으로
+      if (isShopChoice && (opt.key === "shop:sep" || opt.key.startsWith("shop:sep:"))) {
+        const sep = div("choice-sep");
+        sep.style.cssText =
+          `height:${sx(1)}px;` +
+          "background:rgba(255,255,255,.12);" +
+          `margin:${sx(6)}px 0;`;
+        list.appendChild(sep);
+        return;
+      }
+
       const item = makeItemShell();
 
       const left = div("choice-left");
@@ -4803,8 +5504,8 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
           try { elNext = renderCardPreviewByUidWithUpgrade(g, uid, nextUp); }
           catch { elNext = renderRealCardForOverlay(g, uid) as HTMLElement; }
 
-          fixPreviewSize(elCur, 0.78);
-          fixPreviewSize(elNext, 0.78);
+          fixPreviewSize(elCur, 1);
+          fixPreviewSize(elNext, 1);
 
           const arrow = divText("upgradeArrow", "→");
           arrow.style.cssText = `align-self:center; font-weight:900; opacity:.85; margin-top:${sx(6)}px;`;
@@ -4827,6 +5528,59 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
         const el = renderCardPreviewByDef(g, defId, upgrade) as HTMLElement;
         fixPreviewSize(el);
         left.appendChild(el);
+      } else if (isShopChoice && typeof opt.key === "string" && opt.key.startsWith("shop:card:")) {
+        const nodeId = String((g.choiceCtx as any)?.nodeId ?? "");
+        const shop = (g.run as any)?.shops?.[nodeId];
+        const idx = Number(opt.key.slice("shop:card:".length));
+        const offer = shop?.cards?.[idx];
+        if (offer?.defId) {
+          const el = renderCardPreviewByDef(g, String(offer.defId), Number(offer.upgrade ?? 0) || 0) as HTMLElement;
+          fixPreviewSize(el);
+          if (offer.sold) el.style.opacity = ".35";
+          left.appendChild(el);
+        }
+      } else if (isShopChoice && typeof opt.key === "string" && opt.key.startsWith("shop:item:")) {
+        const nodeId = String((g.choiceCtx as any)?.nodeId ?? "");
+        const shop = (g.run as any)?.shops?.[nodeId];
+        const idx = Number(opt.key.slice("shop:item:".length));
+        const offer = shop?.items?.[idx];
+        if (offer?.itemId) {
+          const def = getItemDefById(String(offer.itemId));
+          const card = div("shopItemCard");
+          card.style.cssText =
+            `width:${sx(150)}px; aspect-ratio:3/4;` +
+            `border-radius: 0px;` +
+            "border:1px solid rgba(255,255,255,.14);" +
+            "background:rgba(0,0,0,.30);" +
+            "box-shadow: 0 10px 30px rgba(0,0,0,.25);" +
+            "display:flex; flex-direction:column; align-items:center; justify-content:flex-start;" +
+            `padding:${sx(10)}px; gap:${sx(8)}px;` +
+            "user-select:none;" +
+            (offer.sold ? "opacity:.35; cursor:default;" : "cursor:pointer;");
+
+          if (!offer.sold) card.onclick = () => actions.onChooseChoice(opt.key);
+
+          if (def?.art) {
+            const img = document.createElement("img");
+            img.src = assetUrl(def.art);
+            img.alt = def?.name ?? String(offer.itemId);
+            (img.style as any).imageRendering = "pixelated";
+            img.style.cssText =
+              `width:${sx(84)}px; height:${sx(84)}px;` +
+              "object-fit:contain;" +
+              "image-rendering: pixelated; image-rendering: crisp-edges;";
+            card.appendChild(img);
+          }
+
+          const nm = divText("shopItemName", def?.name ?? String(offer.itemId));
+          nm.style.cssText = `font-weight:900; font-size:${sx(13)}px; text-align:center;`;
+          const pr = divText("shopItemPrice", offer.sold ? "품절" : `🪙${Number(offer.priceGold ?? 0) || 0}`);
+          pr.style.cssText = `opacity:.85; font-size:${sx(12)}px;`;
+          card.appendChild(nm);
+          card.appendChild(pr);
+
+          left.appendChild(card);
+        }
       }
 
       const right = div("choice-right");
@@ -4846,7 +5600,56 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
       list.appendChild(item);
     });
 
-    panel.appendChild(list);
+    // 상점은 카드 프리뷰가 있어도 우측 일러스트 칸을 유지
+    if (isShopChoice) {
+      const contentRow = div("choice-contentRow");
+      contentRow.style.cssText =
+        "display:flex;" +
+        `gap:${GAP_ROW}px; margin-top:${sx(12)}px;` +
+        "justify-content:center; align-items:stretch;";
+
+      const leftCol = div("choice-leftCol");
+      leftCol.style.cssText =
+        `flex:1 1 ${sx(560)}px; max-width:${sx(640)}px; min-width:0;` +
+        "display:flex; flex-direction:column;";
+      leftCol.appendChild(list);
+
+      const illuCol = div("choice-illuCol");
+      illuCol.style.cssText =
+        `flex:0 0 ${ILLU_SIZE}px; min-width:${ILLU_MIN}px;` +
+        "display:flex; align-items:center; justify-content:center;";
+
+      const illuBox = div("choice-illuBox");
+      illuBox.style.cssText =
+        "width:100%; aspect-ratio:1/1;" +
+        `border-radius:${sx(18)}px; border:1px solid rgba(255,255,255,.16);` +
+        "background:rgba(0,0,0,.35);" +
+        "position:relative; overflow:hidden;" +
+        "box-shadow: 0 10px 30px rgba(0,0,0,.35);";
+
+      const art = (c as any).art as string | undefined;
+      if (art) {
+        const img = document.createElement("img");
+        img.src = assetUrl(art);
+        img.alt = c.title ?? "illustration";
+        const ZOOM = 1.5;
+        (img.style as any).imageRendering = "pixelated";
+        img.style.cssText =
+          "position:absolute; inset:0;" +
+          `width:${ZOOM * 100}%; height:${ZOOM * 100}%;` +
+          `left:${-(ZOOM - 1) * 50}%; top:${-(ZOOM - 1) * 50}%;` +
+          "object-fit:cover; object-position:50% 50%;" +
+          "image-rendering: pixelated; image-rendering: crisp-edges;";
+        illuBox.appendChild(img);
+      }
+
+      illuCol.appendChild(illuBox);
+      contentRow.appendChild(leftCol);
+      contentRow.appendChild(illuCol);
+      panel.appendChild(contentRow);
+    } else {
+      panel.appendChild(list);
+    }
   }
 
   padWrap.appendChild(panel);
@@ -5041,29 +5844,40 @@ function renderTopHud(g: GameState, actions: UIActions) {
   return top;
 }
 
-function buildResourceText(g: GameState): string {
-  const inCombat = g.enemies.length > 0 && g.phase !== "NODE";
-  const bonusS = g.run.nextBattleSuppliesBonus ?? 0;
+function buildResourceTopText(g: GameState): string {
+  const bonusS = Number((g.run as any).nextBattleSuppliesBonus ?? 0) || 0;
+  const gold = Number((g.run as any).gold ?? 0) || 0; // ✅ g.run.gold 제거
 
   const parts: string[] = [];
+  parts.push(`🪙 G ${gold}`);
 
-  if (inCombat) {
-    parts.push(`🌾 S ${g.player.supplies} |`);
-  } else {
-    if (bonusS > 0) parts.push(`보너스 🌾 S +${bonusS} |`);
+  if (bonusS !== 0) {
+    const sign = bonusS > 0 ? `+${bonusS}` : `${bonusS}`;
+    parts.push(`다음 전투 🌾 ${sign}`);
   }
 
-  parts.push(`💤 F ${g.player.fatigue}`);
+  return parts.join(" | ");
+}
+
+function buildResourceBottomText(g: GameState): string {
+  const inCombat = g.enemies.length > 0 && g.phase !== "NODE";
+
   const runAny = g.run as any;
   const timeMove = Number(runAny.timeMove ?? 0) || 0;
   const timeAct = Number(g.time ?? 0) || 0;
   const timeTotal = timeMove + timeAct;
-parts.push(`| ⏳ 총 ${timeTotal}`);
-  parts.push(`| 🃏 덱 ${g.deck.length}`);
 
-  return parts.join(" ");
+  const parts: string[] = [];
+  parts.push(`⏳ 총 ${timeTotal}`);
+  parts.push(`🃏 덱 ${g.deck.length}`);
+  parts.push(`💤 F ${g.player.fatigue}`);
+
+  if (inCombat) {
+    parts.push(`🌾 S ${g.player.supplies}`);
+  }
+
+  return parts.join(" | ");
 }
-
 
 
 function chipEl(text: string, extraClass = "") {
@@ -5272,14 +6086,8 @@ function renderHandDock(g: GameState, actions: UIActions, targeting: boolean) {
     nextTurnBtn.disabled = step.disabled || g.phase === "NODE";
     nextTurnBtn.onclick = () => actions.onAutoAdvance();
 
-    const clear = document.createElement("button");
-    clear.textContent = "선택 해제";
-    clear.className = "clearBtn primary";
-    clear.disabled = !g.selectedHandCardUid;
-    clear.onclick = actions.onClearSelected;
 
     controls.appendChild(nextTurnBtn);
-    controls.appendChild(clear);
 
     document.body.appendChild(controls);
 
@@ -5899,9 +6707,9 @@ function renderDragOverlay(_app: HTMLElement, g: GameState) {
   wrap.style.mixBlendMode = "normal";
 
   wrap.style.overflow = "hidden";
-  wrap.style.borderRadius = "16px";
+  wrap.style.borderRadius = "0px";
   wrap.style.background = "transparent";
-  wrap.style.clipPath = "inset(0 round 16px)";
+  wrap.style.clipPath = "inset(0)";
   wrap.appendChild(drag.previewEl);
   layer.appendChild(wrap);
 }

@@ -16,6 +16,9 @@
   --uiScaleDesktop: 1;
   --uiScaleMobile: 1;
 
+  /* ---------- ANIMATION SPEED ---------- */
+  --animMul: 1;  /* 0=즉시, 1=기본, 2=느림 */
+
   /* ---------- Z-LAYERS ---------- */
   --zBg: -10;
   --zStatus: 10;         /* status bar region (background 바로 위) */
@@ -100,7 +103,15 @@
   /* ---------- ASSETS ---------- */
   --bgUrl: url("assets/ui/background/dungeon_bg.png");
   --boardUrl: url("assets/ui/boards/battle_board.png");
-  --cardUrl: url("assets/ui/cards/card_parchment.png");
+  /* ---------- CARD BACKGROUNDS (rarity) ---------- */
+  --cardBgBasic:   url("assets/ui/cards/card_basic.png");
+  --cardBgCommon:  url("assets/ui/cards/card_common.png");
+  --cardBgSpecial: url("assets/ui/cards/card_special.png");
+  --cardBgRare:    url("assets/ui/cards/card_rare.png");
+  --cardBgMadness: url("assets/ui/cards/card_madness.png");
+
+  /* 기본 배경(미설치 시에는 기존 parchment를 복사해 위 파일명들로 두셔도 됩니다) */
+  --cardUrl: var(--cardBgCommon, url("assets/ui/cards/card_parchment.png"));
   --mapBgUrl: url("assets/ui/background/map_bg.png");
   /* ---------- ENEMY HUD ---------- */
   --enemyBannerW: calc(360px * var(--uiScale));
@@ -146,7 +157,7 @@
   --playerHudLeftX: calc(var(--edgePad) + calc(30px * var(--uiScale)));
   --playerHudTop:   calc(var(--hudH) + calc(157px * var(--uiScale)));
   --playerHudDropY: calc(196px * var(--uiScale));
-  --statusBarGap: calc(10px * var(--uiScale));
+  --statusBarGap: calc(30px * var(--uiScale));
 
   /* ---------- NODE UI ---------- */
   --gap: calc(6px * var(--uiScale));
@@ -299,7 +310,7 @@ html, body, #app,
   position: fixed;
   left: var(--playerHudLeftX);
   top:  calc(var(--playerHudTop) + var(--playerHudDropY));
-  width: calc(360px * var(--uiScale));
+  width: calc(300px * var(--uiScale));
   padding: calc(12px * var(--uiScale));
   background: var(--hudPanelBg);
   border: 1px solid var(--hudPanelLine);
@@ -389,6 +400,7 @@ html, body, #app,
   background: transparent !important;
   border: 0;
   box-shadow: none;
+  -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
   overflow: visible !important;
 }
@@ -464,7 +476,7 @@ html, body, #app,
   height: var(--slotH);
   border: 0 !important;
   background: transparent !important;
-  border-radius: calc(14px * var(--uiScale));
+  border-radius: 0;
   overflow: hidden;
   --slotTextScale: 0.78;
 }
@@ -519,14 +531,14 @@ html, body, #app,
   content:"";
   position:absolute;
   inset: var(--slotPad);
-  border-radius: calc(4px * var(--uiScale));
+  border-radius: 0;
   pointer-events:none;
   background: rgba(0,0,0,.50);
   box-shadow:
     inset 0 calc(12px * var(--uiScale)) calc(18px * var(--uiScale)) rgba(0,0,0,.65),
     inset 0 calc(-10px * var(--uiScale)) calc(16px * var(--uiScale)) rgba(255,255,255,.06),
     inset 0 0 0 1px rgba(255,255,255,.08);
-  opacity: .95;
+  opacity: .8;
 }
 .slot > *{ position: relative;}
 
@@ -572,6 +584,7 @@ html, body, #app,
   border: 0 !important;
   box-shadow: none !important;
   filter: none !important;
+  -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
 
   color: rgba(25,18,10,.92) !important;
@@ -583,13 +596,22 @@ html, body, #app,
   content:"";
   position:absolute;
   inset:0;
-  border-radius: calc(16px * var(--uiScale));
+  border-radius: 0;
   background: var(--cardUrl) center / 100% 100% no-repeat !important;
   image-rendering: pixelated;
   pointer-events:none;
 }
 .card::after{ content:none !important; display:none !important; }
 .card > *{ position: relative; }
+
+/* =========================
+   Card rarity backgrounds
+   ========================= */
+.card.rarity-basic{ --cardUrl: var(--cardBgBasic); }
+.card.rarity-common{ --cardUrl: var(--cardBgCommon); }
+.card.rarity-special{ --cardUrl: var(--cardBgSpecial); }
+.card.rarity-rare{ --cardUrl: var(--cardBgRare); }
+.card.rarity-madness{ --cardUrl: var(--cardBgMadness); }
 
 .cardHeader{
   background: transparent !important;
@@ -644,6 +666,11 @@ html, body, #app,
   word-break: keep-all !important;
 }
 
+.card.rarity-madness,
+.card.rarity-madness *{
+  color: #fff !important;
+}
+
 /* Front/Back separator */
 .cardSection.front{
   position: relative;
@@ -682,13 +709,16 @@ html, body, #app,
 
 /* selection */
 .card.selected{
-  border-radius: var(--selR) !important;
+  border-radius: 0 !important;
   outline: none !important;
   box-shadow:
     0 0 0 calc(2px * var(--uiScale)) rgba(255,255,255,.60),
     0 calc(12px * var(--uiScale)) calc(22px * var(--uiScale)) rgba(0,0,0,.35) !important;
   transform: translateY(calc(-2px * var(--uiScale)));
-  animation: pickPulse .16s ease-out;
+  animation-name: pickPulse;
+  animation-duration: calc(160ms * var(--animMul));
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
 }
 .card.selected .cardTitle{
   text-shadow: 0 0 calc(10px * var(--uiScale)) rgba(255,255,255,.28);
@@ -703,14 +733,15 @@ html, body, #app,
 .card.isDraggingSource{ opacity: 0.4; filter: saturate(.8); }
 .dragLayer .dragCardPreview{
   overflow: hidden;
-  border-radius: calc(10px * var(--uiScale));
+  border-radius: 0;
   background: transparent !important;
-  clip-path: inset(0 round calc(16px * var(--uiScale)));
+  clip-path: inset(0);
   isolation: isolate;
 }
 .dragLayer .dragCardPreview *{
   background: transparent !important;
   filter: none !important;
+  -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
   mix-blend-mode: normal !important;
 }
@@ -733,9 +764,9 @@ html, body, #app,
   padding: calc(6px * var(--uiScale) * var(--boardScale));
   text-align: center;
 
-  overflow: hidden; /* ✅ 삐져나오는 텍스트/요소 잘라내기 */
-  border-radius: calc(16px * var(--uiScale)); /* ✅ 카드 모서리랑 맞추기 */
-  clip-path: inset(0 round calc(16px * var(--uiScale))); /* ✅ 더 확실하게 */
+  overflow: hidden; /* 텍스트/요소 잘라내기 */
+  border-radius: 0;
+  clip-path: inset(0);
 }
 .card.slotNameOnly .cardTitle{
   font-size: calc(10px * var(--uiScale) * var(--boardScale));
@@ -768,7 +799,7 @@ html, body, #app,
   width: calc(360px * var(--uiScale));
   height: auto;
 
-  border-radius: calc(18px * var(--uiScale));
+  border-radius: 0;
   border: 1px solid rgba(255,255,255,.14);
   background: rgba(0,0,0,.78);
   backdrop-filter: blur(10px);
@@ -803,13 +834,35 @@ html, body, #app,
 }
 
 .cardHoverPreviewDetail{
-  border-radius: calc(14px * var(--uiScale));
+  border-radius: 0;
   border: 1px solid rgba(255,255,255,.10);
   background: rgba(255,255,255,.03);
   padding: calc(12px * var(--uiScale));
   white-space: pre-wrap;
   line-height: 1.4;
   font-size: calc(13px * var(--uiScale));
+}
+
+/* =========================================================
+   HARD OVERRIDE — NO ROUNDING ANYWHERE
+   (overrides inline styles too)
+   ========================================================= */
+.slot,
+.slot::before,
+.slotCardScaler,
+.slotCardInner,
+.card,
+.card::before,
+.card.selected,
+.card.slotNameOnly,
+.dragLayer .dragCardPreview,
+.cardHoverPreview,
+.cardHoverPreviewDetail{
+  border-radius: 0 !important;
+}
+.card.slotNameOnly,
+.dragLayer .dragCardPreview{
+  clip-path: inset(0) !important;
 }
 
 
@@ -919,6 +972,7 @@ html, body, #app,
   align-items:center;
   justify-content:space-between;
   gap: calc(8px * var(--uiScale));
+  -webkit-user-select: none;
   user-select:none;
   cursor:pointer;
   padding: calc(8px * var(--uiScale)) calc(10px * var(--uiScale));
@@ -978,6 +1032,7 @@ html, body, #app,
 .nodeSepSlash{
   text-align: center;
   opacity: .9;
+  -webkit-user-select: none;
   user-select: none;
   pointer-events: none;
 }
@@ -1054,6 +1109,11 @@ html, body, #app,
   white-space: nowrap;            /* ✅ 줄바꿈 금지 */
 }
 
+.enemyHudCenter{
+  min-height: 0 !important;
+  height: auto !important;
+}
+
 /* =========================
    14) HP PIXEL BARS
    ========================= */
@@ -1092,24 +1152,21 @@ html, body, #app,
    ========================= */
 .combatControls{
   position: fixed;
-  bottom: calc(var(--dockH) + calc(-36px * var(--uiScale)));
-  transform: translateX(-50%);
+  bottom: calc(var(--dockH) + calc(-28px * var(--uiScale)));
+  transform: translateX(250%);
   display: flex;
-  gap: calc(10px * var(--uiScale));
   z-index: var(--zChrome) !important;
   pointer-events: auto;
 }
 .combatControls *{ pointer-events: auto !important; }
 
-.combatControls .stepBtn,
-.combatControls .clearBtn{
-  padding: calc(6px * var(--uiScale)) calc(10px * var(--uiScale));
-  border-radius: calc(12px * var(--uiScale));
-  font-size: calc(13px * var(--uiScale));
+.combatControls .stepBtn{
+  padding: calc(10px * var(--uiScale)) calc(14px * var(--uiScale));
+  border-radius: calc(6px * var(--uiScale));
+  font-size: calc(15px * var(--uiScale));
   line-height: 1.1;
 }
-.combatControls .stepBtn.primary,
-.combatControls .clearBtn.primary{ font-weight: 600; }
+.combatControls .stepBtn.primary{ font-weight: 600; }
 
 .phaseBanner{
   position: fixed;
@@ -1123,9 +1180,13 @@ html, body, #app,
   color: #fff;
   font-weight: 900;
   letter-spacing: .2px;
+  -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
   pointer-events: none;
-  animation: phaseInOut 420ms ease both;
+  animation-name: phaseInOut;
+  animation-duration: calc(420ms * var(--animMul));
+  animation-timing-function: ease;
+  animation-fill-mode: both;
 }
 @keyframes phaseInOut{
   0%   { opacity: 0; transform: translateX(-50%) translateY(calc(-6px * var(--uiScale))); }
@@ -1141,7 +1202,7 @@ html, body, #app,
   left: var(--playerHudLeftX) !important;
   transform: none !important;
 
-  top: calc((var(--playerHudTop) + var(--playerHudDropY)) - var(--statusBarGap) - calc(34px * var(--uiScale))) !important;
+  top: calc((var(--playerHudTop) + var(--playerHudDropY)) - var(--statusBarGap) - calc(50px * var(--uiScale))) !important;
 
   text-align: left;
   white-space: nowrap;
@@ -1156,13 +1217,104 @@ html, body, #app,
     inset 0 -1px 0 rgba(0,0,0,.45);
 
   color: rgba(235,240,255,.96);
-  font-size: calc(19px * var(--uiScale));
-  line-height: 1.05;
+  font-size: calc(18px * var(--uiScale));
+  line-height: 1.5;
   text-shadow:
     2px 2px 0 rgba(0,0,0,.90),
     -2px 2px 0 rgba(0,0,0,.90),
     2px -2px 0 rgba(0,0,0,.90),
     -2px -2px 0 rgba(0,0,0,.90);
+}
+
+
+
+/* Item tray (top-left) */
+.itemTray{
+  position: fixed;
+  left: calc(10px * var(--uiScale));
+  top: calc(50px * var(--uiScale));
+  z-index: calc(var(--zChrome) - 10);
+  pointer-events: auto;
+  display: flex;
+  gap: calc(8px * var(--uiScale));
+  align-items: center;
+  overflow: hidden;
+}
+.itemSlot{
+  width: calc(60px * var(--uiScale));
+  height: calc(60px * var(--uiScale));
+  border-radius: calc(12px * var(--uiScale));
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(0,0,0,.55);
+  box-shadow: 0 8px 20px rgba(0,0,0,.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+}
+.itemSlot img{
+  width: 86%;
+  height: 86%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.itemSlot:hover{
+  background: rgba(255,255,255,.06);
+}
+.itemSlot:active{
+  transform: translateY(calc(1px * var(--uiScale)));
+}
+.itemSlot.disabled{
+  opacity: .45;
+  cursor: default;
+}
+
+/* 1) 아이콘이 들어있는 "부모 박스"가 잘라내도록 */
+#itemTray .itemSlot,
+#itemTray .itemCell,
+.itemSlot,
+.itemCard,
+.shopItemCard,
+.shopItemIconWrap{
+  overflow: hidden !important;     /* 핵심 */
+  position: relative;             /* 안정 */
+}
+
+/* 2) 아이콘(이미지)을 살짝 확대 */
+#itemTray img,
+.itemSlot img,
+.itemCard img,
+.shopItemCard img,
+.shopItemIconWrap img{
+  transform: scale(1.4);         /* 1.05~1.12 정도에서 취향 */
+  transform-origin: center;
+  display: block;                  /* 미묘한 여백 제거 */
+}
+
+.itemTray{
+  position: fixed;      /* 이미 있을 텐데 혹시 몰라서 */
+}
+
+.itemTray .itemHoverTip{
+  position: absolute;
+  left: 0;
+  top: calc(100% + calc(10px * var(--uiScale))); /* 트레이 아래에 뜨게 */
+  z-index: var(--zChrome);
+
+  /* 나타날 때 느낌 */
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(calc(-4px * var(--uiScale)));
+  transition: opacity 120ms ease, transform 120ms ease;
+  pointer-events: none; /* hover 꼬임 방지 */
+  display: block;
+}
+
+.itemTray .itemHoverTip.show{
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* new run fixed button */
@@ -1205,7 +1357,10 @@ html, body, #app,
   font-weight: 900;
   font-size: calc(18px * var(--uiScale));
   text-shadow: 0 2px 0 rgba(0,0,0,.55), 0 0 12px rgba(0,0,0,.45);
-  animation: floatUp 650ms ease-out both;
+  animation-name: floatUp;
+  animation-duration: calc(650ms * var(--animMul));
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
   will-change: transform, opacity;
 }
 .floatNum.dmg{  color: #ff6b6b; }
@@ -1575,63 +1730,69 @@ pre.choice-detail,
   align-items: center;
   overflow: visible !important;
 
-  --enemyUi: 0.94;
+  --enemyUi: 0.95;
 }
 
 .enemyArtWrap{
   position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
   overflow: visible;
-  width: calc(var(--enemyCardW)*1);
   --artZoom: 1;
-  --framePad: 120;
 }
 
-/* 아트 카드(프레임+아트) */
+/* 프레임 PNG 비율(1365x2048)에 맞춰 박스 비율을 고정 */
 .enemyArtCard{
   position: relative;
-  width: calc(100% * var(--enemyUi));
+  width: calc(70% * var(--enemyUi));
   margin: calc(8px * var(--uiScale)) auto 0;
-  aspect-ratio: 5 / 7;
+  aspect-ratio: 1365 / 2048;   /* ✅ 프레임과 동일 비율 */
   height: auto;
   flex: 0 0 auto;
-  border-radius: 5px;
-  overflow: visible;
-  background: rgba(0,0,0,.22);
-  padding-bottom: 6px; /* 프레임 하단 숨통 */
 
+  border-radius: 2px;           /* ✅ 라운딩 제거 */
+  overflow: visible;          /* 프레임 자체는 박스 안에 들어오므로 visible이어도 OK */
+  background: transparent;
 }
+
+/* 아트(프레임 아래) */
 .enemyArtCard::before{
   content:"";
   position:absolute;
   inset:0;
   background-image: var(--artImg);
-  background-size: calc(100% * var(--artZoom, 1.0)) auto;
-  background-position: 50% 35%;
   background-repeat: no-repeat;
+  background-position: 50% 35%;
+  background-size: calc(100% * var(--artZoom, 1.0)) auto; /* 기존 느낌 유지 */
   image-rendering: pixelated;
-  opacity: 1;
   z-index: 1;
 }
-.enemyArtWrap::after{
+
+/* 프레임(박스에 딱 맞게) */
+.enemyArtCard::after{
   content:"";
   position:absolute;
-  inset: calc(-1px * var(--framePad));  /* ✅ 프레임이 바깥으로 튀어나오는 정도 */
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  inset:0;                    /* ✅ 튀어나오지 않게 */
   background-image: var(--frameImg);
   background-repeat:no-repeat;
-  background-position: 50% 23%;
-  background-size: 120% 160%;
+  background-position:center;
+  background-size: 100% 100%; /* ✅ 프레임 전체가 보이게 */
   image-rendering: pixelated;
-
   pointer-events:none;
   z-index: 5;
 }
 
+.enemyArtCard{
+  --frameBleed: calc(6px * var(--uiScale)); /* 프레임이 카드 밖으로 나가는 양 */
+}
+.enemyArtCard::after{
+  inset: calc(-2 * var(--frameBleed));
+}
+
 /* 하단 HUD 박스 */
 .enemyMiniHud{
-  width: 95%;
+  width: 70%;
   padding: calc(7px * var(--uiScale) * var(--enemyUi)) calc(9px * var(--uiScale) * var(--enemyUi));
   border: 1px solid rgba(255,255,255,.10);
   background: rgba(0,0,0,0.7);
@@ -1640,7 +1801,7 @@ pre.choice-detail,
   display:flex;
   flex-direction:column;
   gap: calc(5px * var(--uiScale) * var(--enemyUi));
-  border-radius: calc(12px * var(--uiScale));
+  border-radius: calc(3px * var(--uiScale));
   margin-top: -10px;
   z-index: 10;
 }
@@ -1680,7 +1841,7 @@ pre.choice-detail,
   gap: calc(8px * var(--uiScale) * var(--enemyUi));
 }
 .enemyMiniHud .enemyHpText{
-  font-size: calc(15px * var(--uiScale) * var(--enemyUi));
+  font-size: calc(13px * var(--uiScale) * var(--enemyUi));
   width: calc(78px * var(--uiScale) * var(--enemyUi));
   flex: 0 0 auto;
   white-space: nowrap;
@@ -1723,9 +1884,10 @@ pre.choice-detail,
   font-size: calc(12px * var(--uiScale));
   line-height: 1.35;
   padding: 10px 12px;
-  border-radius: 14px;
+  border-radius: 5px;
   border: 1px solid rgba(255,255,255,.14);
   background: rgba(0,0,0,.86);
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
   z-index: 50;
 }
@@ -1741,7 +1903,7 @@ pre.choice-detail,
 
   font-size: calc(14px * var(--uiScale));
   padding: 14px 16px;
-  border-radius: 18px;
+  border-radius: 10px;
 
   max-height: min(40vh, calc(260px * var(--uiScale)));
   overflow: auto;
@@ -1759,6 +1921,8 @@ pre.choice-detail,
 }
 .enemyBanner.enemyCardWrap:hover .enemyMiniHud{ opacity: 0.18; }
 
+
+
 /* =========================
    20) MAP (2-column, full-viewport)
    ========================= */
@@ -1771,12 +1935,12 @@ pre.choice-detail,
   --mapPanelCX: 50%;
   --mapPanelCY: 50%;
   --mapPanelDX: 0%;
-  --mapPanelDY: -30%;
+  --mapPanelDY: -24%;
 
   /* ---- Base sizes (px) : 여기 숫자만 바꾸면 됨 ---- */
   --panelInsetPx: 3;      /* 화면 여백 */
   --panelMaxInsetPx: 60;   /* max-height 계산용(=2*inset 느낌) */
-  --panelMaxWidthPx: 650;
+  --panelMaxWidthPx: 800;
 
   --gridGapPx: 16;
   --sideColWidthPx: 380;
@@ -1790,9 +1954,9 @@ pre.choice-detail,
   --mapSvgDX: 0%;
   --mapSvgDY: 0%;
 
-  /* ---- Background image ---- */
-  --mapBgDim: 0.25;       /* 어둡게 덮는 정도 */
-  --mapBgOpacity: 1;      /* cover 레이어는 opacity 대신 dim으로 조절 추천 */
+  /* ---- Background image ---W- */
+  --mapBgDim: 0;       /* 어둡게 덮는 정도 */
+  --mapBgOpacity: 0;      /* cover 레이어는 opacity 대신 dim으로 조절 추천 */
   --mapHeaderSafeTopPx: 12;
   --mapHeaderSafeSidePx: 14;
 
@@ -1801,7 +1965,7 @@ pre.choice-detail,
   --mapScrollerMinHPx: 520;
   --mapSvgScale: 1.0;
 
-  --pillarPx: 49;
+  --pillarPx: 90;
   --pillarW: calc(var(--pillarPx) * 1px * var(--S));
 
   /* ✅ 지도 창 최소 높이(노드 적어도 높이 유지) */
@@ -1819,12 +1983,9 @@ pre.choice-detail,
   transform: translate(-50%, -40%) !important;
 
   /* width / max-height : uiScale 적용 */
-  width: min(
-    calc(var(--panelMaxWidthPx) * 1px * var(--S)),
-    calc(100vw - (calc(var(--panelMaxInsetPx) * 1px * var(--S))))
-  ) !important;
+  width: calc(var(--panelMaxWidthPx) * 1px * var(--S)) !important;
 
-  max-height: calc(var(--mapPanelMaxHPx) * 1px * var(--S)) !important;
+  max-height: calc(var(--mapPanelMaxHPx) * 2px * var(--S)) !important;
 
   display: flex !important;
   flex-direction: column !important;
@@ -1915,12 +2076,13 @@ pre.choice-detail,
 .mapNodeSelect .mapMiniViewport::-webkit-scrollbar{ width:0; height:0; }
 
 .mapNodeSelect .mapMiniViewport svg{
-  height: 100% !important;
+  height: auto !important;
   width: auto !important;
   max-width: none !important;
   display: block !important;
 
-  transform: none !important; /* “전체 축소” 범인 제거 */
+  transform: scale(var(--mapSvgScale)) !important; /* 원하면 유지(보통 1.0) */
+  transform-origin: top left !important;
 }
 
 .mapNodeSelectMapCol .mapMiniScroller svg,
@@ -1968,16 +2130,11 @@ pre.choice-detail,
 
 
 .mapNodeSelect .nodeSelectHeader{
-  padding:
-    calc(14px * var(--S))
-    calc(16px * var(--S))
-    calc(8px  * var(--S))
-    calc(16px * var(--S)) !important;
-
-  /* 혹시라도 내부가 튀어나오면 보이게 */
-  padding-top:  calc(6px * var(--S)) !important;
-  padding-right:calc(6px * var(--S)) !important;
-  overflow: visible !important;
+  height: auto !important;
+  min-height: calc(40px * var(--S)) !important; /* 필요하면 44~52로 */
+  padding-top: calc(15px * var(--S)) !important; /* 핵심: 위 여유 */
+  padding-bottom: calc(4px * var(--S)) !important;
+  overflow: visible !important; /* 잘라내지 않게 */
 }
 /* 버튼 자체도 위/오른쪽 여유(보험) */
 .mapNodeSelect .nodeSelectHeaderRight button{
@@ -1987,3 +2144,207 @@ pre.choice-detail,
    21) MOBILE (placeholder)
    ========================= */
 /* keep empty for now */
+
+/* =========================
+   Toasts
+   ========================= */
+.toastLayer{
+  top: 50% !important;
+  left: calc(14px * var(--S)) !important;   /* 왼쪽 여백 */
+  right: auto !important;
+  bottom: auto !important;
+
+  transform: translateY(-50%) !important;
+
+  /* 쌓이는 방향(원하시는 쪽으로 선택) */
+  display: flex;
+  flex-direction: column;          /* 아래로 쌓임 */
+  gap: calc(8px * var(--S));
+  align-items: flex-start;
+}
+.toastLayer{ flex-direction: column-reverse; }
+
+.toast{
+  background: rgba(0,0,0,0.72);
+  color: #fff;
+  padding: calc(8px * var(--S)) calc(12px * var(--S));
+  border-radius: calc(10px * var(--S));
+  font-size: calc(14px * var(--S));
+  line-height: 1.2;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  max-width: min(calc(380px * var(--S)), 88vw);
+}
+
+.toast-gold{ border: 1px solid rgba(255,215,0,0.35); }
+.toast-warn{ border: 1px solid rgba(255,120,120,0.35); }
+.toast-relic{ border: 1px solid rgba(120,200,255,0.35); }
+.toast-info{ border: 1px solid rgba(255,255,255,0.18); }
+
+
+
+/* 오버라이드 */
+
+/* ===== SHOP COMPACT LAYOUT (no scroll) ===== */
+.choice-panel.shopPanel{
+  width: calc(700px * var(--uiScale));
+  overflow: hidden;
+}
+
+.shopContentRow{
+  display:flex;
+  gap: calc(14px * var(--uiScale));
+  margin-top: calc(10px * var(--uiScale));
+  align-items: stretch;
+}
+
+.shopLeftCol{
+  flex: 1 1 auto;
+  min-width: 0;
+  display:flex;
+  flex-direction: column;
+  gap: calc(12px * var(--uiScale));
+}
+
+/* 카드 3x2 */
+.shopCardsGrid{
+  display:grid;
+  grid-template-columns: repeat(3, var(--handCardW));
+  gap: calc(12px * var(--uiScale));
+  justify-content: start;
+  align-items: start;
+}
+
+.shopCardTile{
+  display:flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(6px * var(--uiScale));
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.shopCardTile.sold{ opacity: .35; cursor: default; }
+
+.shopTilePrice{
+  font-weight: 900;
+  font-size: calc(12px * var(--uiScale));
+  opacity: .90;
+}
+
+/* 하단: 왼쪽 아이템 / 오른쪽 서비스 */
+.shopBottomRow{
+  display:grid;
+  grid-template-columns: 1fr calc(320px * var(--uiScale));
+  gap: calc(14px * var(--uiScale));
+  align-items: start;
+}
+
+/* 아이템 */
+.shopItemsGrid{
+  display:flex;
+  gap: calc(10px * var(--uiScale));
+  flex-wrap: wrap;
+}
+
+.shopItemTile{
+  width: calc(84px * var(--uiScale));
+  aspect-ratio: 1/1;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(0,0,0,.30);
+  overflow: hidden; /* 아이콘 테두리 숨김(클리핑) */
+  display:flex;
+  flex-direction: column;
+  align-items:center;
+  justify-content:center;
+  gap: calc(6px * var(--uiScale));
+  cursor:pointer;
+}
+.shopItemTile.sold{ opacity:.35; cursor:default; }
+.shopItemTile img{
+  width: calc(56px * var(--uiScale));
+  height: calc(56px * var(--uiScale));
+  object-fit: contain;
+  transform: scale(1.03); /* 살짝 줌 */
+  image-rendering: pixelated;
+}
+
+/* 서비스 버튼 2x2 */
+.shopSvcGrid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(10px * var(--uiScale));
+}
+.shopSvcTile button{
+  width: 100%;
+  padding: calc(10px * var(--uiScale)) calc(10px * var(--uiScale));
+  border-radius: 0;
+}
+.shopSvcNote{
+  margin-top: calc(6px * var(--uiScale));
+  text-align: center;
+  font-size: calc(11px * var(--uiScale));
+  opacity: .85;
+}
+
+.shopBottomRow{
+  display:flex;                           /* ✅ grid -> flex */
+  gap: calc(14px * var(--uiScale));
+  align-items: flex-start;
+  justify-content: flex-start;            /* ✅ 왼쪽에 붙이기 */
+}
+
+/* 아이템/서비스가 내용만큼만 차지 */
+.shopItemsCol{ flex: 0 0 auto; }
+.shopSvcCol{ flex: 0 0 auto; }
+
+.shopSvcGrid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;         /* 2열 유지 */
+  gap: calc(8px * var(--uiScale));
+  width: calc(240px * var(--uiScale));    /* ✅ 320 -> 240 정도로 */
+}
+
+.shopSvcTile button{
+  width: 100%;
+  padding: calc(7px * var(--uiScale)) calc(8px * var(--uiScale));  /* ✅ 작게 */
+  font-size: calc(12px * var(--uiScale));
+  border-radius: 0;
+}
+
+.shopSvcNote{
+  margin-top: calc(4px * var(--uiScale));
+  font-size: calc(10px * var(--uiScale));
+  opacity: .85;
+  text-align:center;
+}
+
+.shopItemTile{
+  width: calc(76px * var(--uiScale));     /* 84 -> 72~78 */
+}
+
+.shopItemTile img{
+  width: calc(50px * var(--uiScale));     /* 56 -> 46~52 */
+  height: calc(50px * var(--uiScale));
+  transform: scale(1.1);
+}
+
+/* ===== Global item tooltip (relic-like) ===== */
+.itemHoverTip{
+  display: block !important;   /* relicHoverTip이 display:none이어도 강제로 */
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(calc(-4px * var(--uiScale)));
+  transition: opacity 90ms ease, transform 90ms ease;
+  max-width: calc(260px * var(--uiScale));
+  padding: calc(10px * var(--uiScale));
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(0,0,0,.72);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.itemHoverTip.show{
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}

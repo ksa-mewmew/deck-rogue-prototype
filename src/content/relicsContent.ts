@@ -28,7 +28,7 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
 
     art: "assets/relics/relic_unknown_square.png",
 
-    unlock: (g) => (g.run as any).unlock?.rest >= 1,
+    unlock: (g, base) => (g.run as any).unlock?.rest >= (base.unlock.rest + 1),
 
     name: "먹을 수 있는 사각형",
     text: "전투 시작 시 🌾 S +2",
@@ -47,7 +47,7 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
 
     art: "assets/relics/relic_monster_leather_helm.png",
 
-    unlock: (g) => (g.run as any).unlock?.eliteWins >= 1,
+    unlock: (g, base) => (g.run as any).unlock?.eliteWins >= (base.unlock.eliteWins + 1),
 
     name: "몬스터 가죽 투구",
     text: "첫 턴에 🛡️ 방어 +4",
@@ -66,7 +66,7 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
 
     art: "assets/relics/relic_smoke_bomb.png",
 
-    unlock: (g) => !!(g.run as any).unlock?.tookBigHit10,
+    unlock: (g, base) => ((g.run as any).unlock?.tookBigHit10 ?? 0) >= (base.unlock.tookBigHit10 + 1),
 
     name: "연막탄",
     text: "활성화 시 연막 카드(소실) 1장 획득",
@@ -89,11 +89,10 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
     unlockHint: "조건: 탐험 5회",
 
     art: "assets/relics/relic_bone_compass.png",
-
-    unlock: (g) => {
+    unlock: (g, base) => {
       const runAny = g.run as any;
       const moves = Number(runAny.timeMove ?? g.run?.nodePickCount ?? 0) || 0;
-      return moves >= 5;
+      return moves >= (base.moves + 5);
     },
 
     name: "뼈가 만든 나침반",
@@ -114,7 +113,7 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
 
     art: "assets/relics/relic_flesh_whetstone.png",
 
-    unlock: (g) => ((g.run as any).unlock?.kills ?? 0) >= 3,
+    unlock: (g, base) => ((g.run as any).unlock?.kills ?? 0) >= (base.unlock.kills + 3),
 
     name: "속살을 찾는 숫돌",
     text: "전투에서 첫 공격이 주는 🗡️ 피해 +3",
@@ -143,7 +142,7 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
 
     art: "assets/relics/relic_weak_bell.png",
 
-    unlock: (g) => !!(g.run as any).unlock?.endedTurnWeak,
+    unlock: (g, base) => ((g.run as any).unlock?.endedTurnWeak ?? 0) >= (base.unlock.endedTurnWeak + 1),
 
     name: "허약의 종소리",
     text: "전투 시작 시 모든 적에게 🥀 약화 +2",
@@ -164,7 +163,7 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
 
     art: "assets/relics/relic_return_path_memory.png",
 
-    unlock: (g) => ((g.run as any).unlock?.eventPicks ?? 0) >= 2,
+    unlock: (g, base) => ((g.run as any).unlock?.eventPicks ?? 0) >= (base.unlock.eventPicks + 2),
 
     name: "돌아온 길의 기억",
     text: "전투 승리 시 HP +3",
@@ -183,7 +182,7 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
 
     art: "assets/relics/relic_wound_vial.png",
 
-    unlock: (g) => !!(g.run as any).unlock?.hpLeq15,
+    unlock: (g, base) => ((g.run as any).unlock?.hpLeq15 ?? 0) >= (base.unlock.hpLeq15 + 1),
 
     name: "상처로 기어가는 약병",
     text: "전투 시작 시 HP +3",
@@ -202,7 +201,7 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
 
     art: "assets/relics/relic_counting_needle.png",
 
-    unlock: (g) => !!(g.run as any).unlock?.skippedTurn,
+    unlock: (g, base) => ((g.run as any).unlock?.skippedTurn ?? 0) >= (base.unlock.skippedTurn + 1),
 
     name: "숨을 세는 바늘",
     text: "턴 종료 시 다음 턴 🃏 드로우 +1",
@@ -221,7 +220,7 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
 
     art: "assets/relics/relic_deeper_needle.png",
 
-    unlock: (g) => ((g.run as any).unlock?.bleedApplied ?? 0) >= 3,
+    unlock: (g, base) => ((g.run as any).unlock?.bleedApplied ?? 0) >= (base.unlock.bleedApplied + 3),
 
     name: "더 깊은 바늘",
     text: "🩸 출혈을 부여할 때마다 +1 추가",
@@ -242,12 +241,11 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
     unlockHint: "조건: 시간 10 흘려보내기",
 
     art: "assets/relics/relic_broken_millstone.png",
-
-    unlock: (g) => {
+    unlock: (g, base) => {
       const runAny = g.run as any;
       const tm = Number(runAny.timeMove ?? 0) || 0;
       const ta = Number(g.time ?? 0) || 0;
-      return (tm + ta) >= 10;
+      return (tm + ta) >= (base.timeTotal + 10);
     },
 
     name: "깨진 맷돌",
@@ -283,9 +281,10 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
     unlockHint: "조건: 💤 F 10 이상",
 
     art: "assets/relics/relic_bloody_spoon.png",
-
-    unlock: (g) => {
-      return g.player.fatigue > 9;
+    unlock: (g, base) => {
+      const f = Number(g.player.fatigue ?? 0) || 0;
+      const target = Math.max(10, (Number(base.fatigue ?? 0) || 0) + 1);
+      return f >= target;
     },
 
     name: "피 묻은 숟가락",
@@ -298,12 +297,12 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
     id: "relic_black_ledger_shard",
     dormantName: "검댕 묻은 종이",
     dormantText: "검은 종이다. 타고 남은 조각일지도 모르겠다.",
-    unlockHint: "조건: 🌾S = 0",
+    unlockHint: "조건: 🌾S = 0으로 턴 종료 1회",
 
     art: "assets/relics/relic_black_ledger_shard.png",
-
-    unlock: (g) => {
-      return g.player.supplies === 0;
+    unlock: (g, base) => {
+      const cur = (g.run as any).unlock?.endedTurnSupplyZero ?? 0;
+      return cur >= (base.unlock.endedTurnSupplyZero + 1);
     },
 
     name: "검은 장부 조각",

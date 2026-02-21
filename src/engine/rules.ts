@@ -1,4 +1,4 @@
-import type { GameState, NodeType, StatusKey, NodeOffer, BranchOffer } from "./types";
+import type { GameState, NodeType, StatusKey, NodeOffer, BranchOffer, UiToastKind, UiToast } from "./types";
 
 function makePair(types: NodeType[]): [NodeOffer, NodeOffer] {
   return [
@@ -10,6 +10,17 @@ function makePair(types: NodeType[]): [NodeOffer, NodeOffer] {
 export type HasStatus = { status: Record<StatusKey, number> };
 
 export type StatusSource = "PLAYER" | "ENEMY" | "SYSTEM";
+
+export function pushUiToast(g: GameState, kind: UiToastKind, text: string, ms = 1600) {
+  const anyG = g as any;
+  if (!anyG.uiToasts) anyG.uiToasts = [];
+
+  const q = anyG.uiToasts as UiToast[];
+  q.push({ kind, text, ms });
+
+  // runaway 방지
+  if (q.length > 30) anyG.uiToasts = q.slice(-30);
+}
 
 export function applyStatusTo(target: HasStatus, key: StatusKey, n: number, g?: GameState, src: StatusSource = "SYSTEM") {
   let amount = n;

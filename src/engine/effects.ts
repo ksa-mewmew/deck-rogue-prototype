@@ -230,18 +230,20 @@ export function applyDamageToPlayer(
   g.player.hp = Math.max(0, g.player.hp - dmg);
   logMsg(g, `플레이어 ${dmg} 피해 (${reason ?? kind}). (HP ${g.player.hp}/${g.player.maxHp})`);
 
-  // 유물 해금 진행도: 한 번에 10+ 피해 / HP<=15 경험
+  // Unlock progress for relic activation: big hit / low HP
   {
     const up = getUnlockProgress(g);
     let changed = false;
-    if (dmg >= 10 && !up.tookBigHit10) {
-      up.tookBigHit10 = true;
+
+    if (dmg >= 10) {
+      up.tookBigHit10 += 1;
       changed = true;
     }
-    if (g.player.hp <= 15 && !up.hpLeq15) {
-      up.hpLeq15 = true;
+    if (g.player.hp <= 15) {
+      up.hpLeq15 += 1;
       changed = true;
     }
+
     if (changed) checkRelicUnlocks(g);
   }
 

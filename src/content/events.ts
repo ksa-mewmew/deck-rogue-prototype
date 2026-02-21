@@ -11,7 +11,7 @@ export type EventOutcome =
   | "REWARD"
   | { kind: "UPGRADE_PICK"; title?: string; prompt?: string }
   | { kind: "REMOVE_PICK"; title: string; prompt?: string; then: "NONE" | "REWARD" | "BATTLE" }
-  | { kind: "BATTLE_SPECIAL"; enemyIds: string[]; title?: string; onWinGrantRelicId?: string };
+  | { kind: "BATTLE_SPECIAL"; enemyIds: string[]; title?: string; onWinGrantRelicId?: string; onWinGrantGold?: number};
 
 export type EventOption = {
   key: string;
@@ -28,9 +28,31 @@ export type EventDef = {
   options: (g: GameState) => EventOption[];
 };
 
+// 런 당 1회만 등장해야 하는 이벤트
+const RUN_ONCE_EVENT_IDS = new Set<string>([
+  "goblin_ambush_low_supplies",
+  "rat_circle",
+]);
+
 export function pickRandomEvent(): EventDef {
   return EVENTS[Math.floor(Math.random() * EVENTS.length)];
 }
+
+
+function pickRandomEventFiltered(g: GameState): EventDef {
+  const runAny = g.run as any;
+  const seen: Record<string, number> = (runAny.eventsSeen ?? {}) as any;
+
+  const pool = EVENTS.filter((e) => {
+    if (!RUN_ONCE_EVENT_IDS.has(e.id)) return true;
+    const n = Number(seen[e.id] ?? 0) || 0;
+    return n <= 0;
+  });
+
+  const pickFrom = pool.length > 0 ? pool : EVENTS;
+  return pickFrom[Math.floor(Math.random() * pickFrom.length)];
+}
+
 
 export function pickEventByMadness(g: GameState) {
   const { tier } = madnessP(g);
@@ -39,7 +61,7 @@ export function pickEventByMadness(g: GameState) {
   if (Math.random() < pNightmare) {
     return pickRandomNightmareEvent(g);
   }
-  return pickRandomEvent();
+  return pickRandomEventFiltered(g);
 }
 
 export const BOSS_OMEN_HINT: Record<string, string> = {
@@ -203,17 +225,16 @@ export const EVENTS: EventDef[] = [
     id: "goblin_ambush_low_supplies",
     name: "매복한 약탈자들",
     prompt:
-      "고블린들이 보급을 약탈했다.\n" +
-      "이번 전투는 보급(S) 5로 시작합니다.",
+      "고블린들이 보급을 약탈했다.",
     art: `assets/events/event_goblin_ambush_low_supplies.png`,
     options: () => [
       {
         key: "fight",
         label: "맞서 싸운다",
-        detail: "고블린 약탈자 2마리 전투 (S = 5 시작)",
+        detail: "고블린 약탈자 2마리 전투 (S가 5 감소한 채로 시작)\n승리 시 🪙50",
         apply: (g: any) => {
           g.run.nextBattleSuppliesBonus = -5;
-          return { kind: "BATTLE_SPECIAL", title: "고블린 매복", enemyIds: ["goblin_raider", "goblin_raider"] };
+          return { kind: "BATTLE_SPECIAL", title: "고블린 매복", enemyIds: ["goblin_raider", "goblin_raider"], onWinGrantGold: 50 };
         },
       },
     ],

@@ -1,7 +1,7 @@
 // engine/relics.ts
 import type { GameState, Side, StatusKey } from "./types";
 import { RELICS_BY_ID, EVENT_RELIC_POOL } from "../content/relicsContent";
-import { logMsg } from "./rules";
+import { logMsg, pushUiToast } from "./rules";
 
 export function hasRelic(g: GameState, id: string) {
   const rs = g.run as any;
@@ -101,7 +101,7 @@ export type RelicDef = {
   unlockFlavor?: string | ((g: GameState) => string);
   tags?: RelicTag[];
 
-  unlock?: (g: GameState) => boolean;
+  unlock?: (g: GameState, base: RelicUnlockBaseline) => boolean;
   onActivate?: (g: GameState) => void;
 
   modifyDamage?: (g: GameState, ctx: DamageContext) => number;
@@ -115,30 +115,41 @@ export type RelicRuntimeState = {
   pending: boolean;
   obtainedAtNode?: number;
   activatedAtNode?: number;
+  unlockBase?: RelicUnlockBaseline;
 };
 
 type UnlockProgress = {
   rest: number;
   eliteWins: number;
-  tookBigHit10: boolean;
+  tookBigHit10: number;
   kills: number;
-  endedTurnWeak: boolean;
+  endedTurnWeak: number;
   eventPicks: number;
-  hpLeq15: boolean;
-  skippedTurn: boolean;
+  hpLeq15: number;
+  skippedTurn: number;
   bleedApplied: number;
+  endedTurnSupplyZero: number;
+};
+
+export type RelicUnlockBaseline = {
+  unlock: UnlockProgress;
+  moves: number;
+  timeTotal: number;
+  fatigue: number;
+  supplies: number;
 };
 
 const DEFAULT_UNLOCK: UnlockProgress = {
   rest: 0,
   eliteWins: 0,
-  tookBigHit10: false,
+  tookBigHit10: 0,
   kills: 0,
-  endedTurnWeak: false,
+  endedTurnWeak: 0,
   eventPicks: 0,
-  hpLeq15: false,
-  skippedTurn: false,
+  hpLeq15: 0,
+  skippedTurn: 0,
   bleedApplied: 0,
+  endedTurnSupplyZero: 0,
 };
 
 function ensureRelicSystem(g: GameState) {
@@ -147,7 +158,7 @@ function ensureRelicSystem(g: GameState) {
   const runAny = g.run as any;
   runAny.relicRuntime ??= {};
   runAny.pendingRelicActivations ??= [];
-  runAny.unlock ??= { ...DEFAULT_UNLOCK };
+  runAny.unlock = { ...DEFAULT_UNLOCK, ...(runAny.unlock ?? {}) };
   runAny.relicUnlocked ??= {};
 }
 
@@ -164,6 +175,22 @@ function pendingQueue(g: GameState): string[] {
 export function getUnlockProgress(g: GameState): UnlockProgress {
   ensureRelicSystem(g);
   return (g.run as any).unlock as UnlockProgress;
+}
+
+function snapshotRelicUnlockBaseline(g: GameState): RelicUnlockBaseline {
+  const up = getUnlockProgress(g);
+  const runAny = g.run as any;
+
+  const moves = Number(runAny.timeMove ?? g.run?.nodePickCount ?? 0) || 0;
+  const timeTotal = (Number(runAny.timeMove ?? 0) || 0) + (Number((g as any).time ?? 0) || 0);
+
+  return {
+    unlock: { ...up },
+    moves,
+    timeTotal,
+    fatigue: Number(g.player?.fatigue ?? 0) || 0,
+    supplies: Number(g.player?.supplies ?? 0) || 0,
+  };
 }
 
 function ensureRuntimeEntry(g: GameState, id: string): RelicRuntimeState {
@@ -253,7 +280,7 @@ export function getRelicDisplay(g: GameState, id: string) {
     const parts: string[] = [];
     if (def?.dormantText) parts.push(def.dormantText);
     if (def?.unlockHint) parts.push(def.unlockHint);
-    const dt = parts.length ? parts.join("\n") : baseText;
+    const dt = parts.length ? parts.join("\n \n") : baseText;
     return { id, state, name: dn, text: dt, art };
   }
 
@@ -283,15 +310,20 @@ export function grantRelic(g: GameState, id: string, source: RelicGrantSource = 
     st.pending = false;
     (g.run as any).relicUnlocked[id] = true;
     logMsg(g, `유물 획득: ${def?.name ?? id}`);
+    pushUiToast(g, "RELIC", `유물 획득: ${def?.name ?? id}`, 2000);
     return;
   }
 
   st.active = false;
+  // Capture baseline on obtain so we don't instantly unlock from past progress
+  if (!st.unlockBase) st.unlockBase = snapshotRelicUnlockBaseline(g);
 
   const disp = getRelicDisplay(g, id);
   logMsg(g, `유물 획득: ${disp.name}`);
+  pushUiToast(g, "RELIC", `유물 획득: ${disp.name}`, 2000);
 
-  checkRelicUnlocks(g);
+  // NOTE: 획득 직후 즉시 해금 체크를 하지 않습니다.
+  // (직전 전투/이전 진행도가 즉시 반영되어 다음 노드에서 활성되는 문제 방지)
 }
 
 function queuePendingActivation(g: GameState, id: string) {
@@ -316,7 +348,13 @@ export function checkRelicUnlocks(g: GameState) {
     const st = ensureRuntimeEntry(g, id);
     if (st.active || st.pending) continue;
 
-    if (def.unlock(g)) queuePendingActivation(g, id);
+    if (!st.unlockBase) {
+      // Back-compat for old saves: set baseline first, then wait for future progress
+      st.unlockBase = snapshotRelicUnlockBaseline(g);
+      continue;
+    }
+
+    if (def.unlock(g, st.unlockBase)) queuePendingActivation(g, id);
   }
 }
 

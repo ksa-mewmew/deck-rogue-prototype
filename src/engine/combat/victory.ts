@@ -1,11 +1,12 @@
 import type { GameState } from "../types";
-import { aliveEnemies, logMsg } from "../rules";
+import { aliveEnemies, logMsg, pushUiToast } from "../rules";
 import { resolvePlayerEffects } from "../resolve";
 import { getCardDefFor } from "../../content/cards";
 import { runRelicHook, checkRelicUnlocks, getUnlockProgress, grantRelic } from "../relics";
 import { openBattleCardRewardChoice, openEliteRelicOfferChoice, openBossRelicOfferChoice } from "../engineRewards";
 import { escapeRequiredNodePicks } from "./encounter";
 import { _cleanupBattleTransientForVictory } from "./phases";
+import { rollBattleItemDrop } from "../items";
 
 
 function shuffleInPlace<T>(a: T[]) {
@@ -80,7 +81,8 @@ export function checkEndConditions(g: GameState) {
 
   if (aliveEnemies(g).length === 0 && g.phase !== "NODE") {
     g.victoryResolvedThisCombat = true;
-    const wasBoss = g.enemies.some((e) => String(e.id).startsWith("boss_"));
+    // 전투 도중 dead enemy를 배열에서 제거하는 경우가 있어, 스폰 시점 플래그를 신뢰
+    const wasBoss = !!(g.run as any).lastBattleWasBoss;
     _cleanupBattleTransientForVictory(g);
     applyWinHooksWhileInBackThisTurn(g);
 
@@ -97,6 +99,34 @@ export function checkEndConditions(g: GameState) {
       const up = getUnlockProgress(g);
       up.eliteWins += 1;
       checkRelicUnlocks(g);
+    }
+
+    // =========================
+    // Victory rewards (gold, etc.)
+    // =========================
+    {
+      const runAny = g.run as any;
+      const curGold = Number(runAny.gold ?? 0) || 0;
+
+      // 기본 전투 골드 보상
+      const T = Number(runAny.timeMove ?? 0) + (g.time ?? 0);
+      const tier = Math.min(3, Math.floor(Math.max(0, T) / 15));
+      let gainGold = 3 + tier * 2;
+      if (g.run.lastBattleWasElite) gainGold += 10;
+      if (wasBoss) gainGold += 30;
+
+      // 이벤트 전투 추가 보상
+      const eventGold = Number(runAny.pendingEventWinGold ?? 0) || 0;
+      if (eventGold !== 0) {
+        gainGold += eventGold;
+        runAny.pendingEventWinGold = 0;
+      }
+
+      if (gainGold !== 0) {
+        runAny.gold = curGold + gainGold;
+        logMsg(g, `전투 보상: 🪙${gainGold}`);
+        pushUiToast(g, "GOLD", `🪙 +${gainGold}`, 1600);
+      }
     }
 
     endCombatReturnAllToDeck(g);
@@ -124,7 +154,10 @@ export function checkEndConditions(g: GameState) {
     }
 
     openEliteRelicOfferChoice(g);
-    openBattleCardRewardChoice(g);
+
+    const ctx = wasBoss ? "BOSS" : g.run.lastBattleWasElite ? "ELITE" : "BATTLE";
+    const drop = rollBattleItemDrop(g, { elite: !!g.run.lastBattleWasElite, boss: !!wasBoss });
+    openBattleCardRewardChoice(g, { itemOfferId: drop ?? undefined, itemSource: ctx });
     g.phase = "NODE";
 
     if (g.run.treasureObtained) {
