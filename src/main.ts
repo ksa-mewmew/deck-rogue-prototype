@@ -43,6 +43,47 @@ function setAssetCssVars() {
 
 setAssetCssVars();
 
+
+
+function injectFontFaces() {
+  let base = import.meta.env.BASE_URL || "/";
+  if (!base.endsWith("/")) base += "/";
+
+  const css = `
+@font-face{
+  font-family: "Mulmaru";
+  src:
+    url("${base}assets/fonts/Mulmaru.woff2") format("woff2"),
+    url("${base}assets/fonts/Mulmaru.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face{
+  font-family: "Mulmaru";
+  src:
+    url("${base}assets/fonts/Mulmaru-Bold.woff2") format("woff2"),
+    url("${base}assets/fonts/Mulmaru-Bold.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+  `.trim();
+
+  let style = document.getElementById("fontFaces") as HTMLStyleElement | null;
+  if (!style) {
+    style = document.createElement("style");
+    style.id = "fontFaces";
+    document.head.appendChild(style);
+  }
+  style.textContent = css;
+}
+
+// ✅ 반드시 render 전에
+injectFontFaces();
+
+
+
 render(g, actions);
 
 document.documentElement.style.setProperty(
