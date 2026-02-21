@@ -53,13 +53,12 @@ function injectFontFaces() {
 @font-face{
   font-family: "Mulmaru";
   src:
-    url("${base}fonts/Mulmaru.woff2") format("woff2"),
-    url("${base}fonts/Mulmaru.woff") format("woff");
+    url("${base}assets/fonts/Mulmaru.woff2") format("woff2"),
+    url("${base}assets/fonts/Mulmaru.woff") format("woff");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
-
   `.trim();
 
   let style = document.getElementById("fontFaces") as HTMLStyleElement | null;
