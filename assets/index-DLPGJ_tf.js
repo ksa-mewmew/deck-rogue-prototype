@@ -211,11 +211,10 @@ ${m?.text??""}`;r.push({key:`shop:item:${l}`,label:`${u} (🪙${c.priceGold})`,d
 @font-face{
   font-family: "Mulmaru";
   src:
-    url("${e}fonts/Mulmaru.woff2") format("woff2"),
-    url("${e}fonts/Mulmaru.woff") format("woff");
+    url("${e}assets/fonts/Mulmaru.woff2") format("woff2"),
+    url("${e}assets/fonts/Mulmaru.woff") format("woff");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
-
   `.trim();let n=document.getElementById("fontFaces");n||(n=document.createElement("style"),n.id="fontFaces",document.head.appendChild(n)),n.textContent=t}Pi();L(ft,Tn);document.documentElement.style.setProperty("--base","/deck-rogue-prototype/");
