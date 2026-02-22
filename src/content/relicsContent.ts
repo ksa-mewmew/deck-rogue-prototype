@@ -31,7 +31,7 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
     unlock: (g, base) => (g.run as any).unlock?.rest >= (base.unlock.rest + 1),
 
     name: "먹을 수 있는 사각형",
-    text: "전투 시작 시 🌾 S +2",
+    text: "전투 시작 시 🍞 S +2",
     unlockFlavor: "먹을 수는 있다. 일단은.",
     onCombatStart(g) {
       g.player.supplies += 2;
@@ -297,7 +297,7 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
     id: "relic_black_ledger_shard",
     dormantName: "검댕 묻은 종이",
     dormantText: "검은 종이다. 타고 남은 조각일지도 모르겠다.",
-    unlockHint: "조건: 🌾S = 0으로 턴 종료 1회",
+    unlockHint: "조건: 🍞S = 0으로 턴 종료 1회",
 
     art: "assets/relics/relic_black_ledger_shard.png",
     unlock: (g, base) => {
@@ -306,7 +306,7 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
     },
 
     name: "검은 장부 조각",
-    text: "🌾S = 0으로 턴을 종료하면, 🌾S +2, 💤 F +1",
+    text: "🍞S = 0으로 턴을 종료하면, 🍞S +2, 💤 F +1",
     unlockFlavor: "장부. 무엇의?",
     onUpkeepEnd(g) {
       const targets: any[] = aliveEnemies(g) as any;
@@ -330,6 +330,37 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
     },
   },
 
+  relic_ink_bottle: {
+    id: "relic_ink_bottle",
+    dormantName: "검은 잉크 얼룩",
+    dormantText: "손가락 끝이 검게 물든다. 씻어도 지워지지 않는다.",
+    unlockHint: "조건: 🍞S = 0으로 턴 종료 1회",
+
+    art: "assets/relics/relic_ink_bottle.png",
+
+    unlock: (g, base) => {
+      const cur = (g.run as any).unlock?.endedTurnSupplyZero ?? 0;
+      return cur >= (base.unlock.endedTurnSupplyZero + 1);
+    },
+
+    name: "검은 잉크병",
+    text: "전투 시작 시 달빛 두루마리 1장을 손패에 추가",
+    unlockFlavor: "글자는 마치 벌레처럼 기어다닌다.",
+
+    onCombatStart(g) {
+
+      const DEF_ID = "token_moon_scroll";
+      g.uidSeq += 1;
+      const uid = String(g.uidSeq);
+      g.cards[uid] = { uid, defId: DEF_ID, zone: "hand", upgrade: 0 } as any;
+      g.hand.push(uid);
+
+      logMsg(g, "유물[검은 잉크병]: 달빛 두루마리 +1");
+    },
+  },
+
+  // 이하 이벤트 유물
+
   relic_ratskin_charm: {
     id: "relic_ratskin_charm",
     name: "쥐가죽 부적",
@@ -339,4 +370,5 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
 
     art: "assets/relics/relic_ratskin_charm.png",
   },
+
 };

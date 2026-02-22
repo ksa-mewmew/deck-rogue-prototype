@@ -15,7 +15,7 @@ export function obtainTreasure(g: GameState) {
   g.deck.push(id);
   g.deck = shuffle(g.deck);
 
-  logMsg(g, "저주받은 보물을 획득했습니다! 덱에 [저주받은 보물] 추가");
+  logMsg(g, "저주받은 보물을 획득했습니다! 덱에 [저주받은 보물] 추가. 이제 입구(START)로 돌아가 탈출하세요!");
 
   repopulateDungeonAfterTreasure(g);
   logMsg(g, "보물이 울부짖자, 던전의 모든 방이 다시 채워집니다...");
@@ -48,7 +48,7 @@ function repopulateDungeonAfterTreasure(g: GameState) {
     if (node.kind === "START" || node.kind === "TREASURE") continue;
 
     // 깊을수록 전투 확률 ↑ (보물 이후 전체적으로 더 위험)
-    const pBattle = Math.min(0.88, 0.72 + depth * 0.01);
+    const pBattle = Math.min(0.8, 0.68 + depth * 0.01);
     const pEvent = 0.18;
     const r = Math.random();
 
@@ -102,6 +102,12 @@ export const REWARD_POOL: RewardEntry[] = [
   { id: "cloth_scrap_armor", weight: 12 },
   { id: "prey_mark", weight: 12 },
   { id: "brawl_cleaver", weight: 20 },
+
+  { id: "install_ballista", weight: 20 },
+  { id: "install_iron_bulwark", weight: 20 },
+  { id: "install_cursed_banner", weight: 12 },
+  { id: "scribe_hand", weight: 12 },
+  { id: "install_scriptorium", weight: 3 },
 
 ];
 

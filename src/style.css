@@ -1,14 +1,14 @@
 /* =========================================================
-   FINAL CSS — UI SCALE + DESKTOP FOCUSED (mobile later)
-   - One :root (tokens)
-   - --uiScale is the single effective scale
-   - Choice/Event overlay fully CSS-driven (no inline sizing)
-   - Removes uiScale^2 traps
+   FINAL style.css (DEDUPED + REORDERED)
+   - 중복 정의 제거: 동일 목적/변수/셀렉터는 "아래쪽 값"만 유지
+   - :root는 1개로 통합 (토큰 싱글 소스)
+   - 섹션 순서 정리 + 한글 주석 추가
    ========================================================= */
 
 
 /* =========================
    0) ROOT TOKENS (SINGLE SOURCE OF TRUTH)
+   - UI 스케일, 레이어, 색, 레이아웃, 트레이/토스트 등 전역 토큰
    ========================= */
 :root{
   /* ---------- UI SCALE ---------- */
@@ -16,16 +16,26 @@
   --uiScaleDesktop: 1;
   --uiScaleMobile: 1;
 
+  /* ---------- SAFE AREA (length) ---------- */
+  --safeT: env(safe-area-inset-top, 0);
+  --safeR: env(safe-area-inset-right, 0);
+  --safeB: env(safe-area-inset-bottom, 0);
+  --safeL: env(safe-area-inset-left, 0);
+
+  /* ---------- DESIGN UNIT (design-pixel to viewport) ---------- */
+  --uBase: min(calc(100vw / 1440), calc(100vh / 900));
+  --u: calc(var(--uBase) * var(--uiScale));
+
   /* ---------- ANIMATION SPEED ---------- */
   --animMul: 1;  /* 0=즉시, 1=기본, 2=느림 */
 
   /* ---------- Z-LAYERS ---------- */
   --zBg: -10;
-  --zStatus: 10;         /* status bar region (background 바로 위) */
+  --zStatus: 10;         /* status bar region (배경 바로 위) */
   --zMain: 1000;
   --zHandDock: 2000;
 
-  --zChrome: 60000;      /* always-clickable chrome */
+  --zChrome: 60000;      /* 항상 클릭 가능한 크롬/고정 UI */
   --zChoiceBackdrop: 49000;
   --zChoicePanel: 51000;
   --zChoice: 52000;
@@ -49,60 +59,68 @@
   --muted:#b7bdc8;
 
   /* ---------- LAYOUT (scale-aware) ---------- */
-  --edgePad: calc(14px * var(--uiScale));
-  --logW:   calc(360px * var(--uiScale));
-  --logGap: calc(14px * var(--uiScale));
+  --edgePad: calc(14 * var(--u));
+  --logW:   calc(360 * var(--u));
+  --logGap: calc(14 * var(--u));
 
-  --hudH:   calc(100px * var(--uiScale));   /* reserved height */
-  --dockH:  calc(185px * var(--uiScale));   /* hand dock height */
+  /* HUD 높이 / 도크 높이 */
+  --hudH:  calc(64 * var(--u));
+  --dockH: calc(160 * var(--u));
 
-  --stageMaxW: calc(720px * var(--uiScale));
+  /* 스테이지(보드) 최대 폭 / 보드 비율 */
+  --stageMaxW: calc(760 * var(--u));
   --boardAR: 1200/922;
 
   /* ---------- CARDS + SLOTS ---------- */
-  --cardW: calc(122px * var(--uiScale));
+  --cardW: calc(122 * var(--u));
   --cardH: calc(var(--cardW) * 7 / 5);
   --handCardW: var(--cardW);
   --handCardH: var(--cardH);
 
   --boardScale: 1;
 
+  /* 보드 이미지 보정 */
   --boardImgZoom: 1.1;
-  --boardImgPosY: 36%;             /* 이미지 중심 Y */
-  --boardImgShiftY: calc(34px * var(--uiScale)); /* 레이어 전체 이동 */  
+  --boardImgPosY: 32%;
+  --boardImgShiftY: calc(34 * var(--u));
 
-  --slotCardW: calc(100px * var(--uiScale) * var(--boardScale));
+  /* 슬롯 크기(보드 위 카드) */
+  --slotCardW: calc(110 * var(--u) * var(--boardScale));
   --slotCardH: calc(var(--slotCardW) * 7 / 5);
-  
-  --slotPad: calc(6px * var(--uiScale));
+
+  --slotPad: calc(6 * var(--u));
   --slotW: calc(var(--slotCardW) + (var(--slotPad) * 2));
   --slotH: calc(var(--slotCardH) + (var(--slotPad) * 2));
-  --slotGap: calc(12px * var(--uiScale) * var(--boardScale));
-  --slotRowGap: calc(2px * var(--uiScale));
+  --slotGap: calc(12 * var(--u) * var(--boardScale));
+  --slotRowGap: calc(2 * var(--u));
 
-  --boardPadX: calc(56px * var(--uiScale));
-  --boardPadY: calc(34px * var(--uiScale));
-  --slotCenterNudgeY: calc(14px * var(--uiScale));
+  --boardPadX: calc(56 * var(--u));
+  --boardPadY: calc(34 * var(--u));
+
+  /* 슬롯 전체를 약간 위로 올리는 미세 보정 */
+  --slotCenterNudgeY: calc(50 * var(--u));
 
   /* ---------- RADII / SHADOW ---------- */
-  --radius: calc(18px * var(--uiScale));
-  --selR: calc(8px * var(--uiScale));
-  --shadow: 0 calc(18px * var(--uiScale)) calc(60px * var(--uiScale)) rgba(0,0,0,.65);
+  --radius: calc(18 * var(--u));
+  --selR: calc(8 * var(--u));
+  --shadow: 0 calc(18 * var(--u)) calc(60 * var(--u)) rgba(0,0,0,.65);
 
   /* ---------- HUD PANEL LOOK ---------- */
   --hudPanelBg: rgba(10,12,14,1);
   --hudPanelLine: rgba(255,255,255,.14);
-  --hudPanelR: calc(18px * var(--uiScale));
+  --hudPanelR: calc(18 * var(--u));
 
   /* ---------- LOGS ---------- */
   --logLine: rgba(255,255,255,.22);
   --logLineStrong: rgba(255,255,255,.32);
-  --logShadow: 0 calc(18px * var(--uiScale)) calc(60px * var(--uiScale)) rgba(0,0,0,.70);
+  --logShadow: 0 calc(18 * var(--u)) calc(60 * var(--u)) rgba(0,0,0,.70);
   --logBg: rgba(0,0,0,.75);
 
   /* ---------- ASSETS ---------- */
   --bgUrl: url("assets/ui/background/dungeon_bg.png");
   --boardUrl: url("assets/ui/boards/battle_board.png");
+  --mapBgUrl: url("assets/ui/background/map_bg.png");
+
   /* ---------- CARD BACKGROUNDS (rarity) ---------- */
   --cardBgBasic:   url("assets/ui/cards/card_basic.png");
   --cardBgCommon:  url("assets/ui/cards/card_common.png");
@@ -112,84 +130,188 @@
 
   /* 기본 배경(미설치 시에는 기존 parchment를 복사해 위 파일명들로 두셔도 됩니다) */
   --cardUrl: var(--cardBgCommon, url("assets/ui/cards/card_parchment.png"));
-  --mapBgUrl: url("assets/ui/background/map_bg.png");
+
   /* ---------- ENEMY HUD ---------- */
-  --enemyBannerW: calc(360px * var(--uiScale));
-  --enemyHudDx: 0px;
+  --enemyBannerW: calc(360 * var(--u));
+  --enemyHudDx: 0;
 
   /* ---------- DOCK ---------- */
-  --dockDrop: calc(12px * var(--uiScale));
-  --dockContentDrop: calc(10px * var(--uiScale));
+  --dockDrop:        calc(0 * var(--u));
+  --dockContentDrop: calc(0 * var(--u));
 
   /* ---------- HP BARS ---------- */
-  --hpH: calc(10px * var(--uiScale));
-  --hpSeg: calc(6px * var(--uiScale));
+  --hpH: calc(10 * var(--u));
+  --hpSeg: calc(6 * var(--u));
   --hpBorder: rgba(0,0,0,.65);
   --hpFrame: rgba(255,255,255,.18);
 
   /* ---------- STAGE CORNER / HINTS ---------- */
-  --hudTop: calc(150px * var(--uiScale));
-  --hintGap: calc(20px * var(--uiScale));
-  --targetHintTop: calc(56px * var(--uiScale));
+  --hudTop: calc(150 * var(--u));
+  --hintGap: calc(20 * var(--u));
+  --targetHintTop: calc(70 * var(--u));
 
   /* ---------- CHOICE OVERLAY ---------- */
-  --choicePadTop: calc(180px * var(--uiScale));
-  --choicePadR:   calc(36px  * var(--uiScale));
-  --choicePadB:   calc(12px  * var(--uiScale));
-  --choicePadL:   calc(12px  * var(--uiScale));
+  --choicePadTop: calc(180 * var(--u));
+  --choicePadR:   calc(36 * var(--u));
+  --choicePadB:   calc(12 * var(--u));
+  --choicePadL:   calc(12 * var(--u));
 
-  --choicePanelW: calc(760px * var(--uiScale));
-  --choicePanelPad: calc(16px * var(--uiScale));
-  --choicePanelR: calc(16px * var(--uiScale));
+  --choicePanelW: calc(760 * var(--u));
+  --choicePanelPad: calc(16 * var(--u));
+  --choicePanelR: calc(16 * var(--u));
 
-  --choiceRowGap: calc(18px * var(--uiScale));
-  --choiceListGap: calc(10px * var(--uiScale));
+  --choiceRowGap: calc(18 * var(--u));
+  --choiceListGap: calc(10 * var(--u));
 
-  --choiceIlluSize: calc(260px * var(--uiScale));
-  --choiceIlluMin:  calc(200px * var(--uiScale));
+  --choiceIlluSize: calc(260 * var(--u));
+  --choiceIlluMin:  calc(200 * var(--u));
 
-  --choicePanelDx: 0px;
-  --choicePanelDy: 40px;
-
-  --choicePanelMarginY: 24px;
+  /* Dx/Dy는 숫자 토큰(설계 단위). 변환 시 --u를 곱해 uiScale 중복을 방지 */
+  --choicePanelDx: 0;
+  --choicePanelDy: 40;
+  --choicePanelMarginY: 24;
 
   /* ---------- PLAYER HUD POSITION ---------- */
-  --playerHudLeftX: calc(var(--edgePad) + calc(30px * var(--uiScale)));
-  --playerHudTop:   calc(var(--hudH) + calc(157px * var(--uiScale)));
-  --playerHudDropY: calc(196px * var(--uiScale));
-  --statusBarGap: calc(30px * var(--uiScale));
+  --playerHudLeftX: calc(var(--safeL) + var(--edgePad));
+  --playerHudTop:   calc(var(--safeT) + calc(480 * var(--u)));
+
+  /* 트레이 이동량과 연동되는 드롭(최종 규칙: trayRaise의 역값) */
+  --trayRaise: calc(-1 * var(--u));
+  --playerHudDropY: calc(9rem);
+  --stageCornerLiftY: calc(-1 * var(--trayRaise));
+
+  --statusBarGap: calc(30 * var(--u));
 
   /* ---------- NODE UI ---------- */
-  --gap: calc(6px * var(--uiScale));
-  --colNow:   calc(70px * var(--uiScale));
-  --colArrow: calc(22px  * var(--uiScale));
-  --colNext:  calc(70px * var(--uiScale));
-  --colSlash: calc(18px  * var(--uiScale));
+  --gap: calc(6 * var(--u));
+  --colNow:   calc(70 * var(--u));
+  --colArrow: calc(22 * var(--u));
+  --colNext:  calc(70 * var(--u));
+  --colSlash: calc(18 * var(--u));
 
-  /* ---------- RELICS ---------- */
-  --relicIconSize: 64px;
-  --relicIconGap: 10px;
+  /* ---------- RELICS (기본 토큰) ---------- */
   --relicImgZoom: 1.3;
-  --relicTrayRight: 14px;
-  --relicTrayBottom: 170px;
 
   /* ---------- ENEMY CARDS ---------- */
-  --enemyCardW: calc(160px * var(--uiScale));
+  --enemyCardW: calc(160 * var(--u));
   --enemyCardH: calc(var(--enemyCardW) * 7 / 5);
-  --enemyArtH:  calc(420px * var(--uiScale));
-  --enemyHudW: calc(208px * var(--uiScale));
+  --enemyArtH:  calc(420 * var(--u));
+  --enemyHudW: calc(208 * var(--u));
+
+  /* ---------- MAP TOKENS ---------- */
+  --mapPanelCX: 50%;
+  --mapPanelCY: 50%;
+  --mapPanelDX: 0%;
+  --mapPanelDY: -24%;
+
+  /* Base sizes (numbers); 이름은 Px이지만 실제로는 --u로 스케일 */
+  --panelInsetPx: 3;
+  --panelMaxInsetPx: 60;
+  --panelMaxWidthPx: 800;
+
+  --gridGapPx: 16;
+  --sideColWidthPx: 380;
+
+  --boxPadPx: 14;
+  --boxRadiusPx: 14;
+  --scrollerRadiusPx: 12;
+
+  --mapSvgScale: 1.0;
+  --mapSvgDX: 0%;
+  --mapSvgDY: 0%;
+
+  --mapBgDim: 0;
+  --mapBgOpacity: 0;
+  --mapHeaderSafeTopPx: 12;
+  --mapHeaderSafeSidePx: 14;
+
+  --mapPanelMaxHPx: 900;
+  --mapScrollerMinHPx: 520;
+
+  --pillarPx: 90;
+  --pillarW: calc(var(--pillarPx) * var(--u));
+
+  /* ---------- SHOP COMPACT TOKENS ---------- */
+  --shopPanelW:    calc(700 * var(--u));
+  --shopSvcW:      calc(240 * var(--u));
+  --shopSvcGap:    calc(8 * var(--u));
+  --shopItemSize:  calc(76 * var(--u));
+  --shopItemIcon:  calc(50 * var(--u));
+
+  /* ---------- TOAST TOKENS (스타일용) ---------- */
+  --toastGap:   calc(8 * var(--u));
+  --toastPadY:  calc(8 * var(--u));
+  --toastPadX:  calc(12 * var(--u));
+  --toastR:     calc(10 * var(--u));
+  --toastFont:  calc(25 * var(--u));
+  --toastMaxW:  calc(380 * var(--u));
+
+  /* ---------- 아이템/렐릭 공통 트레이 토큰 (최종 v4 승자) ---------- */
+  --trayCols: 4;
+  --trayRowsMax: 3;
+
+  --traySlot: calc(72 * var(--u));
+  --trayGap:  calc(10 * var(--u));
+  --trayPad:  calc(10 * var(--u));
+  
+  /* 화면 가장자리 기본 여백 + 추가 안쪽 이동(양쪽 대칭) */
+  --traySidePad: calc(22 * var(--u));
+  --trayInwardX: calc(14 * var(--u)); /* (+) => 아이템은 더 오른쪽, 렐릭은 더 왼쪽으로(중앙 쪽) */
+
+  /* 트레이 바닥 기준(손패 도크 위로) */
+  --trayBottom: calc(var(--safeB) + calc(10 * var(--u)) + var(--trayRaise));
+
+  /* 아이템/렐릭 위치(대칭) */
+  --itemTrayLeft:   calc(var(--safeL) + var(--traySidePad) + var(--trayInwardX));
+  --relicTrayRight: calc(var(--safeR) + var(--traySidePad) + var(--trayInwardX));
+
+  /* 기존 코드 호환 매핑 */
+  --relicIconSize: var(--traySlot);
+  --relicIconGap:  var(--trayGap);
+  --relicTrayBottom: var(--trayBottom);
+
+  --itemTrayCols:  var(--trayCols);
+  --itemTrayGap:   var(--trayGap);
+  --itemSlotSize:  var(--traySlot);
+  --itemTrayRowsMax: var(--trayRowsMax);
+
+  /* ---------- 아이콘 테두리/글로우 ---------- */
+  --iconBorder: rgba(255,255,255,.28);
+  --iconGlow:   rgba(210,240,255,.18);
+
+  /* ---------- S만 보이는 HUD ---------- */
+  --sHudLeft: 21rem;
+  --sHudTop:  calc(var(--safeT) + var(--hudH) + calc(330 * var(--u)));
+  --sHudOffX: calc(0 * var(--u));
+  --sHudOffY: calc(140 * var(--u));
+
+  --sHudFont: clamp(calc(24 * var(--u)), 4vw, calc(36 * var(--u)));
+  --sHudPadY: calc(10 * var(--u));
+  --sHudPadX: calc(14 * var(--u));
+  --sHudR:    calc(12 * var(--u));
+
+  /* ---------- 다음 턴 버튼 ---------- */
+  --combatCtrlLift: calc(10 * var(--u));
+
+  /* ---------- TOAST 위치(중앙 고정 + 미세 이동) ---------- */
+  --toastCX: 50%;
+  --toastCY: 50%;
+  --toastDx: 0; /* 숫자(설계 단위). --u 곱해 적용됨 */
+  --toastDy: -270; /* 숫자(설계 단위). 음수면 위로 이동 */
 }
 
-/* Optional: font scale */
-html{ font-size: calc(16px * var(--uiScale)); }
+
+/* Optional: font scale (디자인 단위 기준 기본 폰트 스케일) */
+html{ font-size: calc(16 * var(--u)); }
 
 
 /* =========================
    1) FONTS
+   - 게임 폰트 설치 + 로그는 가독성 폰트로 분리
    ========================= */
 @font-face{
   font-family: "Mulmaru";
-  src: url("fonts/Mulmaru.woff2") format("woff2");
+  src: url("assets/fonts/Mulmaru.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -206,7 +328,7 @@ body{
   text-rendering: optimizeLegibility;
 }
 
-/* logs use readable sans */
+/* 로그는 산세리프 고정(가독성) */
 pre.log,
 .logPanel pre.log,
 .logOverlay pre.log,
@@ -218,14 +340,17 @@ pre.log.log{
 
 /* =========================
    2) BASE
+   - 기본 레이아웃/배경 안전장치
    ========================= */
 html, body{ height:100%; }
+
 body{
   margin:0;
   color:var(--text);
   overflow:hidden;
   background: transparent;
 }
+
 #app{
   height:100vh;
   min-height:100vh;
@@ -235,19 +360,20 @@ body{
   z-index: var(--zMain);
 }
 
-/* safety: avoid white backgrounds */
+/* 배경이 흰색으로 튀지 않도록 안전장치 */
 html, body, #app,
 .mainRow, .stage, .stageInner,
 .combatRoot, .boardArea{
   background: transparent !important;
 }
 
-/* final overflow safety */
+/* 오버플로 안전장치 */
 .battleTitleRow, .mainPanel, .stage, .stageInner{ overflow: visible !important; }
 
 
 /* =========================
    3) GLOBAL BACKGROUND
+   - 던전 배경 이미지 + 비네팅
    ========================= */
 .bgLayer{
   position: fixed;
@@ -257,6 +383,7 @@ html, body, #app,
   z-index: var(--zBg) !important;
   pointer-events:none !important;
 }
+
 .bgLayer::after{
   content:"";
   position:absolute;
@@ -271,108 +398,102 @@ html, body, #app,
 
 /* =========================
    4) TOP HUD + PLAYER HUD
+   - 상단 버튼 영역 + 좌측 플레이어 HUD 고정
    ========================= */
 .topHud{
   height: var(--hudH);
   display: grid;
   grid-template-columns: 1fr minmax(0, var(--stageMaxW)) 1fr;
   align-items: start;
-  gap: calc(12px * var(--uiScale));
-  padding: calc(8px * var(--uiScale)) var(--edgePad) 0 var(--edgePad);
+  gap: calc(10 * var(--u));
+  padding: calc(6 * var(--u)) var(--edgePad) 0 var(--edgePad);
   box-sizing: border-box;
   overflow: visible;
   position: relative;
-  z-index: var(--zStatus) !important;
-  pointer-events: auto !important; /* ✅ 자식 클릭 살리기 */
+  z-index: var(--zChrome);
+  pointer-events: auto;
 }
 
-/* 스테이터스바에서 클릭 통과시키고 싶은 영역만 none */
-.topHudLeftSpacer{ pointer-events: none !important; }
+.topHudLeftSpacer{ pointer-events: none; }
+.playerHudLeft, .topHudRight{ pointer-events: auto; }
 
-/* 클릭되어야 하는 것들은 auto */
-.playerHudLeft,
-.topHudRight{ pointer-events: auto !important; }
-
-/* right buttons area (always clickable) */
+/* 오른쪽 상단 버튼(항상 클릭 가능) */
 .topHudRight{
-  position: fixed !important;
-  top: var(--edgePad);
-  right: var(--edgePad);
-  z-index: var(--zChrome) !important;
-  pointer-events: auto !important;
+  position: fixed;
+  top:   calc(var(--safeT) + calc(8 * var(--u)));
+  right: calc(var(--safeR) + calc(10 * var(--u)));
+  z-index: var(--zChrome);
+  pointer-events: auto;
 }
-.topHudRight *{ pointer-events:auto !important; }
+.topHudRight *{ pointer-events:auto; }
 
-.enemyHud{ display: flex; gap: calc(10px * var(--uiScale)); flex-wrap: wrap; }
+.enemyHud{ display: flex; gap: calc(10 * var(--u)); flex-wrap: wrap; }
 
-/* PLAYER HUD (left fixed) */
+/* 좌측 플레이어 HUD */
 .playerHudLeft{
   position: fixed;
   left: var(--playerHudLeftX);
   top:  calc(var(--playerHudTop) + var(--playerHudDropY));
-  width: calc(300px * var(--uiScale));
-  padding: calc(12px * var(--uiScale));
+  width: min(calc(420 * var(--u)), calc(100vw - (var(--edgePad) * 2)));
+  padding: calc(14 * var(--u));
   background: var(--hudPanelBg);
-  border: 1px solid var(--hudPanelLine);
+  border: calc(1 * var(--u)) solid var(--hudPanelLine);
   border-radius: var(--hudPanelR);
-  box-shadow: 0 calc(14px * var(--uiScale)) calc(40px * var(--uiScale)) rgba(0,0,0,.40);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  z-index: var(--zChrome) !important;
-  pointer-events: auto !important;
+  box-shadow: 0 calc(14 * var(--u)) calc(40 * var(--u)) rgba(0,0,0,.40);
+  backdrop-filter: blur(calc(6 * var(--u)));
+  -webkit-backdrop-filter: blur(calc(6 * var(--u)));
+  z-index: var(--zChrome);
+  pointer-events: auto;
 }
+.playerHudTitle{ font-size: calc(19 * var(--u)); font-weight: 900; }
 .playerHudLeft *{ pointer-events:auto !important; }
 
 .playerHudLeft .enemyBadges{
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: calc(4px * var(--uiScale));
-  min-height: calc(24px * var(--uiScale));
+  gap: calc(4 * var(--u));
+  min-height: calc(24 * var(--u));
 }
 
 .playerTitleRow{
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: calc(10px * var(--uiScale));
-  margin-bottom: calc(10px * var(--uiScale));
+  gap: calc(10 * var(--u));
+  margin-bottom: calc(10 * var(--u));
 }
 
-.playerHudTitle{
-  font-weight: 900;
-  font-size: calc(16px * var(--uiScale));
-  white-space: nowrap;
-}
-
-/* 버튼 5개는 오른쪽으로 몰기 */
+/* 덱/묘지/드로우 등 버튼 5개를 오른쪽으로 모으기 */
 .pileButtons{
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: calc(1px * var(--uiScale));
+  gap: calc(1 * var(--u));
   flex-wrap: nowrap;
 }
 
 
 /* =========================
    5) MAIN AREA + STAGE
+   - 중앙 스테이지(보드) 영역 배치
    ========================= */
 .mainRow{
   position: relative;
   flex: 1;
   min-height: 0;
-  height: calc(100vh - var(--hudH) - var(--dockH));
   box-sizing: border-box;
   overflow: hidden;
+  padding-bottom: calc(var(--dockH) + calc(6 * var(--u)));
 }
 
 .stage{
   height: 100%;
   display:flex;
   justify-content:center;
-  align-items:center;
-  background: transparent !important;
+  align-items:flex-start;
+  padding-top: calc(0 * var(--u));
+  background: transparent;
 }
 
 .stageInner{
@@ -381,31 +502,26 @@ html, body, #app,
   aspect-ratio: var(--boardAR);
   display:flex;
   margin: 0 auto;
-  box-shadow: none !important;
-  filter: none !important;
-  overflow: visible !important;
-  transform: translateY(calc(60px * var(--uiScale)));
+  overflow: visible;
+  transform: translateY(0);
 }
 
 
 /* =========================
    6) MAIN PANEL (board background)
+   - 전투 시 보드 배경 이미지 레이어
    ========================= */
 .mainPanel{
   position: relative;
   width: 100%;
   height: 100%;
   box-sizing: border-box;
-  padding: calc(10px * var(--uiScale)) calc(16px * var(--uiScale)) calc(16px * var(--uiScale)) calc(16px * var(--uiScale));
-  background: transparent !important;
-  border: 0;
-  box-shadow: none;
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
-  overflow: visible !important;
+  padding: calc(210 * var(--u)) calc(12 * var(--u)) calc(12 * var(--u)) calc(12 * var(--u));
+  background: transparent;
+  overflow: visible;
 }
 
-/* board image layer (combat only) */
+/* 보드 이미지 레이어(전투에만 표시) */
 .mainPanel::before{
   content:"";
   position:absolute;
@@ -413,23 +529,23 @@ html, body, #app,
   pointer-events:none;
   opacity: 0;
 }
+
 .mainPanel.inCombat::before{
   opacity: 1;
   background: var(--boardUrl) center / cover no-repeat;
   image-rendering: pixelated;
-  background-repeat: no-repeat;
-
   background-size: calc(100% * var(--boardImgZoom)) calc(100% * var(--boardImgZoom));
   background-position: 50% var(--boardImgPosY);
-  transform: translateY(calc(-4px * var(--uiScale)));
+  transform: translateY(calc(210 * var(--u)));
 }
 
-/* actual UI above board */
+/* 보드 위 실제 UI는 이미지 위로 */
 .mainPanel > *{ position: relative; }
 
 
 /* =========================
    7) BOARD AREA (slots center)
+   - 슬롯 그리드 중심 정렬/간격
    ========================= */
 .combatRoot,
 .boardArea{
@@ -444,18 +560,17 @@ html, body, #app,
   justify-content: center;
   gap: var(--slotRowGap);
 
-  padding: calc(10px * var(--uiScale) * var(--boardScale));
-  border-radius: calc(18px * var(--uiScale) * var(--boardScale));
+  padding: calc(10 * var(--u));
   box-sizing: border-box;
-  transform: translateY(var(--slotCenterNudgeY));
 
-  padding-top: calc(22px * var(--uiScale));
-  padding-bottom: calc(22px * var(--uiScale));
-  min-height: 78%;
+  transform: translateY(var(--slotCenterNudgeY));
+  min-height: 82%;
 }
+
+/* 전투 시 보드 영역 높이(최종 승자: 86%) */
 .mainPanel.inCombat .boardArea{ min-height: 86%; }
 
-/* slot rows */
+/* 슬롯 행(6칸) */
 .grid6{
   display: flex;
   justify-content: center;
@@ -467,6 +582,7 @@ html, body, #app,
 
 /* =========================
    8) SLOTS
+   - 슬롯 박스 + 슬롯 내부 카드 스케일링
    ========================= */
 .slot{
   position: relative;
@@ -481,41 +597,42 @@ html, body, #app,
   --slotTextScale: 0.78;
 }
 
-/* 슬롯 안에서 "정중앙"에 놓는 컨테이너 */
+/* 슬롯 안에서 정중앙 배치 컨테이너 */
 .slotCardScaler{
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  pointer-events: auto; /* 슬롯 클릭/드래그 막지 않게 */
+  pointer-events: auto;
 }
 
-/* 기준 크기 박스 (여기에 scale만 걸림) */
+/* 기준 박스(여기에 scale만 적용) */
 .slotCardInner{
   width: var(--handCardW);
   height: var(--handCardH);
   transform-origin: 50% 50%;
   transform: scale(var(--slotCardScale, 1));
-  pointer-events: auto; /* 카드에 이벤트 필요하면 다시 켜기 */
+  pointer-events: auto;
 }
 
+/* 슬롯 텍스트는 카드 스케일보다 조금 더 줄이기 */
 .slot .slotCardInner{
-  /* 텍스트는 카드 스케일보다 "조금 더" 줄어들게 */
   --slotTextScale: calc(var(--slotCardScale, 1) * 0.92);
 }
 
 .slot .card{
-  font-size: calc(14px * var(--uiScale) * var(--slotTextScale));
+  font-size: calc(14 * var(--u) * var(--slotTextScale));
   line-height: 1.12;
 }
-/* 이제 내부는 em로만! (px 쓰지 마세요) */
+
+/* 슬롯 내부 텍스트는 em 단위로만 조절 */
 .slot .card .cardTitle{ font-size: 1.00em !important; line-height: 1.05 !important;}
 .slot .card .cardMeta,
 .slot .card .badge{ font-size: 0.80em; line-height: 1.05; }
 .slot .card .cardText{ font-size: 0.8em !important; line-height: 1.15 !important; }
 
-/* 슬롯에서 패딩도 em로 줄여서 더 “쏙” 들어가게 */
+/* 슬롯 내부 패딩도 em로 축소 */
 .slot .card .cardHeader{ padding: 0.45em 0.55em; }
 .slot .card .cardBody{ padding: 0.45em 0.55em; }
 .slot .card .cardSection{ padding: 0.40em; }
@@ -526,7 +643,7 @@ html, body, #app,
   height: 100%;
 }
 
-/* slot recess */
+/* 슬롯 오목한 느낌 레이어 */
 .slot::before{
   content:"";
   position:absolute;
@@ -535,28 +652,28 @@ html, body, #app,
   pointer-events:none;
   background: rgba(0,0,0,.50);
   box-shadow:
-    inset 0 calc(12px * var(--uiScale)) calc(18px * var(--uiScale)) rgba(0,0,0,.65),
-    inset 0 calc(-10px * var(--uiScale)) calc(16px * var(--uiScale)) rgba(255,255,255,.06),
-    inset 0 0 0 1px rgba(255,255,255,.08);
+    inset 0 calc(12 * var(--u)) calc(18 * var(--u)) rgba(0,0,0,.65),
+    inset 0 calc(-10 * var(--u)) calc(16 * var(--u)) rgba(255,255,255,.06),
+    inset 0 0 0 calc(1 * var(--u)) rgba(255,255,255,.08);
   opacity: .8;
 }
 .slot > *{ position: relative;}
 
-/* slot states */
+/* 슬롯 상태(놓을 수 있음 / 드롭 호버) */
 .slot.placeable::before{
   box-shadow:
-    inset 0 calc(10px * var(--uiScale)) calc(18px * var(--uiScale)) rgba(0,0,0,.52),
-    inset 0 0 0 1px rgba(255,255,255,.16),
-    0 0 0 1px rgba(255,255,255,.10);
+    inset 0 calc(10 * var(--u)) calc(18 * var(--u)) rgba(0,0,0,.52),
+    inset 0 0 0 calc(1 * var(--u)) rgba(255,255,255,.16),
+    0 0 0 calc(1 * var(--u)) rgba(255,255,255,.10);
 }
 .slot.dropHover::before{
   box-shadow:
-    inset 0 calc(10px * var(--uiScale)) calc(18px * var(--uiScale)) rgba(0,0,0,.52),
-    inset 0 0 0 1px rgba(255,255,255,.22),
-    0 0 0 calc(2px * var(--uiScale)) rgba(255,255,255,.18);
+    inset 0 calc(10 * var(--u)) calc(18 * var(--u)) rgba(0,0,0,.52),
+    inset 0 0 0 calc(1 * var(--u)) rgba(255,255,255,.22),
+    0 0 0 calc(2 * var(--u)) rgba(255,255,255,.18);
 }
 
-/* force card size in slot */
+/* 슬롯에 들어간 카드 강제 크기 */
 .slot > .card,
 .slot .card.inSlot{
   width: var(--slotCardW) !important;
@@ -567,14 +684,16 @@ html, body, #app,
   --slotTextScale: calc(var(--slotCardScale, 1) * 1.25);
 }
 
+
 /* =========================
    9) CARDS (parchment-only)
+   - 카드 기본 레이아웃 + 희귀도별 배경
    ========================= */
 .card{
   position: relative;
   width: var(--handCardW);
   height: var(--handCardH);
-  padding: calc(10px * var(--uiScale)) calc(10px * var(--uiScale));
+  padding: calc(10 * var(--u)) calc(10 * var(--u));
   box-sizing: border-box;
 
   display:flex;
@@ -591,7 +710,7 @@ html, body, #app,
   text-shadow: none !important;
 }
 
-/* parchment layer */
+/* 카드 바탕(파치먼트) */
 .card::before{
   content:"";
   position:absolute;
@@ -604,9 +723,7 @@ html, body, #app,
 .card::after{ content:none !important; display:none !important; }
 .card > *{ position: relative; }
 
-/* =========================
-   Card rarity backgrounds
-   ========================= */
+/* 희귀도 배경 매핑 */
 .card.rarity-basic{ --cardUrl: var(--cardBgBasic); }
 .card.rarity-common{ --cardUrl: var(--cardBgCommon); }
 .card.rarity-special{ --cardUrl: var(--cardBgSpecial); }
@@ -617,7 +734,7 @@ html, body, #app,
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
-  margin: 0 0 calc(6px * var(--uiScale)) 0 !important;
+  margin: 0 0 calc(6 * var(--u)) 0 !important;
   padding: 0 !important;
 }
 
@@ -625,9 +742,9 @@ html, body, #app,
   text-align: center !important;
   font-family: "Mulmaru", serif !important;
   font-weight: 400 !important;
-  font-size: calc(13px * var(--uiScale)) !important;
+  font-size: calc(13 * var(--u)) !important;
   line-height: 1.1 !important;
-  letter-spacing: -0.2px !important;
+  letter-spacing: -calc(0.2 * var(--u)) !important;
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
@@ -655,9 +772,9 @@ html, body, #app,
 }
 
 .cardText{
-  font-size: calc(11px * var(--uiScale)) !important;
+  font-size: calc(11 * var(--u)) !important;
   line-height: 1.25 !important;
-  letter-spacing: -0.2px !important;
+  letter-spacing: -calc(0.2 * var(--u)) !important;
   margin: 0 !important;
   padding: 0 !important;
 
@@ -666,71 +783,74 @@ html, body, #app,
   word-break: keep-all !important;
 }
 
+/* 광기 카드 텍스트는 흰색 */
 .card.rarity-madness,
 .card.rarity-madness *{
   color: #fff !important;
 }
 
-/* Front/Back separator */
+/* 앞/뒤 구분선 */
 .cardSection.front{
   position: relative;
-  padding-bottom: calc(10px * var(--uiScale));
-  margin-bottom: calc(8px * var(--uiScale));
+  padding-bottom: calc(10 * var(--u));
+  margin-bottom: calc(8 * var(--u));
 }
 .cardSection.front::after{
   content:"";
   position:absolute;
-  left: calc(10px * var(--uiScale));
-  right: calc(10px * var(--uiScale));
+  left: calc(10 * var(--u));
+  right: calc(10 * var(--u));
   bottom: 0;
-  height: 1px;
+  height: calc(1 * var(--u));
   background: rgba(90,60,30,.45);
   opacity: .55;
   pointer-events:none;
 }
 
 .cardSection.back{
-  padding-top: calc(10px * var(--uiScale));
-  margin-top: calc(8px * var(--uiScale));
+  padding-top: calc(10 * var(--u));
+  margin-top: calc(8 * var(--u));
   position: relative;
 }
 
-/* Optional double-line feel */
+/* 뒤 섹션의 보조 구분선 */
 .cardSection.back::after{
   content: "";
   position: absolute;
-  left: calc(8px * var(--uiScale));
-  right: calc(8px * var(--uiScale));
-  top: calc(-17px * var(--uiScale));
-  height: 1px;
+  left: calc(8 * var(--u));
+  right: calc(8 * var(--u));
+  top: calc(-17 * var(--u));
+  height: calc(1 * var(--u));
   background: rgba(110, 70, 35, .55);
   pointer-events: none;
 }
 
-/* selection */
+/* 선택 강조 */
 .card.selected{
   border-radius: 0 !important;
   outline: none !important;
   box-shadow:
-    0 0 0 calc(2px * var(--uiScale)) rgba(255,255,255,.60),
-    0 calc(12px * var(--uiScale)) calc(22px * var(--uiScale)) rgba(0,0,0,.35) !important;
-  transform: translateY(calc(-2px * var(--uiScale)));
+    0 0 0 calc(2 * var(--u)) rgba(255,255,255,.60),
+    0 calc(12 * var(--u)) calc(22 * var(--u)) rgba(0,0,0,.35) !important;
+  transform: translateY(calc(-2 * var(--u)));
   animation-name: pickPulse;
   animation-duration: calc(160ms * var(--animMul));
   animation-timing-function: ease-out;
   animation-fill-mode: both;
 }
 .card.selected .cardTitle{
-  text-shadow: 0 0 calc(10px * var(--uiScale)) rgba(255,255,255,.28);
+  text-shadow: 0 0 calc(10 * var(--u)) rgba(255,255,255,.28);
 }
 @keyframes pickPulse{
   0%{ transform: translateY(0); }
-  40%{ transform: translateY(calc(-3px * var(--uiScale))); }
+  40%{ transform: translateY(calc(-3 * var(--u))); }
   100%{ transform: translateY(0); }
 }
 
-/* drag */
+/* 드래그 소스 */
 .card.isDraggingSource{ opacity: 0.4; filter: saturate(.8); }
+
+/* 드래그 프리뷰 */
 .dragLayer .dragCardPreview{
   overflow: hidden;
   border-radius: 0;
@@ -746,107 +866,103 @@ html, body, #app,
   mix-blend-mode: normal !important;
 }
 
-/* keyword blocks */
+/* 키워드 블록 */
 .kwRun, .kwBadge{
   display: inline-flex;
   align-items: baseline;
-  gap: calc(2px * var(--uiScale));
+  gap: calc(2 * var(--u));
   white-space: nowrap;
 }
 .kwRun *, .kwBadge *{ white-space: nowrap; }
 
-
+/* 슬롯 이름만 보이는 카드 */
 .card.slotNameOnly{
   height: 100%;
   display:flex;
   align-items:center;
   justify-content:center;
-  padding: calc(6px * var(--uiScale) * var(--boardScale));
+  padding: calc(6 * var(--u) * var(--boardScale));
   text-align: center;
 
-  overflow: hidden; /* 텍스트/요소 잘라내기 */
+  overflow: hidden;
   border-radius: 0;
   clip-path: inset(0);
 }
 .card.slotNameOnly .cardTitle{
-  font-size: calc(10px * var(--uiScale) * var(--boardScale));
+  font-size: calc(10 * var(--u) * var(--boardScale));
   font-weight: 900 !important;
 
-  width: 100%;                /* ✅ 제목 박스가 카드 폭을 넘지 않게 */
+  width: 100%;
   box-sizing: border-box;
-  padding: 0 0.35em;          /* ✅ 좌우 안전 여백 */
+  padding: 0 0.35em;
 
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
   line-height: 1.1;
 
-  display: -webkit-box;       /* ✅ 너무 길면 2줄에서 컷 */
+  display: -webkit-box;
   -webkit-box-orient: vertical;
   line-clamp: 2;
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
-
 .card.slotNameOnly .cardBody{ display:none !important; }
 
-
+/* 카드 호버 상세 프리뷰(우측) */
 .cardHoverPreview{
   position: fixed;
-  right: calc(var(--edgePad) + calc(14px * var(--uiScale)));
-  top: calc(var(--hudH) + calc(110px * var(--uiScale)));
+  right: calc(var(--edgePad) + calc(14 * var(--u)));
+  top: calc(var(--hudH) + calc(110 * var(--u)));
   z-index: var(--zChrome);
-  width: calc(360px * var(--uiScale));
+  width: calc(360 * var(--u));
   height: auto;
 
   border-radius: 0;
-  border: 1px solid rgba(255,255,255,.14);
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.14);
   background: rgba(0,0,0,.78);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 calc(18px * var(--uiScale)) calc(60px * var(--uiScale)) rgba(0,0,0,.55);
+  backdrop-filter: blur(calc(10 * var(--u)));
+  -webkit-backdrop-filter: blur(calc(10 * var(--u)));
+  box-shadow: 0 calc(18 * var(--u)) calc(60 * var(--u)) rgba(0,0,0,.55);
 
-  padding: calc(14px * var(--uiScale));
+  padding: calc(14 * var(--u));
   display: none;
-  pointer-events: none; /* hover 유지로 꼬이는 거 방지 */
+  pointer-events: none;
 }
-
 .cardHoverPreview.on{ display:block; }
 
 .cardHoverPreviewTitle{
   font-weight: 900;
-  font-size: calc(18px * var(--uiScale));
-  margin-bottom: calc(10px * var(--uiScale));
+  font-size: calc(18 * var(--u));
+  margin-bottom: calc(10 * var(--u));
   opacity: .95;
 }
-
 .cardHoverPreviewRow{
   display: grid;
   grid-template-columns: 1fr;
-  gap: calc(12px * var(--uiScale));
+  gap: calc(12 * var(--u));
   align-items: start;
 }
-
 .cardHoverPreviewCard{
-  width: calc(220px * var(--uiScale));
+  width: calc(220 * var(--u));
   margin: 0 auto;
-  transform: translateY(calc(4px * var(--uiScale)));
+  transform: translateY(calc(4 * var(--u)));
 }
-
 .cardHoverPreviewDetail{
   border-radius: 0;
-  border: 1px solid rgba(255,255,255,.10);
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.10);
   background: rgba(255,255,255,.03);
-  padding: calc(12px * var(--uiScale));
+  padding: calc(12 * var(--u));
   white-space: pre-wrap;
   line-height: 1.4;
-  font-size: calc(13px * var(--uiScale));
+  font-size: calc(13 * var(--u));
 }
 
-/* =========================================================
-   HARD OVERRIDE — NO ROUNDING ANYWHERE
-   (overrides inline styles too)
-   ========================================================= */
+
+/* =========================
+   9-1) HARD OVERRIDE — NO ROUNDING ANYWHERE
+   - 카드/슬롯 관련 영역 모서리 전부 각지게
+   ========================= */
 .slot,
 .slot::before,
 .slotCardScaler,
@@ -868,88 +984,131 @@ html, body, #app,
 
 /* =========================
    10) HAND DOCK
+   - 손패 도크(하단) + 가로 스크롤
    ========================= */
 .handDock{
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: calc(-3 * var(--dockDrop));
+  left: 50%;
+  width: min(calc(780 * var(--u)), calc(100vw - var(--safeL) - var(--safeR)));
+  max-width: calc(100vw - var(--safeL) - var(--safeR));
+  transform: translateX(-50%);
+  bottom: var(--safeB);
   height: var(--dockH);
-  padding: calc(6px * var(--uiScale)) var(--edgePad) calc(10px * var(--uiScale)) var(--edgePad) !important;
-  background: linear-gradient(180deg, rgba(0,0,0,0.0), rgba(0,0,0,.85));
-  pointer-events: none;
-  margin: 0 auto;
-  justify-content: center;
+  padding: calc(6 * var(--u)) var(--edgePad) calc(10 * var(--u)) var(--edgePad);
+  background: linear-gradient(
+    to top,
+    rgba(0,0,0,0.92) 0%,
+    rgba(0,0,0,0.65) 35%,
+    rgba(0,0,0,0.00) 100%
+  );
+
   z-index: var(--zHandDock);
+  pointer-events: none;
 }
 .handDock * { pointer-events: auto; }
 
 .handDock > .controlsDock,
 .handDock > .hand{
-  transform: translateY(var(--dockContentDrop));
+  transform: none !important;
 }
 
 .hand{
-  height: calc(var(--handCardH) + calc(12px * var(--uiScale)));
+  height: calc(var(--handCardH) + calc(12 * var(--u)));
+  position: relative;
+  box-sizing: border-box;
+  padding-inline: calc(22 * var(--u));
+  scroll-padding-left: calc(22 * var(--u));
+  scroll-padding-right: calc(22 * var(--u));
+
   overflow-x: auto;
   overflow-y: visible;
   -webkit-overflow-scrolling: touch;
+
+  /* 스크롤바 숨김(스크롤은 유지) */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+.hand::-webkit-scrollbar{ width: 0; height: 0; }
+.hand::-webkit-scrollbar-thumb{ background: transparent; }
+.hand::-webkit-scrollbar-track{ background: transparent; }
+
+/* hand edge fades (cut이 노골적으로 보이는 것 완화) */
+.hand::before,
+.hand::after{
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: calc(28 * var(--u));
+  pointer-events: none;
+  z-index: 5;
+}
+/*.hand::before{
+  left: 0;
+  background: linear-gradient(90deg, rgba(0,0,0,.70), rgba(0,0,0,0));
+}
+.hand::after{
+  right: 0;
+  background: linear-gradient(-90deg, rgba(0,0,0,.70), rgba(0,0,0,0));
+}*/
+
+
 .handCardsRow{
   display: flex;
   justify-content: center;
   flex-wrap: nowrap;
-  gap: calc(10px * var(--uiScale));
+  gap: calc(10 * var(--u));
   align-items: flex-end;
   width: max-content;
   min-width: 100%;
-  padding: calc(6px * var(--uiScale)) calc(12px * var(--uiScale)) 0 calc(12px * var(--uiScale));
-  box-sizing: border-box;
+  padding: calc(6 * var(--u)) 0 0 0;
   overflow: visible !important;
 }
 
 
 /* =========================
    11) LOG PANEL + OVERLAY
+   - 우측 로그 패널 + 오버레이 레이어
    ========================= */
 .logPanel{
   position: fixed;
-  top: calc(var(--hudH) + calc(8px * var(--uiScale)));
+  top: calc(var(--safeT) + var(--hudH) + calc(8 * var(--u)));
   right: var(--edgePad);
   width: var(--logW);
-  height: min(46vh, calc(420px * var(--uiScale)));
-  padding: calc(14px * var(--uiScale));
+  height: min(46vh, calc(420 * var(--u)));
+  padding: calc(14 * var(--u));
   display:flex;
   flex-direction:column;
   box-sizing: border-box;
   isolation: isolate;
 
   background: var(--logBg);
-  border: 1px solid var(--logLine);
+  border: calc(1 * var(--u)) solid var(--logLine);
   box-shadow: var(--logShadow);
-  border-radius: calc(18px * var(--uiScale));
+  border-radius: calc(18 * var(--u));
+  z-index: var(--zChrome);
 }
 
 .logPanel .log{
   flex:1;
   min-height:0;
   margin:0;
-  padding: calc(10px * var(--uiScale));
-  border-radius: calc(12px * var(--uiScale));
-  border:1px solid var(--line);
+  padding: calc(10 * var(--u));
+  border-radius: calc(12 * var(--u));
+  border:calc(1 * var(--u)) solid var(--line);
   background: rgba(0,0,0,.55);
   color: #cfd5e2;
-  font-size: calc(12px * var(--uiScale));
+  font-size: calc(12 * var(--u));
   line-height: 1.45;
   overflow:auto;
   white-space: pre-wrap;
 }
 
-/* collapsed => button-only */
+/* 접힘 상태: 버튼만 */
 .logPanel.collapsed{
-  width: calc(56px * var(--uiScale));
-  height: calc(56px * var(--uiScale));
-  padding: calc(10px * var(--uiScale));
+  width: calc(56 * var(--u));
+  height: calc(56 * var(--u));
+  padding: calc(10 * var(--u));
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
@@ -963,26 +1122,26 @@ html, body, #app,
 
 .logPanel.collapsed .logHeaderRow{
   background: rgba(0,0,0,.92) !important;
-  border: 1px solid rgba(255,255,255,.22) !important;
-  box-shadow: 0 calc(10px * var(--uiScale)) calc(24px * var(--uiScale)) rgba(0,0,0,.55) !important;
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.22) !important;
+  box-shadow: 0 calc(10 * var(--u)) calc(24 * var(--u)) rgba(0,0,0,.55) !important;
 }
 
 .logHeaderRow{
   display:flex;
   align-items:center;
   justify-content:space-between;
-  gap: calc(8px * var(--uiScale));
+  gap: calc(8 * var(--u));
   -webkit-user-select: none;
   user-select:none;
   cursor:pointer;
-  padding: calc(8px * var(--uiScale)) calc(10px * var(--uiScale));
-  border-radius: calc(12px * var(--uiScale));
-  border: 1px solid var(--line);
+  padding: calc(8 * var(--u)) calc(10 * var(--u));
+  border-radius: calc(12 * var(--u));
+  border: calc(1 * var(--u)) solid var(--line);
   background: rgba(0,0,0,1);
-  margin-bottom: calc(10px * var(--uiScale));
+  margin-bottom: calc(10 * var(--u));
 }
-.logHeaderRow h2{ margin:0; font-size: calc(14px * var(--uiScale)); }
-.logHeaderRow .chev{ opacity:.85; font-size: calc(14px * var(--uiScale)); }
+.logHeaderRow h2{ margin:0; font-size: calc(14 * var(--u)); }
+.logHeaderRow .chev{ opacity:.85; font-size: calc(14 * var(--u)); }
 
 .logOverlay,
 .logOverlayLayer{
@@ -992,18 +1151,19 @@ html, body, #app,
   pointer-events: auto !important;
 }
 
-/* 로그 스크롤바 투명 */
+/* 로그 스크롤바 숨김 */
 .logScroll{
   scrollbar-width: none;
   scrollbar-color: transparent transparent;
 }
-.logScroll::-webkit-scrollbar{ width: 0px; height: 0px; }
+.logScroll::-webkit-scrollbar{ width: 0; height: 0; }
 .logScroll::-webkit-scrollbar-thumb{ background: transparent; }
 .logScroll::-webkit-scrollbar-track{ background: transparent; }
 
 
 /* =========================
    12) NODE PREVIEW
+   - 노드 프리뷰 라인(아이콘/텍스트)
    ========================= */
 .nodeIcon{
   display:inline-block;
@@ -1023,8 +1183,8 @@ html, body, #app,
   column-gap: var(--gap);
   align-items: center;
 
-  padding: calc(10px * var(--uiScale));
-  border-radius: calc(14px * var(--uiScale));
+  padding: calc(10 * var(--u));
+  border-radius: calc(14 * var(--u));
   cursor: pointer;
 }
 .nodeCol{ min-width: 0; }
@@ -1040,15 +1200,16 @@ html, body, #app,
 
 /* =========================
    13) ENEMY HUD CENTER
+   - 중앙 상단 적 HUD(배너형)
    ========================= */
 .enemyHudCenter{
   position: fixed;
-  top: calc(8px * var(--uiScale));
+  top: calc(8 * var(--u));
   left: 50%;
   transform: translateX(calc(-50% + var(--enemyHudDx)));
 
   width: auto;
-  max-width: calc(100vw - calc(24px * var(--uiScale)));
+  max-width: calc(100vw - calc(24 * var(--u)));
   height: auto;
 
   background: none !important;
@@ -1067,7 +1228,7 @@ html, body, #app,
 .enemyHudCenter .enemyStrip{
   display:flex;
   flex-direction: row;
-  gap: calc(12px * var(--uiScale));
+  gap: calc(12 * var(--u));
   align-items: stretch;
   justify-content: center;
   flex-wrap: nowrap;
@@ -1075,7 +1236,7 @@ html, body, #app,
   pointer-events: auto;
 }
 
-/* clickable banners */
+/* 클릭 가능한 적 배너/칩 */
 .enemyHudCenter .enemyChip,
 .enemyHudCenter .enemyBanner{
   flex: 0 0 var(--enemyHudW) !important;
@@ -1085,10 +1246,10 @@ html, body, #app,
   pointer-events: auto !important;
   cursor: pointer;
 
-  border-radius: calc(18px * var(--uiScale));
-  border: 1px solid rgba(255,255,255,.14);
+  border-radius: calc(18 * var(--u));
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.14);
   background: rgba(0,0,0,.68);
-  box-shadow: 0 calc(18px * var(--uiScale)) calc(50px * var(--uiScale)) rgba(0,0,0,.35);
+  box-shadow: 0 calc(18 * var(--u)) calc(50 * var(--u)) rgba(0,0,0,.35);
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -1104,9 +1265,9 @@ html, body, #app,
   display: flex;
   flex-direction: row;
   align-items: baseline;
-  justify-content: space-between; /* 왼쪽: HP, 오른쪽: 10/10 */
-  gap: calc(8px * var(--uiScale));
-  white-space: nowrap;            /* ✅ 줄바꿈 금지 */
+  justify-content: space-between;
+  gap: calc(8 * var(--u));
+  white-space: nowrap;
 }
 
 .enemyHudCenter{
@@ -1114,18 +1275,20 @@ html, body, #app,
   height: auto !important;
 }
 
+
 /* =========================
    14) HP PIXEL BARS
+   - 적 체력바 픽셀 느낌
    ========================= */
 .enemyHPOuter{
   height: var(--hpH) !important;
-  border-radius: calc(2px * var(--uiScale)) !important;
+  border-radius: calc(2 * var(--u)) !important;
   overflow: hidden !important;
   background: rgba(0,0,0,.35) !important;
-  border: 1px solid var(--hpBorder) !important;
+  border: calc(1 * var(--u)) solid var(--hpBorder) !important;
   box-shadow:
-    inset 0 1px 0 var(--hpFrame),
-    inset 0 -1px 0 rgba(0,0,0,.55);
+    inset 0 calc(1 * var(--u)) 0 var(--hpFrame),
+    inset 0 -calc(1 * var(--u)) 0 rgba(0,0,0,.55);
   image-rendering: pixelated;
 }
 .enemyHPFill{
@@ -1136,8 +1299,8 @@ html, body, #app,
     repeating-linear-gradient(
       90deg,
       rgba(255,255,255,.18) 0,
-      rgba(255,255,255,.18) 1px,
-      rgba(0,0,0,0) 1px,
+      rgba(255,255,255,.18) calc(1 * var(--u)),
+      rgba(0,0,0,0) calc(1 * var(--u)),
       rgba(0,0,0,0) var(--hpSeg)
     ),
     linear-gradient(180deg, rgba(255,255,255,.12), rgba(0,0,0,.20));
@@ -1149,39 +1312,47 @@ html, body, #app,
 
 /* =========================
    15) FX / MISC HUD
+   - 전투 컨트롤/페이즈 배너/상단 코너 HUD/S HUD/힌트/플로팅 숫자
    ========================= */
+
+/* 전투 컨트롤(다음 턴 버튼) */
 .combatControls{
-  position: fixed;
-  bottom: calc(var(--dockH) + calc(-28px * var(--uiScale)));
-  transform: translateX(250%);
-  display: flex;
-  z-index: var(--zChrome) !important;
+  position: absolute;
+  justify-content: center;
+  top: 0;
+  transform: translate(0%, calc(2000% - var(--combatCtrlLift)));
+  z-index: 1;
   pointer-events: auto;
+
+  /* 기존 위치 강제 무효화 */
+  bottom: auto !important;
+  right: auto !important;
 }
 .combatControls *{ pointer-events: auto !important; }
 
 .combatControls .stepBtn{
-  padding: calc(10px * var(--uiScale)) calc(14px * var(--uiScale));
-  border-radius: calc(6px * var(--uiScale));
-  font-size: calc(15px * var(--uiScale));
+  padding: calc(10 * var(--u)) calc(14 * var(--u));
+  border-radius: calc(6 * var(--u));
+  font-size: calc(20 * var(--u));
   line-height: 1.1;
 }
 .combatControls .stepBtn.primary{ font-weight: 600; }
 
+/* 페이즈 배너 */
 .phaseBanner{
   position: fixed;
   left: 50%;
-  top: calc(64px * var(--uiScale));
+  top: calc(64 * var(--u));
   transform: translateX(-50%);
-  padding: calc(10px * var(--uiScale)) calc(14px * var(--uiScale));
-  border-radius: calc(14px * var(--uiScale));
-  border: 1px solid rgba(255,255,255,.18);
+  padding: calc(10 * var(--u)) calc(14 * var(--u));
+  border-radius: calc(14 * var(--u));
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.18);
   background: rgba(0,0,0,.80);
   color: #fff;
   font-weight: 900;
-  letter-spacing: .2px;
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+  letter-spacing: calc(2 * var(--u));
+  -webkit-backdrop-filter: blur(calc(6 * var(--u)));
+  backdrop-filter: blur(calc(6 * var(--u)));
   pointer-events: none;
   animation-name: phaseInOut;
   animation-duration: calc(420ms * var(--animMul));
@@ -1189,161 +1360,97 @@ html, body, #app,
   animation-fill-mode: both;
 }
 @keyframes phaseInOut{
-  0%   { opacity: 0; transform: translateX(-50%) translateY(calc(-6px * var(--uiScale))); }
+  0%   { opacity: 0; transform: translateX(-50%) translateY(calc(-6 * var(--u))); }
   20%  { opacity: 1; }
   70%  { opacity: 1; }
-  100% { opacity: 0; transform: translateX(-50%) translateY(calc(-12px * var(--uiScale))); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(calc(-12 * var(--u))); }
 }
 
-/* Stage corner HUD */
+/* 스테이지 코너 HUD(상단 좌측 근처 고정) */
 .stageCornerHud{
   position: fixed;
   pointer-events: none;
-  left: var(--playerHudLeftX) !important;
-  transform: none !important;
 
-  top: calc((var(--playerHudTop) + var(--playerHudDropY)) - var(--statusBarGap) - calc(50px * var(--uiScale))) !important;
+  left: calc(var(--safeL) + calc(160 * var(--u))) !important;
+  right: auto !important;
 
   text-align: left;
   white-space: nowrap;
 
-  padding: calc(6px * var(--uiScale)) calc(10px * var(--uiScale));
-  background: rgba(0,0,0,0.9);
-  border: 1px solid rgba(255,255,255,.18);
-  border-radius: calc(2px * var(--uiScale));
+  padding: calc(17 * var(--u)) calc(10 * var(--u));
+  background: rgba(0, 0, 0, 1);
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.18);
+  border-radius: calc(10 * var(--u));
   box-shadow:
-    0 2px 0 rgba(0,0,0,.55),
-    inset 0 1px 0 rgba(255,255,255,.10),
-    inset 0 -1px 0 rgba(0,0,0,.45);
+    0 calc(2 * var(--u)) 0 rgba(0,0,0,.55),
+    inset 0 calc(1 * var(--u)) 0 rgba(255,255,255,.10),
+    inset 0 -calc(1 * var(--u)) 0 rgba(0,0,0,.45);
 
   color: rgba(235,240,255,.96);
-  font-size: calc(18px * var(--uiScale));
+  font-size: calc(18 * var(--u));
   line-height: 1.5;
   text-shadow:
-    2px 2px 0 rgba(0,0,0,.90),
-    -2px 2px 0 rgba(0,0,0,.90),
-    2px -2px 0 rgba(0,0,0,.90),
-    -2px -2px 0 rgba(0,0,0,.90);
+    calc(2 * var(--u)) calc(2 * var(--u)) 0 rgba(0,0,0,.90),
+    -calc(2 * var(--u)) calc(2 * var(--u)) 0 rgba(0,0,0,.90),
+    calc(2 * var(--u)) -calc(2 * var(--u)) 0 rgba(0,0,0,.90),
+    -calc(2 * var(--u)) -calc(2 * var(--u)) 0 rgba(0,0,0,.90);
+
+  top:  calc(var(--safeT) + calc(10 * var(--u)));
+  transform: translateX(-50%) translateY(570%) translateY(var(--stageCornerLiftY)) !important;
+  z-index: var(--zChrome);
 }
 
-
-
-/* Item tray (top-left) */
-.itemTray{
+/* S 전용 HUD */
+#hudSOnly{
   position: fixed;
-  left: calc(10px * var(--uiScale));
-  top: calc(50px * var(--uiScale));
-  z-index: calc(var(--zChrome) - 10);
-  pointer-events: auto;
-  display: flex;
-  gap: calc(8px * var(--uiScale));
-  align-items: center;
-  overflow: hidden;
-}
-.itemSlot{
-  width: calc(60px * var(--uiScale));
-  height: calc(60px * var(--uiScale));
-  border-radius: calc(12px * var(--uiScale));
-  border: 1px solid rgba(255,255,255,.18);
-  background: rgba(0,0,0,.55);
-  box-shadow: 0 8px 20px rgba(0,0,0,.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  overflow: hidden;
-}
-.itemSlot img{
-  width: 86%;
-  height: 86%;
-  object-fit: contain;
-  image-rendering: pixelated;
-}
-.itemSlot:hover{
-  background: rgba(255,255,255,.06);
-}
-.itemSlot:active{
-  transform: translateY(calc(1px * var(--uiScale)));
-}
-.itemSlot.disabled{
-  opacity: .45;
-  cursor: default;
-}
-
-/* 1) 아이콘이 들어있는 "부모 박스"가 잘라내도록 */
-#itemTray .itemSlot,
-#itemTray .itemCell,
-.itemSlot,
-.itemCard,
-.shopItemCard,
-.shopItemIconWrap{
-  overflow: hidden !important;     /* 핵심 */
-  position: relative;             /* 안정 */
-}
-
-/* 2) 아이콘(이미지)을 살짝 확대 */
-#itemTray img,
-.itemSlot img,
-.itemCard img,
-.shopItemCard img,
-.shopItemIconWrap img{
-  transform: scale(1.4);         /* 1.05~1.12 정도에서 취향 */
-  transform-origin: center;
-  display: block;                  /* 미묘한 여백 제거 */
-}
-
-.itemTray{
-  position: fixed;      /* 이미 있을 텐데 혹시 몰라서 */
-}
-
-.itemTray .itemHoverTip{
-  position: absolute;
-  left: 0;
-  top: calc(100% + calc(10px * var(--uiScale))); /* 트레이 아래에 뜨게 */
+  left: var(--sHudLeft);
+  top:  var(--sHudTop);
+  transform: translate(var(--sHudOffX), var(--sHudOffY));
   z-index: var(--zChrome);
 
-  /* 나타날 때 느낌 */
-  visibility: hidden;
-  opacity: 0;
-  transform: translateY(calc(-4px * var(--uiScale)));
-  transition: opacity 120ms ease, transform 120ms ease;
-  pointer-events: none; /* hover 꼬임 방지 */
-  display: block;
+  padding: var(--sHudPadY) var(--sHudPadX);
+  background: rgb(255, 255, 255);
+  border: calc(1 * var(--u)) solid rgba(255,255,255,0);
+  border-radius: var(--sHudR);
+
+  font-weight: 900;
+  font-size: var(--sHudFont);
+  color: rgb(0, 0, 0);
+  line-height: 1;
+  white-space: nowrap;
+
+  pointer-events: none;
 }
 
-.itemTray .itemHoverTip.show{
-  visibility: visible;
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* new run fixed button */
+/* 새 런 시작 버튼(좌상단) */
+.floatingNewRun,
 .newRunBtn{
   position: fixed;
-  top: calc(8px * var(--uiScale));
-  right: calc(8px * var(--uiScale));
-  z-index: var(--zChrome) !important;
-  pointer-events: auto !important;
+  top:  calc(var(--safeT) + calc(8 * var(--u)));
+  left: calc(var(--safeL) + calc(10 * var(--u)));
+  z-index: var(--zChrome);
+  pointer-events: auto;
 }
 .newRunBtn *{ pointer-events:auto !important; }
 
-/* target hint near HUD */
+/* 타겟 힌트(HUD 근처) */
 .targetHintInline{
   position: fixed;
   left: 50%;
-  top: calc(var(--targetHintTop) * var(--uiScale)) !important;
+  top: var(--targetHintTop) !important;
   transform: translateX(-50%);
   pointer-events: none;
 
-  max-width: min(calc(720px * var(--uiScale)), calc(100vw - calc(24px * var(--uiScale))));
-  padding: calc(6px * var(--uiScale)) calc(10px * var(--uiScale));
-  border-radius: calc(12px * var(--uiScale));
+  max-width: min(calc(720 * var(--u)), calc(100vw - calc(24 * var(--u))));
+  padding: calc(6 * var(--u)) calc(10 * var(--u));
+  border-radius: calc(12 * var(--u));
 
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* 플로팅 숫자 FX */
 .floatFxLayer{
   position: fixed;
   inset: 0;
@@ -1355,8 +1462,8 @@ html, body, #app,
   position: absolute;
   transform: translate(-50%, -50%);
   font-weight: 900;
-  font-size: calc(18px * var(--uiScale));
-  text-shadow: 0 2px 0 rgba(0,0,0,.55), 0 0 12px rgba(0,0,0,.45);
+  font-size: calc(18 * var(--u));
+  text-shadow: 0 calc(2 * var(--u)) 0 rgba(0,0,0,.55), 0 0 calc(12 * var(--u)) rgba(0,0,0,.45);
   animation-name: floatUp;
   animation-duration: calc(650ms * var(--animMul));
   animation-timing-function: ease-out;
@@ -1368,14 +1475,15 @@ html, body, #app,
 .floatNum.block{ color:#8cc7ff; }
 
 @keyframes floatUp{
-  0%   { opacity: 0; transform: translate(-50%, -50%) translateY(8px) scale(.96); }
+  0%   { opacity: 0; transform: translate(-50%, -50%) translateY(calc(8 * var(--u))) scale(.96); }
   15%  { opacity: 1; }
-  100% { opacity: 0; transform: translate(-50%, -50%) translateY(-22px) scale(1.05); }
+  100% { opacity: 0; transform: translate(-50%, -50%) translateY(-calc(22 * var(--u))) scale(1.05); }
 }
 
 
 /* =========================
    16) SETTINGS / RULEBOOK OVERLAYS
+   - 설정/룰북 등 전체 오버레이 레이아웃
    ========================= */
 .overlay-layer{
   position: fixed !important;
@@ -1397,7 +1505,7 @@ html, body, #app,
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: calc(24px * var(--uiScale));
+  padding: calc(24 * var(--u));
   box-sizing: border-box;
 
   pointer-events: auto !important;
@@ -1405,33 +1513,42 @@ html, body, #app,
 .settingsOverlay *{ pointer-events:auto !important; }
 
 .settingsPanel{
-  width: min(calc(760px * var(--uiScale)), 90%) !important;
+  width: min(calc(760 * var(--u)), 90%) !important;
   max-width: none !important;
   max-height: none !important;
   overflow: visible;
 
-  border-radius: calc(18px * var(--uiScale));
-  border: 1px solid rgba(255,255,255,.14);
+  border-radius: calc(18 * var(--u));
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.14);
   background: rgba(10,12,14,1);
-  padding: calc(16px * var(--uiScale));
+  padding: calc(16 * var(--u));
 }
 
 
 /* =========================
-   17) CHOICE / EVENT OVERLAY (KEY FIX)
+   17) CHOICE / EVENT OVERLAY
+   - 이벤트/선택 모달 패널 + 리스트 스크롤
    ========================= */
 .choice-contentRow{
   display:flex;
   gap: var(--choiceRowGap);
-  margin-top: calc(12px * var(--uiScale));
+  margin-top: calc(12 * var(--u));
   justify-content:center;
   align-items:stretch;
+
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .choice-leftCol{
-  flex: 1 1 calc(640px * var(--uiScale));
-  max-width: calc(720px * var(--uiScale));
+  flex: 1 1 calc(640 * var(--u));
+  max-width: calc(720 * var(--u));
   min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .choice-illuCol{
@@ -1445,8 +1562,8 @@ html, body, #app,
 .choice-illuBox{
   width: 100%;
   aspect-ratio: 1 / 1;
-  border-radius: calc(18px * var(--uiScale));
-  border: 1px solid rgba(255,255,255,.16);
+  border-radius: calc(18 * var(--u));
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.16);
   background: rgba(0,0,0,.35);
   overflow: hidden;
   position: relative;
@@ -1456,15 +1573,20 @@ html, body, #app,
   display:flex;
   flex-direction:column;
   gap: var(--choiceListGap);
+
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding-right: calc(6 * var(--u));
 }
 
 .choice-item{
   display:flex;
-  gap: calc(12px * var(--uiScale));
+  gap: calc(12 * var(--u));
   align-items:flex-start;
-  border:1px solid rgba(255,255,255,.10);
-  border-radius: calc(14px * var(--uiScale));
-  padding: calc(12px * var(--uiScale));
+  border:calc(1 * var(--u)) solid rgba(255,255,255,.10);
+  border-radius: calc(14 * var(--u));
+  padding: calc(12 * var(--u));
   background: rgba(255,255,255,.03);
   position:relative;
 }
@@ -1472,9 +1594,9 @@ html, body, #app,
 pre.choice-detail,
 .choice-panel pre.choice-detail{
   font-family: "Mulmaru", sans-serif !important;
-  font-size: calc(13px * var(--uiScale));
+  font-size: calc(13 * var(--u));
   line-height: 1.35;
-  letter-spacing: -0.2px;
+  letter-spacing: -calc(0.2 * var(--u));
 }
 
 .choice-overlay{
@@ -1493,7 +1615,7 @@ pre.choice-detail,
   box-sizing:border-box;
 }
 
-/* kill the backdrop */
+/* 배경 제거(완전 투명) */
 .choice-backdrop{
   display: none !important;
   pointer-events: none !important;
@@ -1502,7 +1624,7 @@ pre.choice-detail,
   -webkit-backdrop-filter: none !important;
 }
 
-/* panel (modal) */
+/* 모달 패널(중앙 고정 + Dx/Dy 보정) */
 .choice-panel{
   position: fixed !important;
   z-index: var(--zChoicePanel) !important;
@@ -1511,108 +1633,296 @@ pre.choice-detail,
   display: flex;
   flex-direction: column;
 
-
   left: 50% !important;
   top: 50% !important;
 
-  /* ✅ 중심(-50%,-50%)을 잡고, Dx/Dy를 uiScale 한 번만 먹여서 이동 */
   transform:
     translate(-50%, -50%)
     translate(
-      calc(var(--choicePanelDx) * var(--uiScale)),
-      calc(var(--choicePanelDy) * var(--uiScale))
+      calc(var(--choicePanelDx) * var(--u)),
+      calc(var(--choicePanelDy) * var(--u))
     ) !important;
 
-  width: min(calc(800px * var(--uiScale)), 96vw);
-  max-height: calc(92vh - calc(var(--choicePanelMarginY) * var(--uiScale)) * 2);
-  padding: var(--choicePanelPad); /* 원래 패딩 복귀 권장 */
+  width: min(calc(800 * var(--u)), 96vw);
+  max-height: calc(92vh - calc(var(--choicePanelMarginY) * var(--u)) * 2);
+  padding: var(--choicePanelPad);
   box-sizing: border-box;
   overflow: auto;
   overflow-x: hidden;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: calc(1 * var(--u)) solid rgba(255,255,255,0.1);
   border-radius: var(--choicePanelR);
   background: rgba(0,0,0,1);
-  box-shadow: 0 calc(18px * var(--uiScale)) calc(60px * var(--uiScale)) rgba(0,0,0,1);
+  box-shadow: 0 calc(18 * var(--u)) calc(60 * var(--u)) rgba(0,0,0,1);
 }
 
-.choice-contentRow{
-  flex: 1 1 auto;
-  min-height: 0;  /* ✅ overflow 계산에 필수 */
-}
 
-/* 왼쪽 컬럼이 세로로 늘 수 있게 */
-.choice-leftCol{
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-
-/* 리스트가 남는 공간을 먹고, 넘치면 리스트만 스크롤 */
-.choice-list{
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-  padding-right: calc(6px * var(--uiScale)); /* 스크롤바 여유(선택) */
-}
 /* =========================
-   18) RELICS
+   18) TRAYS (ITEMS + RELICS)
+   - 아이템 트레이 / 렐릭 트레이 공통 레이아웃
+   ========================= */
+
+/* 아이템 슬롯 기본 스타일(트레이 밖에서도 사용 가능) */
+.itemSlot{
+  width: calc(60 * var(--u));
+  height: calc(60 * var(--u));
+  border-radius: calc(14 * var(--u));
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.18);
+  background: rgba(0,0,0,.35);
+  box-shadow: 0 calc(8 * var(--u)) calc(20 * var(--u)) rgba(0,0,0,.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+}
+.itemSlot img{
+  width: 86%;
+  height: 86%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.itemSlot:hover{ background: rgba(255,255,255,.06); }
+.itemSlot:active{ transform: translateY(calc(1 * var(--u))); }
+.itemSlot.disabled{ opacity: .45; cursor: default; }
+
+/* 아이템: 버리기 버튼(호버 시 표시) */
+.itemDropBtn{
+  position: absolute;
+  top: calc(2 * var(--u));
+  right: calc(2 * var(--u));
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
+  border-radius: calc(6 * var(--u));
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.22);
+  background: rgba(0,0,0,.55);
+  color: rgba(255,255,255,.85);
+  font-size: calc(12 * var(--u));
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(calc(-1 * var(--u)));
+  transition: opacity .12s ease, transform .12s ease, background .12s ease;
+  z-index: 2;
+}
+.itemSlot:hover .itemDropBtn{
+  opacity: 1;
+  transform: translateY(0);
+}
+.itemDropBtn:hover{ background: rgba(0,0,0,.78); }
+.itemDropBtn:active{ transform: translateY(calc(1 * var(--u))); }
+
+/* 아이템 트레이: 수량/한도 배지 */
+.itemCapBadge{
+  position: absolute;
+  left: calc(6 * var(--u));
+  top: calc(6 * var(--u));
+  padding: calc(3 * var(--u)) calc(6 * var(--u));
+  border-radius: calc(999 * var(--u));
+  background: rgba(0,0,0,.55);
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.18);
+  font-size: calc(11 * var(--u));
+  color: rgba(255,255,255,.85);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* 아이템 트레이: 배지 + 힌트(4/4 옆, 트레이보다 살짝 위) */
+.itemCapHud{
+  position: fixed;
+  display: flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  pointer-events: none;
+  z-index: calc(var(--zRelicHud) + 2);
+}
+.itemCapHud .itemCapBadge{
+  position: static;
+  left: auto;
+  top: auto;
+}
+.itemCapHint{
+  padding: calc(3 * var(--u)) calc(7 * var(--u));
+  border-radius: calc(999 * var(--u));
+  background: rgba(0,0,0,.42);
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.14);
+  font-size: calc(11 * var(--u));
+  color: rgba(255,255,255,.78);
+  white-space: nowrap;
+}
+
+/* 아이콘 부모 박스는 항상 잘라내기 */
+#itemTray .itemSlot,
+#itemTray .itemCell,
+.itemSlot,
+.itemCard,
+.shopItemCard,
+.shopItemIconWrap{
+  overflow: hidden !important;
+  position: relative;
+}
+
+/* 아이템 트레이(좌하단 고정) */
+:is(#itemTray, .itemTray){
+  position: fixed !important;
+  left: var(--itemTrayLeft) !important;
+  bottom: var(--trayBottom) !important;
+  z-index: var(--zRelicHud) !important;
+  pointer-events: auto !important;
+
+  display: grid !important;
+  grid-template-columns: repeat(var(--trayCols), var(--traySlot)) !important;
+  grid-auto-rows: var(--traySlot) !important;
+  gap: var(--trayGap) !important;
+
+  box-sizing: border-box !important;
+  max-height: calc(
+    (var(--traySlot) * var(--trayRowsMax))
+    + (var(--trayGap) * (var(--trayRowsMax) - 1))
+    + (var(--trayPad) * 2)
+  ) !important;
+
+  max-width: calc(
+    (var(--traySlot) * var(--trayCols))
+    + (var(--trayGap) * (var(--trayCols) - 1))
+    + (var(--trayPad) * 2)
+  ) !important;
+
+  padding: var(--trayPad) !important;
+
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  align-content: start !important;
+
+  /* 스크롤바 숨김(스크롤은 유지) */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+:is(#itemTray, .itemTray)::-webkit-scrollbar{ width: 0; height: 0; }
+:is(#itemTray, .itemTray)::-webkit-scrollbar-thumb{ background: transparent; }
+:is(#itemTray, .itemTray)::-webkit-scrollbar-track{ background: transparent; }
+
+/* 트레이 셀(아이템 카드/셀 공통) */
+:is(#itemTray, .itemTray) :is(.itemSlot, .itemCell, .itemCard){
+  width:  var(--traySlot) !important;
+  height: var(--traySlot) !important;
+  box-sizing: border-box !important;
+
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.18) !important;
+  background: rgba(0,0,0,0.35) !important;
+
+  border-radius: calc(14 * var(--u)) !important;
+  box-shadow: 0 calc(8 * var(--u)) calc(20 * var(--u)) rgba(0,0,0,.35) !important;
+
+  display: grid !important;
+  place-items: center !important;
+  cursor: pointer;
+  overflow: hidden !important;
+}
+
+/* 트레이 아이콘 이미지 핏 */
+:is(#itemTray, .itemTray) :is(.itemSlot, .itemCell, .itemCard) img{
+  width: 86% !important;
+  height: 86% !important;
+  object-fit: contain !important;
+  image-rendering: pixelated !important;
+}
+
+/* 아이콘 확대(아이템/상점/기타 공용) */
+#itemTray img,
+.itemSlot img,
+.itemCard img,
+.shopItemCard img,
+.shopItemIconWrap img{
+  transform: scale(1.8);
+  transform-origin: center;
+  display: block;
+}
+
+/* 트레이 내부에 붙는 툴팁은 완전히 제거(커서 호버로만 표시되는 툴팁만 유지) */
+:is(#itemTray, .itemTray) .itemHoverTip{
+  display: none !important;
+}
+
+
+
+/* =========================
+   18-1) RELICS
+   - 우하단 렐릭 트레이 + 툴팁/모달
    ========================= */
 .relicTray{
   position: fixed;
-  right: var(--relicTrayRight);
-  bottom: var(--relicTrayBottom);
+  right: var(--relicTrayRight) !important;
+  bottom: var(--trayBottom) !important;
   z-index: var(--zRelicHud);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 8px;
+  gap: calc(8 * var(--u));
   pointer-events: auto;
+
+
 }
 
-/* 4열, 3행까지만 보이고 그 이상 스크롤 */
+/* 렐릭 리스트(4열 3행 기준, 그 이상은 스크롤) */
 .relicTrayList{
   display: grid;
-  grid-template-columns: repeat(4, var(--relicIconSize));
-  grid-auto-rows: var(--relicIconSize);
-  gap: var(--relicIconGap);
+  grid-template-columns: repeat(var(--trayCols), var(--traySlot)) !important;
+  grid-auto-rows: var(--traySlot) !important;
+  gap: var(--trayGap) !important;
 
   justify-content: end;
   justify-items: stretch;
   align-items: stretch;
 
-  max-height: calc(var(--relicIconSize) * 3 + var(--relicIconGap) * 2);
+  box-sizing: border-box !important;
+  max-height: calc(
+    (var(--traySlot) * var(--trayRowsMax))
+    + (var(--trayGap) * (var(--trayRowsMax) - 1))
+    + (var(--trayPad) * 2)
+  ) !important;
+
+  max-width: calc(
+    (var(--traySlot) * var(--trayCols))
+    + (var(--trayGap) * (var(--trayCols) - 1))
+    + (var(--trayPad) * 2)
+  ) !important;
+
   overflow-y: auto;
   overflow-x: hidden;
 
-  max-width: calc(var(--relicIconSize) * 4 + var(--relicIconGap) * 3);
-  padding: 8px;
+  padding: var(--trayPad) !important;
 
   scrollbar-gutter: stable;
   scroll-snap-type: y mandatory;
 
+  /* 아래에서 위로 쌓이는 느낌(스크롤 방향 반전) */
   transform: rotate(180deg);
 }
+
+/* 아이콘은 다시 뒤집어서 정상 표시 */
 .relicTrayList .relicIcon{ transform: rotate(180deg); }
 
 .relicIcon, .relicHoverTip, .relicModalPanel{ direction: ltr; }
 
-.relicTrayList::-webkit-scrollbar{ width: 10px; }
+/* 렐릭 스크롤바(보이는 버전) */
+.relicTrayList::-webkit-scrollbar{ width: calc(10 * var(--u)); }
 .relicTrayList::-webkit-scrollbar-thumb{
   background: rgba(255,255,255,0.18);
-  border-radius: 999px;
+  border-radius: calc(999 * var(--u));
 }
 .relicTrayList::-webkit-scrollbar-track{
   background: rgba(0,0,0,0.18);
-  border-radius: 999px;
+  border-radius: calc(999 * var(--u));
 }
 
 .relicIcon{
   width: var(--relicIconSize);
   height: var(--relicIconSize);
-  border-radius: 14px;
+  border-radius: calc(14 * var(--u));
 
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: calc(2 * var(--u)) solid rgba(255, 255, 255, 1);
   background: rgba(0, 0, 0, 0.35);
   color: rgba(255, 255, 255, 0.92);
 
@@ -1622,7 +1932,10 @@ pre.choice-detail,
 
   overflow: hidden;
   scroll-snap-align: start;
+
+  box-sizing: border-box;
 }
+
 .relicIconImg{
   width: 100%;
   height: 100%;
@@ -1638,17 +1951,17 @@ pre.choice-detail,
 
 .relicHoverTip{
   display: none;
-  min-width: 220px;
-  max-width: 360px;
+  min-width: calc(220 * var(--u));
+  max-width: calc(360 * var(--u));
   background: rgba(0, 0, 0, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  padding: 10px 12px;
+  border: calc(1 * var(--u)) solid rgba(255, 255, 255, 0.12);
+  border-radius: calc(14 * var(--u));
+  padding: calc(10 * var(--u)) calc(12 * var(--u));
   color: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 calc(18 * var(--u)) calc(40 * var(--u)) rgba(0, 0, 0, 0.45);
 }
-.relicTipTitle{ font-weight: 700; margin-bottom: 6px; }
-.relicTipBody{ font-size: 12.5px; line-height: 1.35; white-space: pre-wrap; }
+.relicTipTitle{ font-weight: 700; margin-bottom: calc(6 * var(--u)); }
+.relicTipBody{ font-size: calc(12.5 * var(--u)); line-height: 1.35; white-space: pre-wrap; }
 
 .relicModal{
   position: fixed;
@@ -1657,43 +1970,43 @@ pre.choice-detail,
   background: rgba(0, 0, 0, 0.55);
   display: grid;
   place-items: center;
-  padding: 18px;
+  padding: calc(18 * var(--u));
 }
 
 .relicModalPanel{
-  width: min(720px, 96vw);
-  max-height: min(84vh, 900px);
+  width: min(calc(720 * var(--u)), 96vw);
+  max-height: min(84vh, calc(900 * var(--u)));
   overflow: auto;
   background: rgba(18, 18, 18, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
-  transform: translateY(-60px);
+  border: calc(1 * var(--u)) solid rgba(255, 255, 255, 0.14);
+  border-radius: calc(16 * var(--u));
+  box-shadow: 0 calc(20 * var(--u)) calc(60 * var(--u)) rgba(0, 0, 0, 0.55);
+  transform: translateY(-calc(60 * var(--u)));
 }
 
 .relicModalHeader{
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+  padding: calc(14 * var(--u)) calc(16 * var(--u));
+  border-bottom: calc(1 * var(--u)) solid rgba(255, 255, 255, 0.10);
 }
 .relicModalTitle{ font-weight: 800; }
 
 .relicModalBody{
-  padding: 16px;
+  padding: calc(16 * var(--u));
   display: grid;
-  grid-template-columns: 160px 1fr;
-  gap: 16px;
+  grid-template-columns: calc(160 * var(--u)) 1fr;
+  gap: calc(16 * var(--u));
   align-items: start;
 }
 
 .relicModalArt{
-  width: 160px;
-  height: 160px;
-  border-radius: 14px;
+  width: calc(160 * var(--u));
+  height: calc(160 * var(--u));
+  border-radius: calc(14 * var(--u));
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.12);
+  border: calc(1 * var(--u)) solid rgba(255,255,255,0.12);
   background: rgba(0,0,0,0.28);
 }
 .relicModalArtImg{
@@ -1716,8 +2029,8 @@ pre.choice-detail,
 
 /* =========================
    19) ENEMY CARDS
+   - 적 카드 프레임/아트/미니 HUD + 호버 상세
    ========================= */
-
 .enemyBanner.enemyCardWrap{
   position: relative;
   flex: 0 0 auto;
@@ -1742,21 +2055,23 @@ pre.choice-detail,
   --artZoom: 1;
 }
 
-/* 프레임 PNG 비율(1365x2048)에 맞춰 박스 비율을 고정 */
+/* 프레임 PNG 비율(1365x2048)에 맞춘 박스 */
 .enemyArtCard{
   position: relative;
   width: calc(70% * var(--enemyUi));
-  margin: calc(8px * var(--uiScale)) auto 0;
-  aspect-ratio: 1365 / 2048;   /* ✅ 프레임과 동일 비율 */
+  margin: calc(8 * var(--u)) auto 0;
+  aspect-ratio: 1365 / 2048;
   height: auto;
   flex: 0 0 auto;
 
-  border-radius: 2px;           /* ✅ 라운딩 제거 */
-  overflow: visible;          /* 프레임 자체는 박스 안에 들어오므로 visible이어도 OK */
+  border-radius: calc(2 * var(--u));
+  overflow: visible;
   background: transparent;
+
+  --frameBleed: calc(6 * var(--u));
 }
 
-/* 아트(프레임 아래) */
+/* 아트 레이어 */
 .enemyArtCard::before{
   content:"";
   position:absolute;
@@ -1764,45 +2079,38 @@ pre.choice-detail,
   background-image: var(--artImg);
   background-repeat: no-repeat;
   background-position: 50% 35%;
-  background-size: calc(100% * var(--artZoom, 1.0)) auto; /* 기존 느낌 유지 */
+  background-size: calc(100% * var(--artZoom, 1.0)) auto;
   image-rendering: pixelated;
   z-index: 1;
 }
 
-/* 프레임(박스에 딱 맞게) */
+/* 프레임 레이어 */
 .enemyArtCard::after{
   content:"";
   position:absolute;
-  inset:0;                    /* ✅ 튀어나오지 않게 */
+  inset: calc(-2 * var(--frameBleed));
   background-image: var(--frameImg);
   background-repeat:no-repeat;
   background-position:center;
-  background-size: 100% 100%; /* ✅ 프레임 전체가 보이게 */
+  background-size: 100% 100%;
   image-rendering: pixelated;
   pointer-events:none;
   z-index: 5;
 }
 
-.enemyArtCard{
-  --frameBleed: calc(6px * var(--uiScale)); /* 프레임이 카드 밖으로 나가는 양 */
-}
-.enemyArtCard::after{
-  inset: calc(-2 * var(--frameBleed));
-}
-
-/* 하단 HUD 박스 */
+/* 하단 미니 HUD */
 .enemyMiniHud{
   width: 70%;
-  padding: calc(7px * var(--uiScale) * var(--enemyUi)) calc(9px * var(--uiScale) * var(--enemyUi));
-  border: 1px solid rgba(255,255,255,.10);
+  padding: calc(7 * var(--u) * var(--enemyUi)) calc(9 * var(--u) * var(--enemyUi));
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.10);
   background: rgba(0,0,0,0.7);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(calc(8 * var(--u)));
+  -webkit-backdrop-filter: blur(calc(8 * var(--u)));
   display:flex;
   flex-direction:column;
-  gap: calc(5px * var(--uiScale) * var(--enemyUi));
-  border-radius: calc(3px * var(--uiScale));
-  margin-top: -10px;
+  gap: calc(5 * var(--u) * var(--enemyUi));
+  border-radius: calc(3 * var(--u));
+  margin-top: -calc(10 * var(--u));
   z-index: 10;
 }
 
@@ -1810,23 +2118,23 @@ pre.choice-detail,
   display:flex;
   justify-content: center !important;
   align-items:center;
-  gap: 8px;
+  gap: calc(8 * var(--u));
 }
 
 .enemyIntentIcon{
-  font-size: calc(20px * var(--uiScale) * var(--enemyUi));
+  font-size: calc(20 * var(--u) * var(--enemyUi));
   line-height: 1;
 }
 
 .enemyIntentDmg{
-  font-size: calc(20px * var(--uiScale) * var(--enemyUi));
+  font-size: calc(20 * var(--u) * var(--enemyUi));
   font-weight: 900;
   line-height: 1;
   white-space: nowrap;
 }
 
 .enemyIntentLine{
-  font-size: calc(11px * var(--uiScale) * var(--enemyUi));
+  font-size: calc(11 * var(--u) * var(--enemyUi));
   opacity: .92;
   white-space: nowrap;
   overflow: hidden;
@@ -1838,154 +2146,105 @@ pre.choice-detail,
   display:flex;
   flex-direction: row;
   align-items:center;
-  gap: calc(8px * var(--uiScale) * var(--enemyUi));
+  gap: calc(8 * var(--u) * var(--enemyUi));
 }
 .enemyMiniHud .enemyHpText{
-  font-size: calc(13px * var(--uiScale) * var(--enemyUi));
-  width: calc(78px * var(--uiScale) * var(--enemyUi));
+  font-size: calc(13 * var(--u) * var(--enemyUi));
+  width: calc(78 * var(--u) * var(--enemyUi));
   flex: 0 0 auto;
   white-space: nowrap;
 }
 .enemyMiniHud .enemyHPOuter{
   flex: 1 1 auto;
-  height: calc(7px * var(--uiScale) * var(--enemyUi));
-  border-radius: 999px;
+  height: calc(7 * var(--u) * var(--enemyUi));
+  border-radius: calc(999 * var(--u));
   overflow:hidden;
 }
 .enemyMiniHud .enemyHPFill{ height: 100%; }
 
-/* 상태 이모지 */
+/* 상태 이모지 라인(표시만, 주석에는 미사용) */
 .enemyStatusEmojiRow{
   display:flex;
   flex-wrap: wrap;
   align-items: center;
-  font-size: calc(10px * var(--uiScale) * var(--enemyUi));
-  gap: calc(3px * var(--uiScale) * var(--enemyUi));
-  min-height: calc(16px * var(--uiScale) * var(--enemyUi));
+  font-size: calc(10 * var(--u) * var(--enemyUi));
+  gap: calc(3 * var(--u) * var(--enemyUi));
+  min-height: calc(16 * var(--u) * var(--enemyUi));
 }
 .enemyStatusEmojiRow .stEmoji{
   line-height: 1.1;
-  border: 1px solid rgba(255,255,255,.10);
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.10);
   background: rgba(255,255,255,.04);
-  padding: calc(1px * var(--uiScale) * var(--enemyUi)) calc(3px * var(--uiScale) * var(--enemyUi));
-  border-radius: calc(7px * var(--uiScale) * var(--enemyUi));
+  padding: calc(1 * var(--u) * var(--enemyUi)) calc(3 * var(--u) * var(--enemyUi));
+  border-radius: calc(7 * var(--u) * var(--enemyUi));
 }
 
-/* hover 상세 */
+/* 호버 상세 */
 .enemyHoverDetail{
   display:none;
   position:absolute;
-  left: 10px; right: 10px;
-  bottom: 10px;
-  transform: translateY(-6px);
+  left: calc(10 * var(--u)); right: calc(10 * var(--u));
+  bottom: calc(10 * var(--u));
+  transform: translateY(-calc(6 * var(--u)));
   opacity: 0;
   pointer-events: none;
   white-space: pre-wrap;
-  font-size: calc(12px * var(--uiScale));
+  font-size: calc(12 * var(--u));
   line-height: 1.35;
-  padding: 10px 12px;
-  border-radius: 5px;
-  border: 1px solid rgba(255,255,255,.14);
+  padding: calc(10 * var(--u)) calc(12 * var(--u));
+  border-radius: calc(5 * var(--u));
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.14);
   background: rgba(0,0,0,.86);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(calc(4 * var(--u)));
+  backdrop-filter: blur(calc(4 * var(--u)));
   z-index: 50;
 }
-
 .enemyBanner:hover .enemyHoverDetail{ display:block; }
 
 .enemyBanner.enemyCardWrap .enemyHoverDetail{
-  left: -18px;
-  right: -18px;
+  left: -calc(18 * var(--u));
+  right: -calc(18 * var(--u));
+  top: -calc(10 * var(--u));
+  bottom: -calc(10 * var(--u));
+  transform: translateY(calc(14 * var(--u)));
 
-  bottom: -14px;
-  transform: translateY(14px);
+  font-size: calc(14 * var(--u));
+  padding: calc(14 * var(--u)) calc(16 * var(--u));
+  border-radius: calc(10 * var(--u));
 
-  font-size: calc(14px * var(--uiScale));
-  padding: 14px 16px;
-  border-radius: 10px;
-
-  max-height: min(40vh, calc(260px * var(--uiScale)));
+  max-height: min(40vh, calc(260 * var(--u)));
   overflow: auto;
 
   display: none;
   opacity: 0;
   pointer-events: none;
 
-  box-shadow: 0 22px 70px rgba(0,0,0,.60);
+  box-shadow: 0 calc(22 * var(--u)) calc(70 * var(--u)) rgba(0,0,0,.60);
 }
 .enemyBanner.enemyCardWrap:hover .enemyHoverDetail{
   display: block;
   opacity: 1;
-  transform: translateY(calc(-30px * var(--uiScale)));
+  transform: translateY(calc(-30 * var(--u)));
 }
 .enemyBanner.enemyCardWrap:hover .enemyMiniHud{ opacity: 0.18; }
 
 
-
 /* =========================
    20) MAP (2-column, full-viewport)
+   - 맵 노드 선택 UI(지도 + 사이드 패널)
    ========================= */
-
-:root{
-  /* ui scale (already in your project, fallback=1) */
-  --S: var(--uiScale, 1);
-
-  /* ---- Panel placement (center + tweak; %는 스케일 영향 X) ---- */
-  --mapPanelCX: 50%;
-  --mapPanelCY: 50%;
-  --mapPanelDX: 0%;
-  --mapPanelDY: -24%;
-
-  /* ---- Base sizes (px) : 여기 숫자만 바꾸면 됨 ---- */
-  --panelInsetPx: 3;      /* 화면 여백 */
-  --panelMaxInsetPx: 60;   /* max-height 계산용(=2*inset 느낌) */
-  --panelMaxWidthPx: 800;
-
-  --gridGapPx: 16;
-  --sideColWidthPx: 380;
-
-  --boxPadPx: 14;
-  --boxRadiusPx: 14;
-  --scrollerRadiusPx: 12;
-
-  /* ---- Map content transform ---- */
-  --mapSvgScale: 0.70; /* (배율은 숫자라 uiScale과 별개) */
-  --mapSvgDX: 0%;
-  --mapSvgDY: 0%;
-
-  /* ---- Background image ---W- */
-  --mapBgDim: 0;       /* 어둡게 덮는 정도 */
-  --mapBgOpacity: 0;      /* cover 레이어는 opacity 대신 dim으로 조절 추천 */
-  --mapHeaderSafeTopPx: 12;
-  --mapHeaderSafeSidePx: 14;
-
-  /* ✅ 패널 최대높이(스케일 반영해서 clamp) */
-  --mapPanelMaxHPx: 900; /* 필요하면 숫자만 조절 */
-  --mapScrollerMinHPx: 520;
-  --mapSvgScale: 1.0;
-
-  --pillarPx: 90;
-  --pillarW: calc(var(--pillarPx) * 1px * var(--S));
-
-  /* ✅ 지도 창 최소 높이(노드 적어도 높이 유지) */
-  --mapScrollerMinHPx: 520;
-
-}
-
-
 .nodeSelectWrap.mapNodeSelect{
   position: fixed !important;
   inset: auto !important;
 
   left: calc(var(--mapPanelCX) + var(--mapPanelDX)) !important;
   top:  calc(var(--mapPanelCY) + var(--mapPanelDY)) !important;
-  transform: translate(-50%, -40%) !important;
+  transform: translate(-50%, 0%) !important;
+  background: rgb(9,8,7) !important;
+  border-radius: 5%;
 
-  /* width / max-height : uiScale 적용 */
-  width: calc(var(--panelMaxWidthPx) * 1px * var(--S)) !important;
-
-  max-height: calc(var(--mapPanelMaxHPx) * 2px * var(--S)) !important;
+  width: calc(var(--panelMaxWidthPx) * var(--u)) !important;
+  max-height: calc(var(--mapPanelMaxHPx) * var(--u)) !important;
 
   display: flex !important;
   flex-direction: column !important;
@@ -1993,19 +2252,17 @@ pre.choice-detail,
 
   box-sizing: border-box !important;
   z-index: 52000 !important;
-
 }
-
 
 .mapNodeSelectBody{
   flex: 1 1 auto;
   min-height: 0;
 
   display: grid;
-  grid-template-columns: minmax(0, 1fr) calc(var(--sideColWidthPx) * 1px * var(--S));
-  gap: calc(var(--gridGapPx) * 1px * var(--S));
+  grid-template-columns: minmax(0, 1fr) calc(var(--sideColWidthPx) * var(--u));
+  gap: calc(var(--gridGapPx) * var(--u));
 
-  margin-top: calc(3px * var(--S));
+  margin-top: calc(3 * var(--u));
 }
 
 .mapNodeSelectMapCol{
@@ -2017,12 +2274,10 @@ pre.choice-detail,
 .mapNodeSelectSideCol{
   min-height: 0;
   overflow: auto;
-
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
 .mapNodeSelectSideCol::-webkit-scrollbar{ width:0; height:0; }
-
 
 .mapNodeSelectMapCol .mapMiniBox,
 .mapNodeSelect .mapMiniBox{
@@ -2032,16 +2287,16 @@ pre.choice-detail,
   display: flex;
   flex-direction: column;
 
-  padding: calc(var(--boxPadPx) * 1px * var(--S)) !important;
-  border-radius: calc(var(--boxRadiusPx) * 1px * var(--S)) !important;
+  padding: calc(var(--boxPadPx) * var(--u)) !important;
+  border-radius: calc(var(--boxRadiusPx) * var(--u)) !important;
   margin: 0 !important;
 }
 
-/* scroller: fill + center */
+/* 스크롤러: 채우기 + 중앙 */
 .mapNodeSelectMapCol .mapMiniScroller,
 .mapNodeSelect .mapMiniScroller{
   flex: 1 1 auto;
-  min-height: calc(var(--mapScrollerMinHPx) * 1px * var(--S)) !important;
+  min-height: calc(var(--mapScrollerMinHPx) * var(--u)) !important;
   overflow-x: auto !important;
   overflow-y: hidden !important;
   display: block !important;
@@ -2049,11 +2304,11 @@ pre.choice-detail,
   justify-content: center !important;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  border-radius: calc(var(--scrollerRadiusPx) * 1px * var(--S)) !important;
+  border-radius: calc(var(--scrollerRadiusPx) * var(--u)) !important;
 
-  /* ✅ JS inline background 덮어쓰기 + 배경 이미지 */
   background: var(--mapBgUrl) center/cover no-repeat !important;
 }
+.mapNodeSelect .mapMiniScroller::-webkit-scrollbar{ width:0; height:0; }
 
 .mapNodeSelect .mapMiniViewport{
   width: 100%;
@@ -2062,10 +2317,7 @@ pre.choice-detail,
   overflow-x: auto;
   overflow-y: hidden;
 
-  /* ✅ 기둥 사이만 보이게 */
   clip-path: inset(0 var(--pillarW) 0 var(--pillarW));
-
-  /* (선택) 시작부터 기둥 안쪽에서 보이게 약간 여백 */
   padding-left: var(--pillarW);
   padding-right: var(--pillarW);
   box-sizing: border-box;
@@ -2075,125 +2327,109 @@ pre.choice-detail,
 }
 .mapNodeSelect .mapMiniViewport::-webkit-scrollbar{ width:0; height:0; }
 
-.mapNodeSelect .mapMiniViewport svg{
-  height: auto !important;
-  width: auto !important;
-  max-width: none !important;
-  display: block !important;
-
-  transform: scale(var(--mapSvgScale)) !important; /* 원하면 유지(보통 1.0) */
-  transform-origin: top left !important;
-}
-
 .mapNodeSelectMapCol .mapMiniScroller svg,
 .mapNodeSelect .mapMiniScroller svg{
-  height: 100% !important;
-  width: auto !important;      /* ✅ 이게 핵심: 가로는 늘어나게 */
-  max-width: none !important;  /* ✅ auto가 다시 눌리지 않게 */
   display: block !important;
 
-  /* 필요하면 약간만(권장: 1.0~1.08) */
-  transform: scale(var(--mapSvgScale)) !important;
+  transform: scale(var(--mapSvgScale)) translate(var(--mapSvgDX), var(--mapSvgDY)) !important;
   transform-origin: top left !important;
 }
-
 
 .mapNodeSelectMapCol .mapMiniScroller svg path,
 .mapNodeSelect .mapMiniScroller svg path{
-  stroke-width: calc(1px * var(--S)) !important;
+  stroke-width: calc(1 * var(--u)) !important;
   stroke: rgb(255, 255, 255) !important;
 }
 
 .mapNodeSelectMapCol .mapMiniScroller svg circle,
 .mapNodeSelect .mapMiniScroller svg circle{
-  stroke-width: calc(3px * var(--S)) !important;
+  stroke-width: calc(3 * var(--u)) !important;
 }
 
 .mapNodeSelectMapCol .mapMiniScroller svg text,
 .mapNodeSelect .mapMiniScroller svg text{
-  font-size: calc(16px * var(--S)) !important;
+  font-size: calc(16 * var(--u)) !important;
   text-anchor: middle !important;
   dominant-baseline: central !important;
 }
 
-
 .mapDetailPanel{
-  width: min(
-    calc(520px * var(--S)),
-    calc(100vw - (calc(64px * var(--S))))
-  ) !important;
-
-  max-height: calc(100vh - (calc(64px * var(--S)))) !important;
+  width: calc(685 * var(--u)) !important;
+  max-height: calc(100vh - (calc(64 * var(--u)))) !important;
   overflow-y: auto !important;
-  transform: translate(-11%, 0%) !important;
+  transform: translate(0%, 39%) !important;
 }
-
 
 .mapNodeSelect .nodeSelectHeader{
   height: auto !important;
-  min-height: calc(40px * var(--S)) !important; /* 필요하면 44~52로 */
-  padding-top: calc(15px * var(--S)) !important; /* 핵심: 위 여유 */
-  padding-bottom: calc(4px * var(--S)) !important;
-  overflow: visible !important; /* 잘라내지 않게 */
+  min-height: calc(40 * var(--u)) !important;
+  padding-top: calc(15 * var(--u)) !important;
+  padding-bottom: calc(0 * var(--u)) !important;
+  padding-left: calc(40 * var(--u)) !important;
+  padding-right: calc(40 * var(--u)) !important;
+  overflow: visible !important;
 }
-/* 버튼 자체도 위/오른쪽 여유(보험) */
 .mapNodeSelect .nodeSelectHeaderRight button{
-  margin-top: calc(2px * var(--S)) !important;
+  margin-top: calc(2 * var(--u)) !important;
 }
-/* =========================
-   21) MOBILE (placeholder)
-   ========================= */
-/* keep empty for now */
+
 
 /* =========================
-   Toasts
+   21) TOASTS
+   - 화면 중앙 고정 + 최상단 레이어
    ========================= */
 .toastLayer{
-  top: 50% !important;
-  left: calc(14px * var(--S)) !important;   /* 왼쪽 여백 */
+  position: fixed !important;
+  z-index: calc(var(--zChrome) + 500) !important;
+
+  left: var(--toastCX) !important;
+  top:  var(--toastCY) !important;
   right: auto !important;
   bottom: auto !important;
 
-  transform: translateY(-50%) !important;
+  transform:
+    translate(-50%, -50%)
+    translate(
+      calc(var(--toastDx) * var(--u)),
+      calc(var(--toastDy) * var(--u))
+    ) !important;
 
-  /* 쌓이는 방향(원하시는 쪽으로 선택) */
   display: flex;
-  flex-direction: column;          /* 아래로 쌓임 */
-  gap: calc(8px * var(--S));
-  align-items: flex-start;
+  flex-direction: column-reverse;
+  gap: var(--toastGap);
+  align-items: center;
 }
-.toastLayer{ flex-direction: column-reverse; }
 
 .toast{
   background: rgba(0,0,0,0.72);
   color: #fff;
-  padding: calc(8px * var(--S)) calc(12px * var(--S));
-  border-radius: calc(10px * var(--S));
-  font-size: calc(14px * var(--S));
+  padding: var(--toastPadY) var(--toastPadX);
+  border-radius: var(--toastR);
+  font-size: var(--toastFont);
   line-height: 1.2;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
-  max-width: min(calc(380px * var(--S)), 88vw);
+  box-shadow: 0 calc(6 * var(--u)) calc(18 * var(--u)) rgba(0,0,0,0.35);
+  max-width: min(var(--toastMaxW), 88vw);
 }
 
-.toast-gold{ border: 1px solid rgba(255,215,0,0.35); }
-.toast-warn{ border: 1px solid rgba(255,120,120,0.35); }
-.toast-relic{ border: 1px solid rgba(120,200,255,0.35); }
-.toast-info{ border: 1px solid rgba(255,255,255,0.18); }
+.toast-gold{ border: calc(1 * var(--u)) solid rgba(255,215,0,0.35); }
+.toast-warn{ border: calc(1 * var(--u)) solid rgba(255,120,120,0.35); }
+.toast-relic{ border: calc(1 * var(--u)) solid rgba(120,200,255,0.35); }
+.toast-info{ border: calc(1 * var(--u)) solid rgba(255,255,255,0.18); }
 
 
-
-/* 오버라이드 */
-
-/* ===== SHOP COMPACT LAYOUT (no scroll) ===== */
+/* =========================
+   22) SHOP COMPACT
+   - 상점 패널 내부 레이아웃(카드/아이템/서비스)
+   ========================= */
 .choice-panel.shopPanel{
-  width: calc(700px * var(--uiScale));
+  width: var(--shopPanelW);
   overflow: hidden;
 }
 
 .shopContentRow{
   display:flex;
-  gap: calc(14px * var(--uiScale));
-  margin-top: calc(10px * var(--uiScale));
+  gap: calc(14 * var(--u));
+  margin-top: calc(10 * var(--u));
   align-items: stretch;
 }
 
@@ -2202,14 +2438,14 @@ pre.choice-detail,
   min-width: 0;
   display:flex;
   flex-direction: column;
-  gap: calc(12px * var(--uiScale));
+  gap: calc(12 * var(--u));
 }
 
-/* 카드 3x2 */
+/* 카드 3x2 그리드 */
 .shopCardsGrid{
   display:grid;
   grid-template-columns: repeat(3, var(--handCardW));
-  gap: calc(12px * var(--uiScale));
+  gap: calc(12 * var(--u));
   justify-content: start;
   align-items: start;
 }
@@ -2218,7 +2454,7 @@ pre.choice-detail,
   display:flex;
   flex-direction: column;
   align-items: center;
-  gap: calc(6px * var(--uiScale));
+  gap: calc(6 * var(--u));
   cursor: pointer;
   -webkit-user-select: none;
   user-select: none;
@@ -2227,44 +2463,44 @@ pre.choice-detail,
 
 .shopTilePrice{
   font-weight: 900;
-  font-size: calc(12px * var(--uiScale));
+  font-size: calc(12 * var(--u));
   opacity: .90;
 }
 
 /* 하단: 왼쪽 아이템 / 오른쪽 서비스 */
 .shopBottomRow{
-  display:grid;
-  grid-template-columns: 1fr calc(320px * var(--uiScale));
-  gap: calc(14px * var(--uiScale));
-  align-items: start;
+  display:flex;
+  gap: calc(14 * var(--u));
+  align-items: flex-start;
+  justify-content: flex-start;
 }
 
 /* 아이템 */
 .shopItemsGrid{
   display:flex;
-  gap: calc(10px * var(--uiScale));
+  gap: calc(10 * var(--u));
   flex-wrap: wrap;
 }
 
 .shopItemTile{
-  width: calc(84px * var(--uiScale));
+  width: var(--shopItemSize);
   aspect-ratio: 1/1;
-  border: 1px solid rgba(255,255,255,.14);
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.14);
   background: rgba(0,0,0,.30);
-  overflow: hidden; /* 아이콘 테두리 숨김(클리핑) */
+  overflow: hidden;
   display:flex;
   flex-direction: column;
   align-items:center;
   justify-content:center;
-  gap: calc(6px * var(--uiScale));
+  gap: calc(6 * var(--u));
   cursor:pointer;
 }
 .shopItemTile.sold{ opacity:.35; cursor:default; }
 .shopItemTile img{
-  width: calc(56px * var(--uiScale));
-  height: calc(56px * var(--uiScale));
+  width: var(--shopItemIcon);
+  height: var(--shopItemIcon);
   object-fit: contain;
-  transform: scale(1.03); /* 살짝 줌 */
+  transform: scale(1.1);
   image-rendering: pixelated;
 }
 
@@ -2272,79 +2508,49 @@ pre.choice-detail,
 .shopSvcGrid{
   display:grid;
   grid-template-columns: 1fr 1fr;
-  gap: calc(10px * var(--uiScale));
+  gap: var(--shopSvcGap);
+  width: var(--shopSvcW);
 }
 .shopSvcTile button{
   width: 100%;
-  padding: calc(10px * var(--uiScale)) calc(10px * var(--uiScale));
+  padding: calc(7 * var(--u)) calc(8 * var(--u));
+  font-size: calc(12 * var(--u));
   border-radius: 0;
 }
 .shopSvcNote{
-  margin-top: calc(6px * var(--uiScale));
-  text-align: center;
-  font-size: calc(11px * var(--uiScale));
-  opacity: .85;
-}
-
-.shopBottomRow{
-  display:flex;                           /* ✅ grid -> flex */
-  gap: calc(14px * var(--uiScale));
-  align-items: flex-start;
-  justify-content: flex-start;            /* ✅ 왼쪽에 붙이기 */
-}
-
-/* 아이템/서비스가 내용만큼만 차지 */
-.shopItemsCol{ flex: 0 0 auto; }
-.shopSvcCol{ flex: 0 0 auto; }
-
-.shopSvcGrid{
-  display:grid;
-  grid-template-columns: 1fr 1fr;         /* 2열 유지 */
-  gap: calc(8px * var(--uiScale));
-  width: calc(240px * var(--uiScale));    /* ✅ 320 -> 240 정도로 */
-}
-
-.shopSvcTile button{
-  width: 100%;
-  padding: calc(7px * var(--uiScale)) calc(8px * var(--uiScale));  /* ✅ 작게 */
-  font-size: calc(12px * var(--uiScale));
-  border-radius: 0;
-}
-
-.shopSvcNote{
-  margin-top: calc(4px * var(--uiScale));
-  font-size: calc(10px * var(--uiScale));
+  margin-top: calc(4 * var(--u));
+  font-size: calc(10 * var(--u));
   opacity: .85;
   text-align:center;
 }
 
-.shopItemTile{
-  width: calc(76px * var(--uiScale));     /* 84 -> 72~78 */
-}
 
-.shopItemTile img{
-  width: calc(50px * var(--uiScale));     /* 56 -> 46~52 */
-  height: calc(50px * var(--uiScale));
-  transform: scale(1.1);
-}
-
-/* ===== Global item tooltip (relic-like) ===== */
+/* =========================
+   23) GLOBAL ITEM TOOLTIP
+   - 커서 호버 시만 보이는 툴팁(트레이 내부 고정 툴팁은 제거됨)
+   ========================= */
 .itemHoverTip{
-  display: block !important;   /* relicHoverTip이 display:none이어도 강제로 */
+  display: block !important;
   opacity: 0;
   visibility: hidden;
-  transform: translateY(calc(-4px * var(--uiScale)));
+  transform: translateY(calc(-4 * var(--u)));
   transition: opacity 90ms ease, transform 90ms ease;
-  max-width: calc(260px * var(--uiScale));
-  padding: calc(10px * var(--uiScale));
-  border: 1px solid rgba(255,255,255,.14);
+  max-width: calc(260 * var(--u));
+  padding: calc(10 * var(--u));
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.14);
   background: rgba(0,0,0,.72);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(calc(4 * var(--u)));
+  -webkit-backdrop-filter: blur(calc(4 * var(--u)));
 }
-
 .itemHoverTip.show{
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
 }
+
+
+/* =========================
+   24) MOBILE (placeholder)
+   - 현재 비워둠
+   ========================= */
+/* keep empty for now */

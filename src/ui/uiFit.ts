@@ -51,7 +51,7 @@ export function installUiFit() {
 
 
     const clamped = Math.max(0.55, Math.min(u, 1.25));
-    r.style.setProperty("--u", String(clamped));
+    r.style.setProperty("--uiScale", String(clamped));
   };
 
   const onResize = () => {

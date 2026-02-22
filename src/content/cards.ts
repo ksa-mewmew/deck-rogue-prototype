@@ -519,15 +519,15 @@ export const CARDS: CardData[] = [
     id: "blood_contract",
     name: "피의 계약",
     rarity: "COMMON",
-    frontText: "지정 피해 12, HP -3",
-    backText: "S +3, F +1",
+    frontText: "지정 피해 13, HP -3",
+    backText: "S +4, F +1",
     front: [{ op: "damageEnemy", target: "select", n: 12 }, { op: "hp", n: -3 }],
     back: [{ op: "supplies", n: 3 }, { op: "fatigue", n: 1 }],
 
     upgrades: [
       {
-        frontText: "지정 피해 15, HP -3",
-        backText: "S +4, F +1",
+        frontText: "지정 피해 16, HP -3",
+        backText: "S +5, F +1",
         front: [{ op: "damageEnemy", target: "select", n: 15 }, { op: "hp", n: -3 }],
         back: [{ op: "supplies", n: 4 }, { op: "fatigue", n: 1 }],
       },
@@ -588,6 +588,121 @@ export const CARDS: CardData[] = [
         front: [{ op: "damageEnemyFormula", target: "select", kind: "triple_bounty_u1" }],
         backText: "방어 +7",
         back: [{ op: "block", n: 7 }],
+      },
+    ],
+  },
+
+
+  // =========================
+  // 설치(장비) / 토큰(두루마리)
+  // =========================
+
+  {
+    id: "install_ballista",
+    name: "발리스타",
+    rarity: "COMMON",
+    tags: ["INSTALL"],
+    installWhen: "BOTH",
+    frontText: "지정 피해 3 (설치)",
+    backText: "무작위 피해 2 (설치)",
+    front: [{ op: "damageEnemy", target: "select", n: 3 }],
+    back: [{ op: "damageEnemy", target: "random", n: 2 }],
+    upgrades: [
+      {
+        frontText: "지정 피해 4 (설치)",
+        backText: "무작위 피해 3 (설치)",
+        front: [{ op: "damageEnemy", target: "select", n: 4 }],
+        back: [{ op: "damageEnemy", target: "random", n: 3 }],
+      },
+    ],
+  },
+
+  {
+    id: "install_iron_bulwark",
+    name: "철갑 방벽",
+    rarity: "COMMON",
+    tags: ["INSTALL"],
+    installWhen: "BOTH",
+    frontText: "방어 +3 (설치)",
+    backText: "방어 +1 (설치)",
+    front: [{ op: "block", n: 3 }],
+    back: [{ op: "block", n: 1 }],
+    upgrades: [
+      {
+        frontText: "방어 +4 (설치)",
+        backText: "방어 +2 (설치)",
+        front: [{ op: "block", n: 4 }],
+        back: [{ op: "block", n: 2 }],
+      },
+    ],
+  },
+
+  {
+    id: "install_cursed_banner",
+    name: "저주의 깃발",
+    rarity: "SPECIAL",
+    tags: ["INSTALL"],
+    installWhen: "BOTH",
+    frontText: "무작위 적에게 취약 +1 (설치)",
+    backText: "방어 +1 (설치)",
+    front: [{ op: "statusEnemy", target: "random", key: "vuln", n: 1 }],
+    back: [{ op: "block", n: 1 }],
+    upgrades: [
+      {
+        frontText: "무작위 적에게 취약 +2 (설치)",
+        backText: "방어 +2 (설치)",
+        front: [{ op: "statusEnemy", target: "random", key: "vuln", n: 2 }],
+        back: [{ op: "block", n: 2 }],
+      },
+    ],
+  },
+
+  // (토큰) 달빛 두루마리 — 전투 한정, 소모
+  {
+    id: "token_moon_scroll",
+    name: "달빛 두루마리",
+    rarity: "COMMON",
+    tags: ["TOKEN", "EXHAUST"],
+    frontText: "지정 적에게 취약 +1, 소모",
+    backText: "방어 +2, 소모",
+    front: [{ op: "statusEnemy", target: "select", key: "vuln", n: 1 }],
+    back: [{ op: "block", n: 2 }],
+  },
+
+  {
+    id: "scribe_hand",
+    name: "필경사의 손",
+    rarity: "SPECIAL",
+    frontText: "방어 +5",
+    backText: "달빛 두루마리 2장 생성",
+    front: [{ op: "block", n: 5 }],
+    back: [{ op: "addCardToHand", defId: "token_moon_scroll", n: 2 }],
+    upgrades: [
+      {
+        frontText: "방어 +7",
+        backText: "달빛 두루마리 3장 생성",
+        front: [{ op: "block", n: 7 }],
+        back: [{ op: "addCardToHand", defId: "token_moon_scroll", n: 3 }],
+      },
+    ],
+  },
+
+  {
+    id: "install_scriptorium",
+    name: "피 묻은 필사대",
+    rarity: "RARE",
+    tags: ["INSTALL"],
+    installWhen: "BOTH",
+    frontText: "방어 +1 (설치)",
+    backText: "S -1, 달빛 두루마리 1장 생성 (설치)",
+    front: [{ op: "block", n: 1 }],
+    back: [{ op: "supplies", n: -1 }, { op: "addCardToHand", defId: "token_moon_scroll", n: 1 }],
+    upgrades: [
+      {
+        frontText: "방어 +2 (설치)",
+        backText: "S -1, 달빛 두루마리 2장 생성 (설치)",
+        front: [{ op: "block", n: 2 }],
+        back: [{ op: "supplies", n: -1 }, { op: "addCardToHand", defId: "token_moon_scroll", n: 2 }],
       },
     ],
   },

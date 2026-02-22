@@ -4,7 +4,6 @@ import { resolvePlayerEffects } from "../resolve";
 import { getCardDefFor } from "../../content/cards";
 import { runRelicHook, checkRelicUnlocks, getUnlockProgress, grantRelic } from "../relics";
 import { openBattleCardRewardChoice, openEliteRelicOfferChoice, openBossRelicOfferChoice } from "../engineRewards";
-import { escapeRequiredNodePicks } from "./encounter";
 import { _cleanupBattleTransientForVictory } from "./phases";
 import { rollBattleItemDrop } from "../items";
 
@@ -27,7 +26,21 @@ function endCombatReturnAllToDeck(g: GameState) {
   for (const uid of g.exhausted) pool.push(uid);
 
   const seen = new Set<string>();
-  const unique = pool.filter((u) => (seen.has(u) ? false : (seen.add(u), true)));
+  let unique = pool.filter((u) => (seen.has(u) ? false : (seen.add(u), true)));
+
+  const tokenUids = unique.filter((uid) => {
+    const inst = g.cards[uid];
+    if (!inst) return false;
+    const def = g.content.cardsById[inst.defId];
+    return !!def?.tags?.includes("TOKEN");
+  });
+  if (tokenUids.length > 0) {
+    const tok = new Set(tokenUids);
+    unique = unique.filter((u) => !tok.has(u));
+    for (const uid of tokenUids) {
+      delete (g.cards as any)[uid];
+    }
+  }
 
   const keep = unique.filter((uid) => g.cards[uid]?.zone !== "vanished");
 
@@ -64,10 +77,6 @@ function applyWinHooksWhileInBackThisTurn(g: GameState) {
   }
 }
 
-function getEscapeReq(g: GameState): number {
-  const snap = g.run.deckSizeAtTreasure ?? null;
-  return snap == null ? 10 : escapeRequiredNodePicks(snap);
-}
 
 export function checkEndConditions(g: GameState) {
   if (g.player.hp <= 0) {
@@ -159,15 +168,6 @@ export function checkEndConditions(g: GameState) {
     const drop = rollBattleItemDrop(g, { elite: !!g.run.lastBattleWasElite, boss: !!wasBoss });
     openBattleCardRewardChoice(g, { itemOfferId: drop ?? undefined, itemSource: ctx });
     g.phase = "NODE";
-
-    if (g.run.treasureObtained) {
-      const req = getEscapeReq(g);
-      if (g.run.afterTreasureNodePicks >= req) {
-        g.run.finished = true;
-        logMsg(g, `승리! 저주받은 보물을 얻은 후 ${req}번의 탐험 동안 살아남았습니다.`);
-        return;
-      }
-    }
 
 
     return;

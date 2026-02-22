@@ -56,6 +56,7 @@ export function openBattleCardRewardChoice(g: GameState, opts?: { itemOfferId?: 
     offers: [a, b, c],
     itemOfferId,
     itemSource,
+    cardDecision: undefined,
     itemDecision: undefined,
   } as any);
 }
@@ -129,13 +130,15 @@ export function applyRewardChoiceKey(g: GameState, key: string): boolean {
   // Combined battle reward: allow taking/skipping item without closing the choice.
   {
     const ctx: any = g.choiceCtx as any;
-    if (ctx?.kind === "BATTLE_REWARD") {
+    if (ctx?.kind === "BATTLE_REWARD" || ctx?.kind === "BATTLE_CARD_REWARD") {
       const offerId = String(ctx.itemOfferId ?? "");
       if (key === "take_item") {
         if (!offerId) return true;
         if (ctx.itemDecision) return true;
-        addItemToInventory(g, offerId, String(ctx.itemSource ?? "BATTLE"));
+        const ok = addItemToInventory(g, offerId, String(ctx.itemSource ?? "BATTLE"));
+        if (!ok) return true;
         ctx.itemDecision = "TAKEN";
+        if (ctx.cardDecision) closeChoice(g);
         return true;
       }
       if (key === "skip_item") {
@@ -143,6 +146,7 @@ export function applyRewardChoiceKey(g: GameState, key: string): boolean {
         if (ctx.itemDecision) return true;
         logMsg(g, "아이템 보상을 생략했습니다.");
         ctx.itemDecision = "SKIPPED";
+        if (ctx.cardDecision) closeChoice(g);
         return true;
       }
     }
@@ -167,7 +171,9 @@ export function applyRewardChoiceKey(g: GameState, key: string): boolean {
       const id = String(ctx.offerId ?? "");
       if (!id) return false;
 
-      addItemToInventory(g, id, "BATTLE");
+      const ok = addItemToInventory(g, id, String(ctx.source ?? "BATTLE"));
+      if (!ok) return true;
+
       closeChoice(g);
       return true;
     }
@@ -175,8 +181,19 @@ export function applyRewardChoiceKey(g: GameState, key: string): boolean {
     return false;
   }
 
-
   if (key === "skip") {
+    const ctx: any = g.choiceCtx as any;
+    const isBattleReward = ctx?.kind === "BATTLE_REWARD" || ctx?.kind === "BATTLE_CARD_REWARD";
+    const itemId = String(ctx?.itemOfferId ?? "");
+
+    if (isBattleReward && itemId) {
+      if (ctx.cardDecision) return true;
+      logMsg(g, "카드 보상을 생략했습니다.");
+      ctx.cardDecision = "SKIPPED";
+      if (ctx.itemDecision) closeChoice(g);
+      return true;
+    }
+
     logMsg(g, "보상을 생략했습니다.");
     closeChoice(g);
     return true;
@@ -189,8 +206,22 @@ export function applyRewardChoiceKey(g: GameState, key: string): boolean {
 
     if (!defId) return false;
 
+    const ctx: any = g.choiceCtx as any;
+    const isBattleReward = ctx?.kind === "BATTLE_REWARD" || ctx?.kind === "BATTLE_CARD_REWARD";
+    const itemId = String(ctx?.itemOfferId ?? "");
+
+    // 아이템 보상이 같이 걸려있으면, 카드부터 집어도 화면을 닫지 않게
+    if (isBattleReward && itemId) {
+      if (ctx.cardDecision) return true;
+      addCardToDeck(g, defId, { upgrade: Number.isFinite(upgrade) ? upgrade : 0 });
+      logMsg(g, "카드 획득: " + defId + (upgrade > 0 ? " +" + upgrade : ""));
+      ctx.cardDecision = key;
+      if (ctx.itemDecision) closeChoice(g);
+      return true;
+    }
+
     addCardToDeck(g, defId, { upgrade: Number.isFinite(upgrade) ? upgrade : 0 });
-    logMsg(g, `카드 획득: ${defId}${upgrade > 0 ? ` +${upgrade}` : ""}`);
+    logMsg(g, "카드 획득: " + defId + (upgrade > 0 ? " +" + upgrade : ""));
     closeChoice(g);
     return true;
   }
@@ -449,8 +480,8 @@ export function openShopChoice(g: GameState, nodeId: string) {
 
   options.push({ key: "shop:service:upgrade", label: upLabel, detail: shop.usedUpgrade ? "" : "가격: 🪙25 카드 1장을 강화합니다." });
   options.push({ key: "shop:service:remove", label: rmLabel, detail: shop.usedRemove ? "" : "가격: 🪙25 덱에서 카드 1장을 제거합니다." });
-  options.push({ key: "shop:supply:buy", label: "보급 구매", detail: "-🪙6, 다음 전투 보급 🌾 +3" });
-  options.push({ key: "shop:supply:sell", label: "보급 판매", detail: "다음 전투 보급 🌾 -3, +🪙4" });
+  options.push({ key: "shop:supply:buy", label: "보급 구매", detail: "-🪙6, 다음 전투 보급 🍞 +3" });
+  options.push({ key: "shop:supply:sell", label: "보급 판매", detail: "다음 전투 보급 🍞 -3, +🪙4" });
 
   options.push({ key: "shop:leave", label: "나가기", detail: "" });
 

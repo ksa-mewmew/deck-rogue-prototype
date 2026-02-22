@@ -70,10 +70,7 @@ function injectFontFaces() {
   style.textContent = css;
 }
 
-// ✅ 반드시 render 전에
 injectFontFaces();
-
-
 
 render(g, actions);
 

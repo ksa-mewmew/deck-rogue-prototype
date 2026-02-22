@@ -23,7 +23,7 @@ import { logMsg, pushUiToast } from "../engine/rules";
 import { createInitialState } from "../engine/state";
 import { applyChoiceKey } from "../engine/choiceApply";
 import { openShopChoice } from "../engine/engineRewards";
-import { useItemAt } from "../engine/items";
+import { useItemAt, discardItemAt, getItemCap } from "../engine/items";
 import type { EventOutcome } from "../content/events";
 import { pickEventByMadness, getEventById } from "../content/events";
 import { removeCardByUid, addCardToDeck, offerRewardsByFatigue, canUpgradeUid, upgradeCardByUid, obtainTreasure } from "../content/rewards";
@@ -38,12 +38,16 @@ import { getRelicDisplay, getUnlockProgress, checkRelicUnlocks } from "../engine
 
 import { buildIntentPreview } from "../engine/intentPreview";
 
+import { setSOnlyHud } from "./s_only_hud";
+
+
 const RULEBOOK_TEXT = `# Deck Rogue Prototype — 룰북 (플레이어용)
 
 이 문서는 스포일러를 최소화합니다.
 
 [1] 개요
 노드를 선택하며 진행하고, 전투에서 살아남아 성장합니다. 목표는 무엇일까요?
+→ 던전 깊숙한 곳의 [저주받은 보물]을 얻고, 입구(START)로 되돌아오면 승리합니다.
 모든 카드는 전열과 후열이 있습니다. 배치에 따라 역할이 달라집니다.
 
 [2] 보급과 피로도
@@ -109,8 +113,8 @@ function ensureItemTip(): HTMLDivElement {
   tip.className = "itemHoverTip relicHoverTip"; // relic 룩 재사용
   tip.style.pointerEvents = "none";
   tip.style.position = "fixed";
-  tip.style.left = "0px";
-  tip.style.top = "0px";
+  tip.style.left = "0";
+  tip.style.top = "0";
   tip.style.zIndex = "70000"; // zChoice(52000)보다 위
   document.body.appendChild(tip);
   _itemTip = tip;
@@ -136,24 +140,31 @@ function setItemTipContent(itemId: string) {
 
 function moveItemTip(clientX: number, clientY: number) {
   const tip = ensureItemTip();
-  const pad = 12;
-  const off = 14;
+
+  const u = unitLenDev();
+  const padU = 12;
+  const offU = 14;
+
+  const pad = padU * u;
+  const off = offU * u;
+
+  let x = clientX + off;
+  let y = clientY + off;
 
   // 먼저 대략 위치
-  tip.style.left = `${clientX + off}px`;
-  tip.style.top = `${clientY + off}px`;
+  tip.style.left = lenFromDev(x);
+  tip.style.top = lenFromDev(y);
 
   // 화면 밖 나가면 클램프 (내용 반영된 후 크기 기준)
   const r = tip.getBoundingClientRect();
-  let x = clientX + off;
-  let y = clientY + off;
+
   if (x + r.width + pad > window.innerWidth) x = window.innerWidth - r.width - pad;
   if (y + r.height + pad > window.innerHeight) y = window.innerHeight - r.height - pad;
   if (x < pad) x = pad;
   if (y < pad) y = pad;
 
-  tip.style.left = `${Math.round(x)}px`;
-  tip.style.top = `${Math.round(y)}px`;
+  tip.style.left = lenFromDev(Math.round(x));
+  tip.style.top = lenFromDev(Math.round(y));
 }
 
 function showItemTip(itemId: string, e: MouseEvent) {
@@ -503,10 +514,27 @@ let uiSettings: UiSettings = loadUiSettings();
 
 
 function getUiScaleNow() {
-  return isMobileUiNow() ? uiSettings.uiScaleMobile : uiSettings.uiScaleDesktop;
+  // CSS가 화면비율에 맞춰 1 design-unit(--u)을 계산합니다.
+  // 여기서는 사용자 배율(설정)만 적용합니다.
+  const userMul = isMobileUiNow() ? uiSettings.uiScaleMobile : uiSettings.uiScaleDesktop;
+  return clamp(userMul, 0.65, 1.5);
 }
-function sx(px: number) {
-  return Math.round(px * getUiScaleNow());
+
+function unitLenDev(): number {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue("--u");
+  const n = parseFloat(raw);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+function len(n: number): string {
+  return "calc(" + n + " * var(--u))";
+}
+
+function lenFromDev(dev: number): string {
+  const u = unitLenDev();
+  const units = dev / u;
+  const safe = Number.isFinite(units) ? units : 0;
+  return "calc(" + safe + " * var(--u))";
 }
 
 function animMulNow() {
@@ -525,9 +553,12 @@ function animMs(ms: number) {
 
 
 function isMobileUiNow() {
-  return window.matchMedia("(max-width: 900px) and (pointer: coarse)").matches;
+  // matchMedia는 CSS 변수 calc()를 안정적으로 파싱하지 못합니다.
+  // 따라서 기기 너비 기반으로 판정합니다.
+  const w = window.innerWidth;
+  const coarse = window.matchMedia("(pointer: coarse)").matches;
+  return w <= 900 && coarse;
 }
-
 
 let logCollapsed = false;
 
@@ -719,9 +750,6 @@ function resizeFrameCanvasToViewport() {
   const h = Math.max(1, window.innerHeight);
   frameCanvas.width = Math.floor(w * dpr);
   frameCanvas.height = Math.floor(h * dpr);
-  frameCanvas.style.width = `${w}px`;
-  frameCanvas.style.height = `${h}px`;
-
   frameCtx!.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
@@ -939,8 +967,8 @@ function renderCard(
 
   if (mode === "FULL") {
     const meta = div("cardMeta");
-    if (def.tags?.includes("EXHAUST")) meta.appendChild(badge("소모"));
-    if (def.tags?.includes("VANISH")) meta.appendChild(badge("소실"));
+    if (def.tags?.includes("EXHAUST")) meta.appendChild(badge(""));
+    if (def.tags?.includes("VANISH")) meta.appendChild(badge(""));
     header.appendChild(meta);
   }
 
@@ -1108,7 +1136,7 @@ const KW_ICON: Record<string, string> = {
   "출혈": "🩸",
   "교란": "🌀",
   "면역": "✨",
-  "S": "🌾",
+  "S": "🍞",
   "F": "💤",
   "드로우": "🃏",
   "피해": "🗡️",
@@ -1164,7 +1192,7 @@ const EFFECT_ICON: Record<string, string> = {
   bleed: "🩸",
   disrupt: "🌀",
   immune: "✨",
-  supplies: "🌾",
+  supplies: "🍞",
   fatigue: "💤",
 };
 
@@ -1316,6 +1344,24 @@ let mapDetailOverlayOpen = false;
 
 let relicHoverId: string | null = null;
 let relicHoverAt: Pt | null = null;
+
+function clearRelicHoverTooltip() {
+  relicHoverId = null;
+  relicHoverAt = null;
+  document.querySelector(".relicTooltip")?.remove();
+}
+
+function clearAllHover() {
+  clearCardHoverPreview();
+  clearRelicHoverTooltip();
+
+  // 아이템 툴팁(트레이)도 같이 닫기
+  document.querySelectorAll<HTMLElement>(".itemHoverTip").forEach((el) => {
+    el.classList.remove("show");
+    (el as any).innerHTML = "";
+  });
+}
+
 let relicModalId: string | null = null;
 
 
@@ -1560,7 +1606,7 @@ function ensureGraphRuntime(g: GameState) {
     presenceR: 2,
     typeR: 1,
     detailR: 0,
-    noise: 0.01 * g.player.fatigue,
+    noise: 0,
   };
   
   runAny.pursuit ??= { heat: 0 };
@@ -1613,7 +1659,12 @@ function pursuitTier(heat: number) {
 }
 
 
+// 추격(보물 이후) 시스템: "재발동"만 남기고, 길(간선) 재배치는 비활성화
+const PURSUIT_TOPOLOGY_SHIFT_ENABLED = false;
+
+
 function maybeShiftTopology(g: GameState) {
+  if (!PURSUIT_TOPOLOGY_SHIFT_ENABLED) return;
   const { map, pursuit } = ensureGraphRuntime(g);
   const tier = pursuitTier(pursuit.heat ?? 0);
   if (tier <= 0) return;
@@ -2081,7 +2132,7 @@ function visionParamsFromState(g: GameState): VisionParams {
   presenceR = clampInt(presenceR, 0, 99);
   typeR = clampInt(typeR, 0, presenceR);
   detailR = clampInt(detailR, 0, typeR);
-  noise = clamp01(noise);
+  noise = 0;
 
   return { mode, presenceR, typeR, detailR, noise };
 }
@@ -2117,23 +2168,12 @@ function perceivedKindForNode(
   if (reveal === 3) {
     return { shown: actual, label: nodeLabelParts(actual, false).text, certainty: "DETAIL" };
   }
-
-  const seed =
-    hash32(nodeId) ^
-    Math.imul(hash32(String((g.run as any).map?.visionNonce ?? 1)), 2654435761);
-
-  const r = seeded01(seed);
-
-  if (r < vp.noise) {
-    return { shown: null, label: "무언가", certainty: "PRESENCE" };
-  }
-
   return { shown: actual, label: nodeLabelParts(actual, false).text, certainty: "TYPE" };
 }
 
 function renderPerceivedLabel(parent: HTMLElement, pk: ReturnType<typeof perceivedKindForNode>) {
   const line = div("mapNodeLine");
-  line.style.cssText = `display:flex; gap:${sx(8)}px; align-items:center;`;
+  line.style.cssText = `display:flex; gap:calc(${8} * var(--u)); align-items:center;`;
 
   if (pk.shown) {
     appendNodeLabel(line, pk.shown, false);
@@ -2388,13 +2428,13 @@ function renderMapMiniGraph(
 
   const box = div("mapMiniBox");
   box.style.cssText =
-    `margin-top:${sx(12)}px; ` +
-    `border:0px solid rgba(255,255,255,.12); border-radius:${sx(12)}px; ` +
+    `margin-top:calc(${12} * var(--u)); ` +
+    `border:0 solid rgba(255,255,255,.12); border-radius:calc(${12} * var(--u)); ` +
     `background:rgba(0,0,0,0); ` +
-    `padding:${sx(10)}px;`;
+    `padding:calc(${10} * var(--u));`;
 
-  const title = divText("", "지도");
-  title.style.cssText = `font-weight:700; margin-bottom:${sx(8)}px; opacity:.95;`;
+  const title = divText("", "");
+  title.style.cssText = `font-weight:700; margin-bottom:calc(${8} * var(--u)); opacity:.95;`;
   box.appendChild(title);
 
   const scroller = div("mapMiniScroller");
@@ -2404,8 +2444,8 @@ function renderMapMiniGraph(
   scroller.style.cssText =
     `position:relative; ` +
     `overflow:auto; ` +
-    `max-height:${sx(scrollerH)}px; ` +
-    `border-radius:${sx(10)}px; ` +
+    `max-height:calc(${scrollerH} * var(--u)); ` +
+    `border-radius:calc(${10} * var(--u)); ` +
     `background:rgba(255,255,255,.0);`;
 
   viewport.addEventListener("wheel", (ev) => {
@@ -2417,8 +2457,9 @@ function renderMapMiniGraph(
 
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("viewBox", `${viewX} ${viewY} ${viewW} ${viewH}`);
-  svg.setAttribute("width", String(sx(viewW * mapZoom)));
-  svg.setAttribute("height", String(sx(viewH * mapZoom)));
+  // 강경 모드: SVG 크기도 화면비 기반 단위(var(--u))로 맞춘다.
+  (svg.style as any).width = `calc(${viewW * mapZoom} * var(--u))`;
+  (svg.style as any).height = `calc(${viewH * mapZoom} * var(--u))`;
   svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
   svg.style.display = "block";
 
@@ -2511,7 +2552,7 @@ function renderMapMiniGraph(
       halo1.setAttribute("stroke", C_ACCENT);
       halo1.setAttribute("stroke-width", String(detailMode ? 3 : 3.5));
       halo1.setAttribute("opacity", "0.55");
-      (halo1.style as any).filter = "drop-shadow(0 0 6px rgba(179,74,70,.65))";
+      (halo1.style as any).filter = "drop-shadow(0 0 calc(6 * var(--u)) rgba(179,74,70,.65))";
       gNodes.appendChild(halo1);
     }
 
@@ -2535,7 +2576,7 @@ function renderMapMiniGraph(
     }
 
     const titleEl = document.createElementNS("http://www.w3.org/2000/svg", "title");
-    const cleared = node?.cleared ? "클리어" : node?.visited ? "방문" : "미방문";
+    const cleared = node?.cleared ? "" : node?.visited ? "" : "";
     titleEl.textContent = `${cleared}`;
     circle.appendChild(titleEl);
     gNodes.appendChild(circle);
@@ -2563,16 +2604,16 @@ function renderMapMiniGraph(
   if (detailMode) {
     const overlay = div("mapMiniOverlay");
     overlay.style.cssText =
-      `position:absolute; right:${sx(10)}px; bottom:${sx(10)}px; ` +
-      `max-width:${sx(360)}px; ` +
-      `padding:${sx(10)}px; border-radius:${sx(12)}px; ` +
-      `border:1px solid rgba(255,255,255,.12); ` +
-      `background:rgba(0,0,0,.55); backdrop-filter: blur(2px); ` +
-      `font-size:12px; line-height:1.35;`;
+      `position:absolute; right:calc(${10} * var(--u)); bottom:calc(${10} * var(--u)); ` +
+      `max-width:calc(${360} * var(--u)); ` +
+      `padding:calc(${10} * var(--u)); border-radius:calc(${12} * var(--u)); ` +
+      `border:calc(1 * var(--u)) solid rgba(255,255,255,.12); ` +
+      `background:rgba(0,0,0,.55); backdrop-filter: blur(calc(2 * var(--u))); ` +
+      `font-size:calc(12 * var(--u)); line-height:1.35;`;
 
     const ns = map.edges[map.pos] ?? [];
     const neighLine = div("mapMiniOverlayNeigh");
-    neighLine.style.cssText = `margin-bottom:${sx(8)}px; opacity:.95;`;
+    neighLine.style.cssText = `margin-bottom:calc(${8} * var(--u)); opacity:.95;`;
     neighLine.appendChild(divText("", `이웃 ${ns.length}곳`));
     overlay.appendChild(neighLine);
 
@@ -2613,10 +2654,10 @@ function renderMapMiniGraph(
     const p = layout.pos[map.pos];
     if (!p) return;
     const scale = getUiScaleNow();
-    const px = (p.x - viewX) * scale * mapZoom;
-    const py = (p.y - viewY) * scale * mapZoom;
-    const targetX = Math.max(0, px - viewport.clientWidth * 0.45);
-    const targetY = Math.max(0, py - viewport.clientHeight * 0.45);
+    const vx = (p.x - viewX) * scale * mapZoom;
+    const vy = (p.y - viewY) * scale * mapZoom;
+    const targetX = Math.max(0, vx - viewport.clientWidth * 0.45);
+    const targetY = Math.max(0, vy - viewport.clientHeight * 0.45);
     viewport.scrollLeft = targetX;
     viewport.scrollTop = targetY;
   });
@@ -2627,7 +2668,7 @@ function renderMapMiniGraph(
       ? "상세: 지도 위에 요약 정보가 표시됩니다. 이동은 인접 노드 클릭으로만 가능합니다."
       : ""
   );
-  tip.style.cssText = `margin-top:${sx(8)}px; font-size:12px; opacity:.8; line-height:1.3;`;
+  tip.style.cssText = `margin-top:calc(${8} * var(--u)); font-size:calc(12 * var(--u)); opacity:.8; line-height:1.3;`;
   box.appendChild(tip);
 
   parent.appendChild(box);
@@ -2641,7 +2682,7 @@ function renderMapNodeSelect(root: HTMLElement, g: GameState, actions: UIActions
   wrap.classList.add("mapNodeSelect");
 
   const hdr = div("nodeSelectHeader");
-  hdr.style.cssText = "display:flex; align-items:flex-end; justify-content:space-between; gap:16px;";
+  hdr.style.cssText = "display:flex; align-items:flex-end; justify-content:space-between; gap:calc(16 * var(--u));";
 
   const left = div("nodeSelectTitle");
   const tNow = totalTimeOnMap(g);
@@ -2679,15 +2720,15 @@ function renderMapNodeSelect(root: HTMLElement, g: GameState, actions: UIActions
 
   const right = div("nodeSelectHeaderRight");
 
-  const hint = divText("", `오류 ${Math.round(vp.noise * 100)}%.`);
+  /*const hint = divText("", "시야 " + vp.presenceR + "/" + vp.typeR + "/" + vp.detailR + " (" + vp.mode + ")");
   hint.style.opacity = "0.8";
-  right.appendChild(hint);
+  right.appendChild(hint);*/
 
   const btnDetail = mkButton(mapDetailOverlayOpen ? "상세 닫기" : "상세", () => {
     mapDetailOverlayOpen = !mapDetailOverlayOpen;
     render(g, actions);
   });
-  btnDetail.style.cssText = `margin-left:${sx(-30)}px; padding:${sx(2)}px ${sx(5)}px; opacity:.9;`;
+  btnDetail.style.cssText = `margin-left:calc(${-30} * var(--u)); padding:calc(${2} * var(--u)) calc(${5} * var(--u)); opacity:.9;`;
   right.appendChild(btnDetail);
 
   hdr.appendChild(left);
@@ -2700,15 +2741,15 @@ function renderMapNodeSelect(root: HTMLElement, g: GameState, actions: UIActions
 
     const panel = div("mapDetailPanel");
     panel.style.cssText =
-      `position:fixed; right:${sx(24)}px; top:${sx(24)}px; ` +
-      `width:min(${sx(520)}px, calc(100vw - ${sx(64)}px)); ` +
-      `max-height:calc(100vh - ${sx(64)}px); ` +
+      `position:fixed; right:calc(${24} * var(--u)); top:calc(${24} * var(--u)); ` +
+      `width:min(calc(${520} * var(--u)), calc(100vw - calc(${64} * var(--u)))); ` +
+      `max-height:calc(100vh - calc(${64} * var(--u))); ` +
       `overflow-y:auto; overflow-x:hidden; ` +
       `z-index:70001; ` +
-      `border:1px solid rgba(255,255,255,.14); border-radius:${sx(14)}px; ` +
+      `border:calc(1 * var(--u)) solid rgba(255,255,255,.14); border-radius:calc(${14} * var(--u)); ` +
       `background:rgba(0,0,0,1); ` +                 // ✅ 완전 불투명
       `backdrop-filter:none; ` +
-      `padding:${sx(12)}px;`;
+      `padding:calc(${12} * var(--u));`;
 
     panel.addEventListener("click", (ev) => ev.stopPropagation());
     panel.addEventListener("wheel", (ev) => ev.stopPropagation(), { passive: true });
@@ -2722,7 +2763,7 @@ function renderMapNodeSelect(root: HTMLElement, g: GameState, actions: UIActions
     };
  
     const head = div("");
-    head.style.cssText = `display:flex; align-items:center; justify-content:space-between; gap:${sx(10)}px;`;
+    head.style.cssText = `display:flex; align-items:center; justify-content:space-between; gap:calc(${10} * var(--u));`;
 
     const hTitle = divText("", "지도 상세");
     hTitle.style.cssText = `font-weight:700; opacity:.95;`;
@@ -2732,18 +2773,18 @@ function renderMapNodeSelect(root: HTMLElement, g: GameState, actions: UIActions
       mapDetailOverlayOpen = false;
       render(g, actions);
     });
-    btnClose.style.cssText = `padding:${sx(6)}px ${sx(10)}px; opacity:.9;`;
+    btnClose.style.cssText = `padding:calc(${6} * var(--u)) calc(${10} * var(--u)); opacity:.9;`;
     head.appendChild(btnClose);
 
     panel.appendChild(head);
 
     const neighBox = div("");
     neighBox.style.cssText =
-      `margin-top:${sx(10)}px; padding:${sx(10)}px; ` +
-      `border:1px solid rgba(255,255,255,.10); border-radius:${sx(12)}px; background:rgba(255,255,255,.03);`;
+      `margin-top:calc(${10} * var(--u)); padding:calc(${10} * var(--u)); ` +
+      `border:calc(1 * var(--u)) solid rgba(255,255,255,.10); border-radius:calc(${12} * var(--u)); background:rgba(255,255,255,.03);`;
 
     const neighTitle = h3("이동 가능한 이웃");
-    neighTitle.style.margin = `0 0 ${sx(6)}px 0`;
+    neighTitle.style.margin = `0 0 calc(${6} * var(--u)) 0`;
     neighBox.appendChild(neighTitle);
 
     const ns = map.edges[map.pos] ?? [];
@@ -2770,15 +2811,15 @@ function renderMapNodeSelect(root: HTMLElement, g: GameState, actions: UIActions
 
       const row = div("");
       row.style.cssText =
-        `display:flex; align-items:center; gap:${sx(10)}px; ` +
-        `padding:${sx(8)}px ${sx(10)}px; border-radius:${sx(10)}px; ` +
-        `border:1px solid rgba(255,255,255,.10); background:rgba(0,0,0,.20);` +
-        `margin-top:${sx(6)}px;`;
+        `display:flex; align-items:center; gap:calc(${10} * var(--u)); ` +
+        `padding:calc(${8} * var(--u)) calc(${10} * var(--u)); border-radius:calc(${10} * var(--u)); ` +
+        `border:calc(1 * var(--u)) solid rgba(255,255,255,.10); background:rgba(0,0,0,.20);` +
+        `margin-top:calc(${6} * var(--u));`;
 
       const badge = divText("", (revealNow > 0 || lv > 0) ? `${toId}` : `출구 ${i + 1}`);
       badge.style.cssText =
-        `flex:0 0 auto; padding:${sx(4)}px ${sx(8)}px; border-radius:${sx(10)}px; ` +
-        `border:1px solid rgba(255,255,255,.14); background:rgba(0,0,0,.25); opacity:.9;`;
+        `flex:0 0 auto; padding:calc(${4} * var(--u)) calc(${8} * var(--u)); border-radius:calc(${10} * var(--u)); ` +
+        `border:calc(1 * var(--u)) solid rgba(255,255,255,.14); background:rgba(0,0,0,.25); opacity:.9;`;
       row.appendChild(badge);
 
       const mid = div("");
@@ -2800,11 +2841,11 @@ function renderMapNodeSelect(root: HTMLElement, g: GameState, actions: UIActions
       if (farIds.length) {
         const scout = div("");
         scout.style.cssText =
-          `margin-top:${sx(10)}px; padding:${sx(10)}px; ` +
-          `border:1px solid rgba(255,255,255,.10); border-radius:${sx(12)}px; background:rgba(255,255,255,.03);`;
+          `margin-top:calc(${10} * var(--u)); padding:calc(${10} * var(--u)); ` +
+          `border:calc(1 * var(--u)) solid rgba(255,255,255,.10); border-radius:calc(${12} * var(--u)); background:rgba(255,255,255,.03);`;
 
         const t = h3("멀리 보이는 곳");
-        t.style.margin = `0 0 ${sx(6)}px 0`;
+        t.style.margin = `0 0 calc(${6} * var(--u)) 0`;
         scout.appendChild(t);
 
         const buckets = new Map<number, Record<string, number>>();
@@ -2947,8 +2988,12 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
 
       slots[idx] = null;
 
-      g.usedThisTurn = Math.max(0, g.usedThisTurn - 1);
-      if (side === "front") g.frontPlacedThisTurn = Math.max(0, g.frontPlacedThisTurn - 1);
+      const placed = (g.placedUidsThisTurn ?? []).includes(uidHere);
+      if (placed) {
+        g.usedThisTurn = Math.max(0, g.usedThisTurn - 1);
+        if (side === "front") g.frontPlacedThisTurn = Math.max(0, g.frontPlacedThisTurn - 1);
+        g.placedUidsThisTurn = (g.placedUidsThisTurn ?? []).filter((u) => u !== uidHere);
+      }
 
       g.hand.push(uidHere);
       g.cards[uidHere].zone = "hand";
@@ -2979,6 +3024,17 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       if (isTargeting(g)) return;
 
       const ok = useItemAt(g, idx);
+      if (ok) render(g, actions);
+    },
+
+    onDiscardItem: (idx: number) => {
+      const g = getG();
+      if (g.run.finished) return;
+      // allow discarding even while a choice is open (reward/shop)
+      if (overlay) return;
+      if (isTargeting(g)) return;
+
+      const ok = discardItemAt(g, idx, "UI");
       if (ok) render(g, actions);
     },
 
@@ -3028,8 +3084,12 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
 
       slots[fromIdx] = null;
 
-      g.usedThisTurn = Math.max(0, g.usedThisTurn - 1);
-      if (fromSide === "front") g.frontPlacedThisTurn = Math.max(0, g.frontPlacedThisTurn - 1);
+      const placed = (g.placedUidsThisTurn ?? []).includes(uid);
+      if (placed) {
+        g.usedThisTurn = Math.max(0, g.usedThisTurn - 1);
+        if (fromSide === "front") g.frontPlacedThisTurn = Math.max(0, g.frontPlacedThisTurn - 1);
+        g.placedUidsThisTurn = (g.placedUidsThisTurn ?? []).filter((u) => u !== uid);
+      }
 
       g.hand.push(uid);
       g.cards[uid].zone = "hand";
@@ -3244,6 +3304,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         const OMEN_CHANCE = 0.3;
         let ev = pickEventByMadness(g);
 
+        // 오멘 이벤트는 처음엔 가끔 강제, 한 번 본 뒤에는 거의 나오지 않게
         if (runAny2.ominousProphecySeen === true) {
           for (let i = 0; i < 50 && (ev as any).id === "ominous_prophecy"; i++) {
             ev = pickEventByMadness(g);
@@ -3251,8 +3312,28 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         } else {
           if (Math.random() < OMEN_CHANCE) {
             ev = getEventById("ominous_prophecy") ?? ev;
-            runAny2.ominousProphecySeen = true;
           }
+        }
+
+        // ✅ 같은 이벤트가 2연속으로 나오지 않게(가능한 경우)
+        {
+          const lastEventId: string | null | undefined = (runAny2.lastEventId as any) ?? null;
+          if (lastEventId && (ev as any)?.id === lastEventId) {
+            for (let i = 0; i < 60; i++) {
+              const cand = pickEventByMadness(g);
+              const cid = (cand as any)?.id;
+              if (!cid) continue;
+              if (runAny2.ominousProphecySeen === true && cid === "ominous_prophecy") continue;
+              if (cid !== lastEventId) {
+                ev = cand;
+                break;
+              }
+            }
+          }
+        }
+
+        if ((ev as any)?.id === "ominous_prophecy") {
+          runAny2.ominousProphecySeen = true;
         }
 
         if (!ev) {
@@ -3266,6 +3347,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
           runAnyEv.eventsSeen ??= {};
           const cur = Number(runAnyEv.eventsSeen[ev.id] ?? 0) || 0;
           runAnyEv.eventsSeen[ev.id] = cur + 1;
+          runAnyEv.lastEventId = ev.id;
         }
 
         let opts = ev.options(g);
@@ -3322,8 +3404,9 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
           }
 
           if (typeof outcome === "object" && outcome.kind === "REMOVE_PICK") {
+            // "저주받은 보물"(goal_treasure)은 제거 불가: 리스트에서 제외
             const candidates = Object.values(g.cards)
-              .filter((c) => c.zone === "deck" || c.zone === "hand" || c.zone === "discard")
+              .filter((c) => (c.zone === "deck" || c.zone === "hand" || c.zone === "discard") && c.defId !== "goal_treasure")
               .map((c) => c.uid);
 
             openChoice(g, {
@@ -3740,11 +3823,18 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
 
 
 function normalizePlacementCounters(g: GameState) {
-  const front = g.frontSlots.filter((x) => x != null).length;
-  const back  = g.backSlots.filter((x) => x != null).length;
+  const placed = (g.placedUidsThisTurn ?? []).filter((uid) => {
+    const inst = g.cards[uid];
+    return !!inst && (inst.zone === "front" || inst.zone === "back");
+  });
 
-  g.frontPlacedThisTurn = front;
-  g.usedThisTurn = front + back;
+  g.usedThisTurn = placed.length;
+
+  let frontPlaced = 0;
+  for (const uid of placed) {
+    if (g.cards[uid]?.zone === "front") frontPlaced += 1;
+  }
+  g.frontPlacedThisTurn = frontPlaced;
 }
 
 export function mountRoot(): HTMLDivElement {
@@ -3767,23 +3857,21 @@ function normalizeEnemyNameWidth() {
   const names = Array.from(document.querySelectorAll<HTMLElement>(".enemyName"));
   if (names.length === 0) return;
 
-  
+  // 강경 모드: 픽셀 단위 대신 문자폭(ch) 기반으로 폭을 맞춘다.
+  // (폰트/언어에 따라 완전 동일하진 않지만, 다양한 화면에서 예측 가능성이 좋습니다.)
+  let maxLen = 0;
+  for (const el of names) {
+    const t = (el.textContent ?? "").trim();
+    if (t.length > maxLen) maxLen = t.length;
+  }
+
+  const CAP_CH = 24;
+  const wch = Math.max(6, Math.min(maxLen, CAP_CH));
+
   names.forEach((el) => {
     el.style.display = "inline-block";
-    el.style.width = "auto";
+    el.style.width = `${wch}ch`;
     el.style.whiteSpace = "nowrap";
-  });
-
-  let maxW = 0;
-  for (const el of names) maxW = Math.max(maxW, el.scrollWidth);
-
-  
-  const cap = 320; 
-  const w = Math.min(maxW, cap);
-
-  
-  names.forEach((el) => {
-    el.style.width = `${w}px`;
     el.style.overflow = "hidden";
     el.style.textOverflow = "ellipsis";
   });
@@ -3824,13 +3912,17 @@ function renderFloatFxLayer() {
       el.textContent = f.text;
 
       el.style.position = "absolute";
-      el.style.left = `${Math.round(f.x)}px`;
-      el.style.top = `${Math.round(f.y)}px`;
+      const xvw = (f.x / window.innerWidth) * 100;
+      const yvh = (f.y / window.innerHeight) * 100;
+      el.style.left = `${xvw.toFixed(4)}vw`;
+      el.style.top = `${yvh.toFixed(4)}vh`;
 
       layer.appendChild(el);
     } else {
-      el.style.left = `${Math.round(f.x)}px`;
-      el.style.top = `${Math.round(f.y)}px`;
+      const xvw = (f.x / window.innerWidth) * 100;
+      const yvh = (f.y / window.innerHeight) * 100;
+      el.style.left = `${xvw.toFixed(4)}vw`;
+      el.style.top = `${yvh.toFixed(4)}vh`;
     }
   }
 }
@@ -3846,19 +3938,19 @@ export function ensureFloatingNewRunButton() {
 
   btn.style.cssText = `
     position: fixed;
-    top: calc(env(safe-area-inset-top, 0px) + 10px);
-    left: calc(env(safe-area-inset-left, 0px) + 10px);
+    top: calc(env(safe-area-inset-top, 0) + calc(10 * var(--u)));
+    left: calc(env(safe-area-inset-left, 0) + calc(10 * var(--u)));
     pointer-events: auto;
     z-index: var(--zChrome);
 
-    padding: 10px 12px;
-    border-radius: 14px;
-    border: 1px solid rgba(255,255,255,.16);
+    padding: calc(10 * var(--u)) calc(12 * var(--u));
+    border-radius: calc(14 * var(--u));
+    border: calc(1 * var(--u)) solid rgba(255,255,255,.16);
     background: rgba(0,0,0,.55);
     color: #fff;
 
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(calc(8 * var(--u)));
+    -webkit-backdrop-filter: blur(calc(8 * var(--u)));
     cursor: pointer;
     touch-action: manipulation;
   `;
@@ -3884,6 +3976,7 @@ export function render(g: GameState, actions: UIActions) {
     applyUiScaleVars();
   }
   currentG = g;
+  clearAllHover();
 
   setDevConsoleCtx({
     getG: () => currentG ?? g,
@@ -3921,7 +4014,6 @@ export function render(g: GameState, actions: UIActions) {
         normalizeEnemyNameWidth();
         alignHandToBoardAnchor(currentG);
         alignEnemyHudToViewportCenter();
-        positionPlayerHudByStage();
         applyUiScaleVars();
       }
     });
@@ -3930,6 +4022,8 @@ export function render(g: GameState, actions: UIActions) {
   }
 
   app.appendChild(renderTopHud(g, actions));
+
+  renderTopRightChrome(g, actions);
 
   const mainRow = div("mainRow");
 
@@ -3979,7 +4073,6 @@ export function render(g: GameState, actions: UIActions) {
   renderHandDock(g, actions, isTargeting(g));
   alignHandToBoardAnchor(g);
   alignEnemyHudToViewportCenter();
-  positionPlayerHudByStage();
   renderDragOverlay(app, g);
 
   renderOverlayLayer(g, {
@@ -4004,6 +4097,16 @@ export function render(g: GameState, actions: UIActions) {
   renderRelicHud(g, actions);
   scheduleSave(g);
   schedulePostLayout(g);
+
+  setSOnlyHud(getSValueFromGame(g));
+}
+
+function getSValueFromGame(g: any): number | null {
+  const s = g.player.supplies
+
+  const inCombat = !g.run.finished && g.enemies.length > 0 && g.phase !== "NODE";
+  if (!inCombat) return null;
+  return (typeof s === "number") ? s : null;
 }
 
 
@@ -4056,7 +4159,7 @@ function renderRelicHud(g: GameState, actions: UIActions) {
       const t = document.createElement("div");
       t.textContent = v.name.slice(0, 2);
       t.style.fontWeight = "900";
-      t.style.fontSize = "12px";
+      t.style.fontSize = "calc(12 * var(--u))";
       t.style.opacity = ".95";
       icon.appendChild(t);
     }
@@ -4130,16 +4233,21 @@ function renderRelicTooltip(g: GameState) {
 
   document.body.appendChild(tip);
 
-  const pad = 12;
+  const u = unitLenDev();
+  const padU = 12;
+  const pad = padU * u;
+  const offU = 10;
+  const off = offU * u;
+
   const r = tip.getBoundingClientRect();
   let x = relicHoverAt.x - r.width;
-  let y = relicHoverAt.y - r.height - 10;
+  let y = relicHoverAt.y - r.height - off;
 
   x = Math.max(pad, Math.min(window.innerWidth - r.width - pad, x));
   y = Math.max(pad, Math.min(window.innerHeight - r.height - pad, y));
 
-  tip.style.left = `${Math.round(x)}px`;
-  tip.style.top = `${Math.round(y)}px`;
+  tip.style.left = lenFromDev(Math.round(x));
+  tip.style.top = lenFromDev(Math.round(y));
 }
 
 function renderRelicModal(g: GameState, actions: UIActions) {
@@ -4157,12 +4265,12 @@ function renderRelicModal(g: GameState, actions: UIActions) {
     z-index: var(--zRelicModal, 70000);
     pointer-events: auto;
     background: rgba(0,0,0,.55);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(calc(6 * var(--u)));
+    -webkit-backdrop-filter: blur(calc(6 * var(--u)));
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 18px;
+    padding: calc(18 * var(--u));
     box-sizing: border-box;
   `;
 
@@ -4245,13 +4353,14 @@ function renderStageCornerResourceHud(g: GameState) {
   document.body.appendChild(hud);
 
   const r = anchor.getBoundingClientRect();
-
-  const padTop = -56;
+  const u = unitLenDev();
+  const padTopU = -56;
+  const padTop = padTopU * u;
   const centerX = (r.left + r.right) / 2;
 
   hud.style.right = "";
-  hud.style.left = `${Math.round(centerX)}px`;
-  hud.style.top = `${Math.round(r.top + padTop)}px`;
+  hud.style.left = lenFromDev(Math.round(centerX));
+  hud.style.top = lenFromDev(Math.round(r.top + padTop));
 
   hud.style.transform = "translateX(-50%)";
 }
@@ -4282,7 +4391,7 @@ function renderLogOverlay(g: GameState, actions: UIActions) {
     position: fixed; inset: 0;
     pointer-events:auto;
     background: rgba(0,0,0,.55);
-    backdrop-filter: blur(6px);
+    backdrop-filter: blur(calc(6 * var(--u)));
     display: flex;
     align-items: flex-end;
     justify-content: center;
@@ -4290,10 +4399,10 @@ function renderLogOverlay(g: GameState, actions: UIActions) {
 
   const sheet = div("panel");
   sheet.style.cssText = `
-    width: min(720px, 100%);
+    width: min(calc(720 * var(--u)), 100%);
     max-height: 70vh;
-    border-radius: 18px 18px 0 0;
-    padding: 12px;
+    border-radius: calc(18 * var(--u)) calc(18 * var(--u)) 0 0;
+    padding: calc(12 * var(--u));
     margin: 0;
   `;
 
@@ -4324,13 +4433,13 @@ function renderLogOverlay(g: GameState, actions: UIActions) {
 
 function renderSettingsPanel(onChange: () => void, actions: UIActions) {
   const wrap = div("settingsPanel");
-  wrap.style.cssText = "display:flex; flex-direction:column; gap:12px;";
+  wrap.style.cssText = "display:flex; flex-direction:column; gap:calc(12 * var(--u));";
 
   // =========================
   // UI 스케일
   // =========================
   const row = div("settingsRow");
-  row.style.cssText = "display:flex; align-items:center; gap:12px; flex-wrap:wrap;";
+  row.style.cssText = "display:flex; align-items:center; gap:calc(12 * var(--u)); flex-wrap:wrap;";
 
   const label = divText("", "UI 스케일");
   label.style.cssText = "font-weight:800;";
@@ -4338,7 +4447,7 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
   const getNow = () => (isMobileUiNow() ? uiSettings.uiScaleMobile : uiSettings.uiScaleDesktop);
 
   const val = divText("", `${Math.round(getNow() * 100)}%`);
-  val.style.cssText = "opacity:.9; min-width:64px; text-align:right;";
+  val.style.cssText = "opacity:.9; min-width:calc(64 * var(--u)); text-align:right;";
 
   const slider = document.createElement("input");
   slider.type = "range";
@@ -4346,7 +4455,7 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
   slider.max = "1.25";
   slider.step = "0.01";
   slider.value = String(getNow());
-  slider.style.cssText = "flex:1 1 260px;";
+  slider.style.cssText = "flex:1 1 calc(260 * var(--u));";
 
   slider.oninput = () => {
     const v = Number(slider.value);
@@ -4361,7 +4470,7 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
   wrap.appendChild(row);
 
   const presets = div("settingsPresets");
-  presets.style.cssText = "display:flex; gap:8px; flex-wrap:wrap;";
+  presets.style.cssText = "display:flex; gap:calc(8 * var(--u)); flex-wrap:wrap;";
 
   const makePreset = (txt: string, v: number) => {
     const b = mkButton(txt, () => {
@@ -4371,7 +4480,7 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
       onChange();
     });
     b.style.cssText =
-      "padding:8px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.16);" +
+      "padding:calc(8 * var(--u)) calc(12 * var(--u)); border-radius:calc(12 * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.16);" +
       "background:rgba(255,255,255,.06); color:#fff; cursor:pointer;";
     return b;
   };
@@ -4383,7 +4492,7 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
   wrap.appendChild(presets);
 
   const resetRow = div("settingsResetRow");
-  resetRow.style.cssText = "display:flex; justify-content:flex-end; margin-top:6px;";
+  resetRow.style.cssText = "display:flex; justify-content:flex-end; margin-top:calc(6 * var(--u));";
   const reset = mkButton("스케일 초기화", () => {
     setUiScaleNow(1.0);
     slider.value = String(getNow());
@@ -4391,7 +4500,7 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
     onChange();
   });
   reset.style.cssText =
-    "padding:8px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.16);" +
+    "padding:calc(8 * var(--u)) calc(12 * var(--u)); border-radius:calc(12 * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.16);" +
     "background:rgba(255,255,255,.06); color:#fff; cursor:pointer;";
   resetRow.appendChild(reset);
   wrap.appendChild(resetRow);
@@ -4400,13 +4509,13 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
   // 애니메이션 속도
   // =========================
   const animRow = div("settingsRow");
-  animRow.style.cssText = "display:flex; align-items:center; gap:12px; flex-wrap:wrap;";
+  animRow.style.cssText = "display:flex; align-items:center; gap:calc(12 * var(--u)); flex-wrap:wrap;";
 
   const animLabel = divText("", "애니메이션 속도");
   animLabel.style.cssText = "font-weight:800;";
 
   const animVal = divText("", `x${animMulNow().toFixed(2)}`);
-  animVal.style.cssText = "opacity:.9; min-width:64px; text-align:right;";
+  animVal.style.cssText = "opacity:.9; min-width:calc(64 * var(--u)); text-align:right;";
 
   const animSlider = document.createElement("input");
   animSlider.type = "range";
@@ -4414,7 +4523,7 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
   animSlider.max = "2";
   animSlider.step = "0.05";
   animSlider.value = String(animMulNow());
-  animSlider.style.cssText = "flex:1 1 260px;";
+  animSlider.style.cssText = "flex:1 1 calc(260 * var(--u));";
 
   const setAnim = (v: number) => {
     uiSettings.animMul = clamp(v, 0.0, 2.0);
@@ -4435,7 +4544,7 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
   wrap.appendChild(animRow);
 
   const animPresets = div("settingsPresets");
-  animPresets.style.cssText = "display:flex; gap:8px; flex-wrap:wrap;";
+  animPresets.style.cssText = "display:flex; gap:calc(8 * var(--u)); flex-wrap:wrap;";
 
   const makeAnimPreset = (txt: string, v: number) => {
     const b = mkButton(txt, () => {
@@ -4445,7 +4554,7 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
       onChange();
     });
     b.style.cssText =
-      "padding:8px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.16);" +
+      "padding:calc(8 * var(--u)) calc(12 * var(--u)); border-radius:calc(12 * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.16);" +
       "background:rgba(255,255,255,.06); color:#fff; cursor:pointer;";
     return b;
   };
@@ -4458,7 +4567,7 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
   wrap.appendChild(animPresets);
 
   const animResetRow = div("settingsResetRow");
-  animResetRow.style.cssText = "display:flex; justify-content:flex-end; margin-top:6px;";
+  animResetRow.style.cssText = "display:flex; justify-content:flex-end; margin-top:calc(6 * var(--u));";
   const animReset = mkButton("애니 초기화", () => {
     setAnim(1.0);
     animSlider.value = String(animMulNow());
@@ -4466,7 +4575,7 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
     onChange();
   });
   animReset.style.cssText =
-    "padding:8px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.16);" +
+    "padding:calc(8 * var(--u)) calc(12 * var(--u)); border-radius:calc(12 * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.16);" +
     "background:rgba(255,255,255,.06); color:#fff; cursor:pointer;";
   animResetRow.appendChild(animReset);
   wrap.appendChild(animResetRow);
@@ -4475,7 +4584,7 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
   // 슬롯 카드 표시
   // =========================
   const modeRow = div("settingsRow");
-  modeRow.style.cssText = "display:flex; align-items:center; gap:12px; flex-wrap:wrap;";
+  modeRow.style.cssText = "display:flex; align-items:center; gap:calc(12 * var(--u)); flex-wrap:wrap;";
 
   const modeLabel = divText("", "슬롯 카드 표시");
   modeLabel.style.cssText = "font-weight:800;";
@@ -4493,9 +4602,9 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
     onChange();
   });
 
-  btnFull.style.cssText = `padding:8px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.16);
+  btnFull.style.cssText = `padding:calc(8 * var(--u)) calc(12 * var(--u)); border-radius:calc(12 * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.16);
     background:${cur === "FULL" ? "rgba(255,255,255,.16)" : "rgba(255,255,255,.06)"}; color:#fff; cursor:pointer;`;
-  btnName.style.cssText = `padding:8px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.16);
+  btnName.style.cssText = `padding:calc(8 * var(--u)) calc(12 * var(--u)); border-radius:calc(12 * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.16);
     background:${cur === "NAME_ONLY" ? "rgba(255,255,255,.16)" : "rgba(255,255,255,.06)"}; color:#fff; cursor:pointer;`;
 
   modeRow.appendChild(modeLabel);
@@ -4507,28 +4616,11 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
 }
 
 
-function positionPlayerHudByStage() {
-  const stage = document.querySelector<HTMLElement>(".stageInner");
-  if (!stage) return;
-
-  const r = stage.getBoundingClientRect();
-
-  
-  const x = Math.round(r.left);
-  const y = Math.round(r.top);
-
-  const root = document.documentElement;
-  root.style.setProperty("--stageLeftPx", `${x}px`);
-  root.style.setProperty("--stageTopPx", `${y}px`);
-  root.style.setProperty("--stageHPx", `${Math.round(r.height)}px`);
-}
-
 function applyUiScaleVars() {
   const root = document.documentElement;
 
-  const scale = isMobileUiNow()
-    ? uiSettings.uiScaleMobile
-    : uiSettings.uiScaleDesktop;
+  // ✅ Final scale = (user multiplier) x (screen-fit ratio)
+  const scale = getUiScaleNow();
 
   root.style.setProperty("--uiScale", String(scale));
   root.style.setProperty("--uiScaleDesktop", String(uiSettings.uiScaleDesktop));
@@ -4556,7 +4648,7 @@ function renderOverlayLayer(
     ? "position:fixed; inset:0;" +
       "background:rgba(0,0,0,1);" +          
       "display:flex; justify-content:center; align-items:flex-start;" +
-      "padding:24px; box-sizing:border-box;"
+      "padding:calc(24 * var(--u)); box-sizing:border-box;"
     : "position:fixed; inset:0;" +
       "background:rgba(0,0,0,.55);" +
       "display:flex; justify-content:center; align-items:center;";
@@ -4568,12 +4660,12 @@ function renderOverlayLayer(
 
   const panel = div("overlay-panel");
   panel.style.cssText = isFull
-    ? "width:min(860px, 96vw); max-height:calc(100vh - 48px); overflow:auto;" +
-      "padding:16px; border:1px solid rgba(255,255,255,.12); border-radius:16px;" +
-      "background:rgba(15,18,22,1); box-shadow:0 18px 60px rgba(0,0,0,.45);"
-    : "width:min(980px, 92vw); max-height:80vh; overflow:auto; padding:16px;" +
-      "border:1px solid rgba(255,255,255,.12); border-radius:16px;" +
-      "background:rgba(15,18,22,.92); box-shadow:0 18px 60px rgba(0,0,0,.45);";
+    ? "width:min(calc(860 * var(--u)), 96vw); max-height:calc(100vh - calc(48 * var(--u))); overflow:auto;" +
+      "padding:calc(16 * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.12); border-radius:calc(16 * var(--u));" +
+      "background:rgba(15,18,22,1); box-shadow:0 calc(18 * var(--u)) calc(60 * var(--u)) rgba(0,0,0,.45);"
+    : "width:min(calc(980 * var(--u)), 92vw); max-height:80vh; overflow:auto; padding:calc(16 * var(--u));" +
+      "border:calc(1 * var(--u)) solid rgba(255,255,255,.12); border-radius:calc(16 * var(--u));" +
+      "background:rgba(15,18,22,.92); box-shadow:0 calc(18 * var(--u)) calc(60 * var(--u)) rgba(0,0,0,.45);";
   panel.onclick = (e) => e.stopPropagation();
 
   const title =
@@ -4592,7 +4684,7 @@ function renderOverlayLayer(
 
   const header = div("overlayHeader");
   header.style.cssText =
-    "display:flex; align-items:center; justify-content:space-between; gap:12px; position:sticky; top:0; padding-bottom:12px; margin-bottom:12px; background:rgba(15,18,22,.92);";
+    "display:flex; align-items:center; justify-content:space-between; gap:calc(12 * var(--u)); position:sticky; top:0; padding-bottom:calc(12 * var(--u)); margin-bottom:calc(12 * var(--u)); background:rgba(15,18,22,.92);";
 
   const h = h3(title);
   h.classList.add("overlayTitle");
@@ -4600,7 +4692,7 @@ function renderOverlayLayer(
   const closeBtn = button("닫기", actions.onCloseOverlay, false);
   closeBtn.classList.add("overlayClose");
   closeBtn.style.cssText =
-    "padding:8px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.16); background:rgba(255,255,255,.06); color:#fff; cursor:pointer;";
+    "padding:calc(8 * var(--u)) calc(12 * var(--u)); border-radius:calc(12 * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.16); background:rgba(255,255,255,.06); color:#fff; cursor:pointer;";
 
   header.appendChild(h);
   header.appendChild(closeBtn);
@@ -4614,7 +4706,7 @@ function renderOverlayLayer(
     pre.className = "rulebook";
     pre.textContent = RULEBOOK_TEXT;
     pre.style.cssText =
-      "white-space:pre-wrap; line-height:1.45; font-size:13px; margin:0; padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,.10); background:rgba(0,0,0,.18);";
+      "white-space:pre-wrap; line-height:1.45; font-size:calc(13 * var(--u)); margin:0; padding:calc(12 * var(--u)); border-radius:calc(12 * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.10); background:rgba(0,0,0,.18);";
     panel.appendChild(pre);
   } else if (overlay.kind === "SETTINGS") {
     panel.appendChild(renderSettingsPanel(() => {
@@ -4651,15 +4743,15 @@ function renderOverlayLayer(
     const wrap = div("pileView");
     wrap.style.cssText =
       "display:grid;" +
-      "grid-template-columns: 1fr 320px;" +
-      "gap:16px;" +
+      "grid-template-columns: 1fr calc(320 * var(--u));" +
+      "gap:calc(16 * var(--u));" +
       "align-items:start;";
 
     const grid = div("pileGrid");
     grid.style.cssText =
       "display:grid;" +
       "grid-template-columns: repeat(auto-fill, minmax(var(--handCardW), 1fr));" +
-      "gap:10px;" +
+      "gap:calc(10 * var(--u));" +
       "align-content:start;" +
       "min-width:0;"+
       "max-height: 62vh;" + 
@@ -4668,33 +4760,33 @@ function renderOverlayLayer(
 
     const side = div("pileSide");
     side.style.cssText =
-      "position:sticky; top:72px;" +
+      "position:sticky; top:calc(72 * var(--u));" +
       "align-self:start;" +
-      "border:1px solid rgba(255,255,255,.10);" +
-      "border-radius:14px;" +
-      "padding:12px;" +
+      "border:calc(1 * var(--u)) solid rgba(255,255,255,.10);" +
+      "border-radius:calc(14 * var(--u));" +
+      "padding:calc(12 * var(--u));" +
       "background:rgba(0,0,0,.22);";
 
     const sideTitle = div("pileSideTitle");
-    sideTitle.style.cssText = "font-weight:800; margin:0 0 10px 0; opacity:.95;";
+    sideTitle.style.cssText = "font-weight:800; margin:0 0 calc(10 * var(--u)) 0; opacity:.95;";
     side.appendChild(sideTitle);
 
     const previewBox = div("pilePreviewBox");
     previewBox.style.cssText =
       "display:flex; justify-content:center; align-items:flex-start;" +
-      "padding:8px 0 10px 0;";
+      "padding:calc(8 * var(--u)) 0 calc(10 * var(--u)) 0;";
     side.appendChild(previewBox);
 
     const sidePre = document.createElement("pre");
     sidePre.className = "pileSideDetail";
     sidePre.style.cssText =
       "margin:0;" +
-      "padding:10px;" +
+      "padding:calc(10 * var(--u));" +
       "white-space:pre-wrap;" +
-      "border-radius:12px;" +
-      "border:1px solid rgba(255,255,255,.10);" +
+      "border-radius:calc(12 * var(--u));" +
+      "border:calc(1 * var(--u)) solid rgba(255,255,255,.10);" +
       "background:rgba(0,0,0,.20);" +
-      "font-size:12px;" +
+      "font-size:calc(12 * var(--u));" +
       "line-height:1.45;";
     side.appendChild(sidePre);
 
@@ -4722,7 +4814,7 @@ function renderOverlayLayer(
       const empty = div("overlayEmpty");
       empty.textContent = "비어 있음";
       empty.style.cssText =
-        "padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,.10); background:rgba(255,255,255,.03);";
+        "padding:calc(12 * var(--u)); border-radius:calc(12 * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.10); background:rgba(255,255,255,.03);";
       grid.appendChild(empty);
     } else {
       for (const uid of sortedUids) {
@@ -4773,6 +4865,7 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string) {
 
 function renderItemTray(g: GameState, actions: UIActions) {
   document.querySelector(".itemTray")?.remove();
+  document.querySelector(".itemCapHud")?.remove();
 
   const items = ((g.run as any).items as string[]) ?? [];
   if (!items || items.length === 0) return;
@@ -4788,6 +4881,28 @@ function renderItemTray(g: GameState, actions: UIActions) {
   // 유물 tooltip 스타일 그대로 재사용
   tip.className = "relicHoverTip itemHoverTip";
   tray.appendChild(tip);
+
+  // 아이템 수/한도 + 버리기 힌트(2/2 옆, 트레이보다 살짝 위)
+  const cap = getItemCap(g);
+  const capHud = document.createElement("div");
+  capHud.className = "itemCapHud";
+
+  const capBadge = document.createElement("div");
+  capBadge.className = "itemCapBadge";
+  capBadge.textContent = items.length + "/" + cap;
+
+  const capHint = document.createElement("div");
+  capHint.className = "itemCapHint";
+  capHint.textContent = "우클릭/×: 버리기";
+
+  capHud.appendChild(capBadge);
+  capHud.appendChild(capHint);
+
+  // tray는 overflow가 있어서(스크롤) 위로 튀어나오면 잘릴 수 있음 → HUD는 body에 따로 붙이고 위치를 맞춘다
+  // (render 때마다 재배치되므로 resize에도 크게 문제 없음)
+  document.body.appendChild(capHud);
+  // tray는 나중에 body에 append되므로, append 이후 위치를 계산해야 함
+
 
   const updateTip = () => {
     const id = itemHoverId;
@@ -4826,6 +4941,24 @@ function renderItemTray(g: GameState, actions: UIActions) {
     if (def?.art) img.src = assetUrl(def.art);
     slot.appendChild(img);
 
+    const drop = document.createElement("button");
+    drop.type = "button";
+    drop.className = "itemDropBtn";
+    drop.title = "";
+    drop.textContent = "×";
+    drop.onclick = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      actions.onDiscardItem(i);
+    };
+    slot.appendChild(drop);
+
+    slot.oncontextmenu = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      actions.onDiscardItem(i);
+    };
+
     // 툴팁(간단)
 
     const disabled = !inCombat || !!g.choice || !!overlay || isTargeting(g);
@@ -4850,6 +4983,14 @@ function renderItemTray(g: GameState, actions: UIActions) {
   }
 
   document.body.appendChild(tray);
+
+  // HUD 위치 계산(트레이의 좌상단 기준)
+  try {
+    const u = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--u")) || 1;
+    const r = tray.getBoundingClientRect();
+    capHud.style.left = `${Math.round(r.left + 6 * u)}px`;
+    capHud.style.top = `${Math.round(r.top - 10 * u)}px`;
+  } catch {}
 }
 
 
@@ -4954,29 +5095,30 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
 
 
   const isShopChoice = (g.choiceCtx as any)?.kind === "SHOP";
+  // 강경 모드: 모든 치수는 화면비 기반(var(--u))으로만 계산한다.
+  // 여기 값들은 '디자인 기준치' (1440x900 기반)이고, 실제 렌더는 CSS가 var(--u)로 스케일합니다.
+  const CHOICE_DROP = 70;
+  const PAD_TOP = 20 + CHOICE_DROP;
+  const PAD_R = 36;
+  const PAD_B = 16;
+  const PAD_L = 16;
 
-  const CHOICE_DROP = sx(70);
-  const PAD_TOP = sx(20) + CHOICE_DROP;
-  const PAD_R   = sx(36);
-  const PAD_B   = sx(16);
-  const PAD_L   = sx(16);
+  const GAP_ROW  = isShopChoice ? 12 : 18;
+  const GAP_LIST = 10;
 
-  const GAP_ROW   = sx(isShopChoice ? 12 : 18);
-  const GAP_LIST  = sx(10);
+  const ILLU_SIZE = isShopChoice ? 220 : 260;
+  const ILLU_MIN  = isShopChoice ? 170 : 200;
 
-  const ILLU_SIZE = sx(isShopChoice ? 220 : 260);
-  const ILLU_MIN  = sx(isShopChoice ? 170 : 200);
+  const ITEM_R   = 14;
+  const ITEM_PAD = 12;
 
-  const ITEM_R    = sx(14);
-  const ITEM_PAD  = sx(12);
+  const DETAIL_PAD  = 10;
+  const DETAIL_R    = 12;
+  const DETAIL_FS   = 12;
+  const DETAIL_MAXH = 220;
 
-  const DETAIL_PAD  = sx(10);
-  const DETAIL_R    = sx(12);
-  const DETAIL_FS   = sx(12);
-  const DETAIL_MAXH = sx(220);
-
-  const TITLE_FS  = sx(22);
-  const PROMPT_FS = sx(14);
+  const TITLE_FS  = 22;
+  const PROMPT_FS = 14;
 
 
   const overlayEl = div("choice-overlay");
@@ -4990,8 +5132,8 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
   backdrop.style.cssText =
     "position:absolute; inset:0;" +
     "background: rgba(0,0,0,.72);" +
-    "backdrop-filter: blur(4px);" +
-    "-webkit-backdrop-filter: blur(4px);" +
+    "backdrop-filter: blur(calc(4 * var(--u)));" +
+    "-webkit-backdrop-filter: blur(calc(4 * var(--u)));" +
     "pointer-events:auto;";
 
 
@@ -5002,7 +5144,7 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
   const padWrap = div("choice-padWrap");
   padWrap.style.cssText =
     "position:relative; width:100%;" +
-    `padding:${PAD_TOP}px ${PAD_R}px ${PAD_B}px ${PAD_L}px;` +
+    `padding:calc(${PAD_TOP} * var(--u)) calc(${PAD_R} * var(--u)) calc(${PAD_B} * var(--u)) calc(${PAD_L} * var(--u));` +
     "box-sizing:border-box;" +
     "display:flex; justify-content:center; align-items:flex-start;" +
     "pointer-events:auto;";
@@ -5020,14 +5162,14 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
 
   const titleEl = h2(c.title);
   titleEl.style.cssText =
-    `margin:0 0 ${sx(8)}px 0; font-size:${TITLE_FS}px; font-weight:900;` +
+    `margin:0 0 calc(${8} * var(--u)) 0; font-size:calc(${TITLE_FS} * var(--u)); font-weight:900;` +
     "text-align:left;";
   panel.appendChild(titleEl);
 
   if (c.prompt) {
     const promptEl = p(c.prompt);
     promptEl.style.cssText =
-      `margin:0 0 ${sx(12)}px 0; font-size:${PROMPT_FS}px; line-height:1.25; opacity:.95;`;
+      `margin:0 0 calc(${12} * var(--u)) 0; font-size:calc(${PROMPT_FS} * var(--u)); line-height:1.25; opacity:.95;`;
     panel.appendChild(promptEl);
   }
 
@@ -5045,12 +5187,12 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
     pre.className = "choice-detail";
     pre.textContent = String(detail);
     pre.style.cssText =
-      `margin:${sx(10)}px 0 0 0; padding:${DETAIL_PAD}px;` +
+      `margin:calc(${10} * var(--u)) 0 0 0; padding:calc(${DETAIL_PAD} * var(--u));` +
       "white-space:pre-wrap;" +
-      `border-radius: 0px; border:1px solid rgba(255,255,255,.10);` +
+      `border-radius: 0; border:calc(1 * var(--u)) solid rgba(255,255,255,.10);` +
       "background:rgba(0,0,0,.22);" +
-      `font-size:${DETAIL_FS}px; line-height:1.45;` +
-      `max-height:${DETAIL_MAXH}px; overflow:auto;`;
+      `font-size:calc(${DETAIL_FS} * var(--u)); line-height:1.45;` +
+      `max-height:calc(${DETAIL_MAXH} * var(--u)); overflow:auto;`;
     return pre;
   };
 
@@ -5058,10 +5200,10 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
     const item = div("choice-item");
     item.style.cssText =
       "display:flex;" +
-      `gap:${sx(12)}px;` +
+      `gap:calc(${12} * var(--u));` +
       "align-items:flex-start;" +
-      `border:1px solid rgba(255,255,255,.10); border-radius:${ITEM_R}px;` +
-      `padding:${ITEM_PAD}px;` +
+      `border:calc(1 * var(--u)) solid rgba(255,255,255,.10); border-radius:calc(${ITEM_R} * var(--u));` +
+      `padding:calc(${ITEM_PAD} * var(--u));` +
       "background:rgba(255,255,255,.03);";
     return item;
   };
@@ -5079,25 +5221,25 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
     const contentRow = div("choice-contentRow");
     contentRow.style.cssText =
       "display:flex;" +
-      `gap:${GAP_ROW}px; margin-top:${sx(12)}px;` +
+      `gap:calc(${GAP_ROW} * var(--u)); margin-top:calc(${12} * var(--u));` +
       "justify-content:center; align-items:stretch;";
 
     const leftCol = div("choice-leftCol");
     leftCol.style.cssText =
-      `flex:1 1 ${sx(isShopChoice ? 560 : 640)}px; max-width:${sx(isShopChoice ? 640 : 720)}px; min-width:0;` +
+      `flex:1 1 calc(${isShopChoice ? 560 : 640} * var(--u)); max-width:calc(${isShopChoice ? 640 : 720} * var(--u)); min-width:0;` +
       "display:flex; flex-direction:column;";
 
     const list = div("choice-list");
-    list.style.cssText = `display:flex; flex-direction:column; gap:${GAP_LIST}px;`;
+    list.style.cssText = `display:flex; flex-direction:column; gap:calc(${GAP_LIST} * var(--u));`;
 
     c.options.forEach((opt) => {
       const item = makeItemShell();
 
       const b = button(opt.label, () => actions.onChooseChoice(opt.key), false);
       b.classList.add("choiceOptBtn");
-      b.style.fontSize = `${sx(14)}px`;
-      b.style.padding = `${sx(10)}px ${sx(12)}px`;
-      b.style.borderRadius = `${sx(10)}px`;
+      b.style.fontSize = `calc(${14} * var(--u))`;
+      b.style.padding = `calc(${10} * var(--u)) calc(${12} * var(--u))`;
+      b.style.borderRadius = `calc(${10} * var(--u))`;
       item.appendChild(b);
 
       if ((opt as any).detail) item.appendChild(makeDetailPre((opt as any).detail));
@@ -5108,16 +5250,16 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
 
     const illuCol = div("choice-illuCol");
     illuCol.style.cssText =
-      `flex:0 0 ${ILLU_SIZE}px; min-width:${ILLU_MIN}px;` +
+      `flex:0 0 calc(${ILLU_SIZE} * var(--u)); min-width:calc(${ILLU_MIN} * var(--u));` +
       "display:flex; align-items:center; justify-content:center;";
 
     const illuBox = div("choice-illuBox");
     illuBox.style.cssText =
       "width:100%; aspect-ratio:1/1;" +
-      `border-radius:${sx(18)}px; border:1px solid rgba(255,255,255,.16);` +
+      `border-radius:calc(${18} * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.16);` +
       "background:rgba(0,0,0,.35);" +
       "position:relative; overflow:hidden;" +
-      "box-shadow: 0 10px 30px rgba(0,0,0,.35);";
+      "box-shadow: 0 calc(10 * var(--u)) calc(30 * var(--u)) rgba(0,0,0,.35);";
 
     const art = (c as any).art as string | undefined;
     if (art) {
@@ -5251,8 +5393,8 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
           !!shop.usedRemove
         )
       );
-      svcGrid.appendChild(mkSvc("shop:supply:buy", "보급 구매", "-🪙6 / 🌾+3", false));
-      svcGrid.appendChild(mkSvc("shop:supply:sell", "보급 판매", "+🪙4 / 🌾-3", false));
+      svcGrid.appendChild(mkSvc("shop:supply:buy", "보급 구매", "-🪙6 / 🍞+3", false));
+      svcGrid.appendChild(mkSvc("shop:supply:sell", "보급 판매", "+🪙4 / 🍞-3", false));
 
       svcCol.appendChild(svcGrid);
 
@@ -5266,11 +5408,11 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
       leaveBtn.classList.add("shopLeaveBtn");
       leaveBtn.style.cssText =
         "position:absolute;" +
-        `top:${sx(16)}px; right:${sx(16)}px;` +
+        `top:calc(${16} * var(--u)); right:calc(${16} * var(--u));` +
         "z-index: 2;" +
-        "border-radius:0px;" +
-        `padding:${sx(10)}px ${sx(14)}px;` +
-        `font-size:${sx(13)}px; font-weight:900;`;
+        "border-radius:0;" +
+        `padding:calc(${10} * var(--u)) calc(${14} * var(--u));` +
+        `font-size:calc(${13} * var(--u)); font-weight:900;`;
 
       panel.appendChild(leaveBtn);
 
@@ -5284,16 +5426,16 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
 
       const illuCol = div("choice-illuCol");
       illuCol.style.cssText =
-        `flex:0 0 ${ILLU_SIZE}px; min-width:${ILLU_MIN}px;` +
+        `flex:0 0 calc(${ILLU_SIZE} * var(--u)); min-width:calc(${ILLU_MIN} * var(--u));` +
         "display:flex; align-items:center; justify-content:center;";
 
       const illuBox = div("choice-illuBox");
       illuBox.style.cssText =
         "width:100%; aspect-ratio:1/1;" +
-        `border-radius:${sx(18)}px; border:1px solid rgba(255,255,255,.16);` +
+        `border-radius:calc(${18} * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.16);` +
         "background:rgba(0,0,0,.35);" +
         "position:relative; overflow:hidden;" +
-        "box-shadow: 0 10px 30px rgba(0,0,0,.35);";
+        "box-shadow: 0 calc(10 * var(--u)) calc(30 * var(--u)) rgba(0,0,0,.35);";
 
       const art = (c as any).art as string | undefined;
       if (art) {
@@ -5350,9 +5492,11 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
       const pickOpts = c.options.filter((opt) => typeof opt.key === "string" && opt.key.startsWith("pick:"));
       const skipOpt = c.options.find((opt) => opt.key === "skip") ?? null;
 
+      const ctx: any = g.choiceCtx as any;
+      const cardDecision = ctx?.cardDecision as (string | "SKIPPED" | undefined);
+
       // Optional item reward (combined into this screen)
       {
-        const ctx: any = g.choiceCtx as any;
         const itemId = String(ctx?.itemOfferId ?? "");
         const itemDecision = ctx?.itemDecision as ("TAKEN" | "SKIPPED" | undefined);
         if (itemId) {
@@ -5360,18 +5504,21 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
           const row = div("choice-rewardItemRow");
           row.style.cssText =
             "display:flex; justify-content:center; align-items:flex-start;" +
-            `gap:${sx(14)}px; margin-bottom:${sx(16)}px;`;
+            `gap:calc(${14} * var(--u)); margin-bottom:calc(${16} * var(--u));`;
 
           const card = div("itemOfferCard");
           card.style.cssText =
-            `width:${sx(170)}px; aspect-ratio:3/4;` +
-            `border-radius: 0px;` +
-            "border:1px solid rgba(255,255,255,.14);" +
+            `width:calc(${170} * var(--u)); aspect-ratio:3/4;` +
+            `border-radius: 0;` +
+            "border:calc(1 * var(--u)) solid rgba(255,255,255,.14);" +
             "background:rgba(0,0,0,.35);" +
-            "box-shadow: 0 10px 30px rgba(0,0,0,.35);" +
+            "box-shadow: 0 calc(10 * var(--u)) calc(30 * var(--u)) rgba(0,0,0,.35);" +
             "display:flex; flex-direction:column; align-items:center; justify-content:flex-start;" +
-            `padding:${sx(12)}px; gap:${sx(10)}px;` +
+            `padding:calc(${12} * var(--u)); gap:calc(${10} * var(--u));` +
             "cursor:pointer; user-select:none;";
+
+          // Hover tooltip: show item ability text
+          wireItemHover(card, itemId);
 
           if (itemDecision) {
             card.style.opacity = ".55";
@@ -5381,7 +5528,7 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
           }
 
           const title = divText("itemOfferTitle", "아이템 보상");
-          title.style.cssText = `font-weight:900; font-size:${sx(14)}px; opacity:.92;`;
+          title.style.cssText = `font-weight:900; font-size:calc(${14} * var(--u)); opacity:.92;`;
 
           if (def?.art) {
             const img = document.createElement("img");
@@ -5389,26 +5536,33 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
             img.alt = def.name;
             (img.style as any).imageRendering = "pixelated";
             img.style.cssText =
-              `width:${sx(96)}px; height:${sx(96)}px;` +
+              `width:calc(${96} * var(--u)); height:calc(${96} * var(--u));` +
               "object-fit:contain;" +
               "image-rendering: pixelated; image-rendering: crisp-edges;";
             card.appendChild(img);
           }
 
           const nm = divText("itemOfferName", def?.name ?? itemId);
-          nm.style.cssText = `font-weight:800; font-size:${sx(14)}px; text-align:center;`;
+          nm.style.cssText = `font-weight:800; font-size:calc(${14} * var(--u)); text-align:center;`;
           const hint = divText(
             "itemOfferHint",
             itemDecision === "TAKEN" ? "획득함" : itemDecision === "SKIPPED" ? "생략함" : "클릭하면 받습니다"
           );
-          hint.style.cssText = `opacity:.75; font-size:${sx(12)}px; text-align:center;`;
+          hint.style.cssText = `opacity:.75; font-size:calc(${12} * var(--u)); text-align:center;`;
 
           // Put title above card contents
           const wrap = div("itemOfferWrap");
           wrap.style.cssText = "display:flex; flex-direction:column; align-items:center;";
           wrap.appendChild(title);
           wrap.appendChild(card);
+          const desc = divText("itemOfferDesc", def?.text ?? "");
+          desc.style.cssText = `opacity:.85; font-size:calc(${12} * var(--u)); text-align:center; white-space:pre-wrap; line-height:1.35;`;
+          (desc.style as any).maxHeight = `calc(${54} * var(--u))`;
+          (desc.style as any).overflow = "hidden";
+          (desc.style as any).textOverflow = "ellipsis";
+
           card.appendChild(nm);
+          card.appendChild(desc);
           card.appendChild(hint);
 
           row.appendChild(wrap);
@@ -5417,9 +5571,9 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
           if (!itemDecision) {
             const skipB = button("아이템 생략", () => actions.onChooseChoice("skip_item"), false);
             skipB.classList.add("ghost");
-            skipB.style.fontSize = `${sx(13)}px`;
-            skipB.style.padding = `${sx(10)}px ${sx(14)}px`;
-            skipB.style.borderRadius = `${sx(10)}px`;
+            skipB.style.fontSize = `calc(${13} * var(--u))`;
+            skipB.style.padding = `calc(${10} * var(--u)) calc(${14} * var(--u))`;
+            skipB.style.borderRadius = `calc(${10} * var(--u))`;
             row.appendChild(skipB);
           }
 
@@ -5430,7 +5584,7 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
       const row = div("choice-rewardCardRow");
       row.style.cssText =
         "display:flex;" +
-        `gap:${sx(18)}px;` +
+        `gap:calc(${18} * var(--u));` +
         "justify-content:center; align-items:flex-start;" +
         "flex-wrap:nowrap;";
 
@@ -5438,21 +5592,29 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
         const payload = opt.key.slice("pick:".length);
         const [defId, upStr] = payload.split(":");
         const upgrade = Number(upStr ?? "0") || 0;
-        const el = renderClickablePreviewByDef(defId, upgrade, () => actions.onChooseChoice(opt.key));
+        const canPick = !cardDecision;
+        const el = renderClickablePreviewByDef(defId, upgrade, () => {
+          if (!canPick) return;
+          actions.onChooseChoice(opt.key);
+        });
+        if (!canPick) {
+          el.style.opacity = ".55";
+          el.style.cursor = "default";
+        }
         fixPreviewSize(el, 1);
         row.appendChild(el);
       }
 
       panel.appendChild(row);
 
-      if (skipOpt) {
+      if (skipOpt && !cardDecision) {
         const skipWrap = div("choice-rewardSkipRow");
-        skipWrap.style.cssText = `margin-top:${sx(18)}px; display:flex; justify-content:center;`;
+        skipWrap.style.cssText = `margin-top:calc(${18} * var(--u)); display:flex; justify-content:center;`;
         const b = button(skipOpt.label || "생략", () => actions.onChooseChoice("skip"), false);
         b.classList.add("primary");
-        b.style.fontSize = `${sx(14)}px`;
-        b.style.padding = `${sx(10)}px ${sx(16)}px`;
-        b.style.borderRadius = `${sx(10)}px`;
+        b.style.fontSize = `calc(${14} * var(--u))`;
+        b.style.padding = `calc(${10} * var(--u)) calc(${16} * var(--u))`;
+        b.style.borderRadius = `calc(${10} * var(--u))`;
         skipWrap.appendChild(b);
         panel.appendChild(skipWrap);
       }
@@ -5467,16 +5629,16 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
     const list = div("choice-list");
     list.style.cssText =
       "display:flex; flex-direction:column;" +
-      `gap:${GAP_LIST}px; margin-top:${sx(12)}px;`;
+      `gap:calc(${GAP_LIST} * var(--u)); margin-top:calc(${12} * var(--u));`;
 
     c.options.forEach((opt) => {
       // 상점 구분선은 버튼이 아니라 라인으로
       if (isShopChoice && (opt.key === "shop:sep" || opt.key.startsWith("shop:sep:"))) {
         const sep = div("choice-sep");
         sep.style.cssText =
-          `height:${sx(1)}px;` +
+          `height:calc(${1} * var(--u));` +
           "background:rgba(255,255,255,.12);" +
-          `margin:${sx(6)}px 0;`;
+          `margin:calc(${6} * var(--u)) 0;`;
         list.appendChild(sep);
         return;
       }
@@ -5495,7 +5657,7 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
 
         if (isUpgradePick) {
           const pair = div("upgradePair");
-          pair.style.cssText = `display:flex; gap:${sx(10)}px; align-items:flex-start;`;
+          pair.style.cssText = `display:flex; gap:calc(${10} * var(--u)); align-items:flex-start;`;
 
           let elCur: HTMLElement;
           let elNext: HTMLElement;
@@ -5508,7 +5670,7 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
           fixPreviewSize(elNext, 1);
 
           const arrow = divText("upgradeArrow", "→");
-          arrow.style.cssText = `align-self:center; font-weight:900; opacity:.85; margin-top:${sx(6)}px;`;
+          arrow.style.cssText = `align-self:center; font-weight:900; opacity:.85; margin-top:calc(${6} * var(--u));`;
 
           pair.appendChild(elCur);
           pair.appendChild(arrow);
@@ -5548,13 +5710,13 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
           const def = getItemDefById(String(offer.itemId));
           const card = div("shopItemCard");
           card.style.cssText =
-            `width:${sx(150)}px; aspect-ratio:3/4;` +
-            `border-radius: 0px;` +
-            "border:1px solid rgba(255,255,255,.14);" +
+            `width:calc(${150} * var(--u)); aspect-ratio:3/4;` +
+            `border-radius: 0;` +
+            "border:calc(1 * var(--u)) solid rgba(255,255,255,.14);" +
             "background:rgba(0,0,0,.30);" +
-            "box-shadow: 0 10px 30px rgba(0,0,0,.25);" +
+            "box-shadow: 0 calc(10 * var(--u)) calc(30 * var(--u)) rgba(0,0,0,.25);" +
             "display:flex; flex-direction:column; align-items:center; justify-content:flex-start;" +
-            `padding:${sx(10)}px; gap:${sx(8)}px;` +
+            `padding:calc(${10} * var(--u)); gap:calc(${8} * var(--u));` +
             "user-select:none;" +
             (offer.sold ? "opacity:.35; cursor:default;" : "cursor:pointer;");
 
@@ -5566,16 +5728,16 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
             img.alt = def?.name ?? String(offer.itemId);
             (img.style as any).imageRendering = "pixelated";
             img.style.cssText =
-              `width:${sx(84)}px; height:${sx(84)}px;` +
+              `width:calc(${84} * var(--u)); height:calc(${84} * var(--u));` +
               "object-fit:contain;" +
               "image-rendering: pixelated; image-rendering: crisp-edges;";
             card.appendChild(img);
           }
 
           const nm = divText("shopItemName", def?.name ?? String(offer.itemId));
-          nm.style.cssText = `font-weight:900; font-size:${sx(13)}px; text-align:center;`;
+          nm.style.cssText = `font-weight:900; font-size:calc(${13} * var(--u)); text-align:center;`;
           const pr = divText("shopItemPrice", offer.sold ? "품절" : `🪙${Number(offer.priceGold ?? 0) || 0}`);
-          pr.style.cssText = `opacity:.85; font-size:${sx(12)}px;`;
+          pr.style.cssText = `opacity:.85; font-size:calc(${12} * var(--u));`;
           card.appendChild(nm);
           card.appendChild(pr);
 
@@ -5584,13 +5746,13 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
       }
 
       const right = div("choice-right");
-      right.style.cssText = `flex:1 1 auto; min-width:${sx(260)}px;`;
+      right.style.cssText = `flex:1 1 auto; min-width:calc(${260} * var(--u));`;
 
       const b = button(opt.label, () => actions.onChooseChoice(opt.key), false);
       b.classList.add("primary");
-      b.style.fontSize = `${sx(14)}px`;
-      b.style.padding = `${sx(10)}px ${sx(12)}px`;
-      b.style.borderRadius = `${sx(10)}px`;
+      b.style.fontSize = `calc(${14} * var(--u))`;
+      b.style.padding = `calc(${10} * var(--u)) calc(${12} * var(--u))`;
+      b.style.borderRadius = `calc(${10} * var(--u))`;
       right.appendChild(b);
 
       if ((opt as any).detail) right.appendChild(makeDetailPre((opt as any).detail));
@@ -5605,27 +5767,27 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
       const contentRow = div("choice-contentRow");
       contentRow.style.cssText =
         "display:flex;" +
-        `gap:${GAP_ROW}px; margin-top:${sx(12)}px;` +
+        `gap:calc(${GAP_ROW} * var(--u)); margin-top:calc(${12} * var(--u));` +
         "justify-content:center; align-items:stretch;";
 
       const leftCol = div("choice-leftCol");
       leftCol.style.cssText =
-        `flex:1 1 ${sx(560)}px; max-width:${sx(640)}px; min-width:0;` +
+        `flex:1 1 calc(${560} * var(--u)); max-width:calc(${640} * var(--u)); min-width:0;` +
         "display:flex; flex-direction:column;";
       leftCol.appendChild(list);
 
       const illuCol = div("choice-illuCol");
       illuCol.style.cssText =
-        `flex:0 0 ${ILLU_SIZE}px; min-width:${ILLU_MIN}px;` +
+        `flex:0 0 calc(${ILLU_SIZE} * var(--u)); min-width:calc(${ILLU_MIN} * var(--u));` +
         "display:flex; align-items:center; justify-content:center;";
 
       const illuBox = div("choice-illuBox");
       illuBox.style.cssText =
         "width:100%; aspect-ratio:1/1;" +
-        `border-radius:${sx(18)}px; border:1px solid rgba(255,255,255,.16);` +
+        `border-radius:calc(${18} * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.16);` +
         "background:rgba(0,0,0,.35);" +
         "position:relative; overflow:hidden;" +
-        "box-shadow: 0 10px 30px rgba(0,0,0,.35);";
+        "box-shadow: 0 calc(10 * var(--u)) calc(30 * var(--u)) rgba(0,0,0,.35);";
 
       const art = (c as any).art as string | undefined;
       if (art) {
@@ -5707,7 +5869,7 @@ function renderTopHud(g: GameState, actions: UIActions) {
 
   const blOuter = div("enemyHPOuter");
   const blFill = div("enemyHPFill");
-  blFill.style.background = "linear-gradient(90deg, #64b5ff, #2a7cff)";
+  blFill.style.background = "#2a7cff";
   blFill.style.width = `${Math.max(0, Math.min(100, (g.player.block / Math.max(1, g.player.maxHp)) * 100))}%`;
   blOuter.appendChild(blFill);
   pbox.appendChild(blOuter);
@@ -5738,7 +5900,7 @@ function renderTopHud(g: GameState, actions: UIActions) {
       flex-wrap: nowrap;
       justify-content: center;
       align-items: stretch;
-      gap: 14px;
+      gap: calc(14 * var(--u));
       overflow: visible;
       white-space: nowrap;
     `;
@@ -5831,17 +5993,25 @@ function renderTopHud(g: GameState, actions: UIActions) {
 
   top.appendChild(left);
 
-  const right = div("topHudRight");
+  return top;
+}
 
-  right.appendChild(mkButton("룰북", () => actions.onViewRulebook()));
-  right.appendChild(mkButton("로그", () => actions.onToggleLogOverlay()));
-  right.appendChild(mkButton("설정", () => {
-    overlay = { kind: "SETTINGS" };
+// ✅ Portal: keep 룰북/로그/설정 buttons above choice overlays (same layer as '새로운 런')
+function renderTopRightChrome(g: GameState, actions: UIActions) {
+  // Remove old (in case of hot reload / re-render)
+  document.querySelector('.topHudRightChrome')?.remove();
+
+  const right = div('topHudRight');
+  right.classList.add('topHudRightChrome');
+
+  right.appendChild(mkButton('룰북', () => actions.onViewRulebook()));
+  right.appendChild(mkButton('로그', () => actions.onToggleLogOverlay()));
+  right.appendChild(mkButton('설정', () => {
+    overlay = { kind: 'SETTINGS' };
     render(g, actions);
   }));
-  top.appendChild(right);
 
-  return top;
+  document.body.appendChild(right);
 }
 
 function buildResourceTopText(g: GameState): string {
@@ -5853,7 +6023,7 @@ function buildResourceTopText(g: GameState): string {
 
   if (bonusS !== 0) {
     const sign = bonusS > 0 ? `+${bonusS}` : `${bonusS}`;
-    parts.push(`다음 전투 🌾 ${sign}`);
+    parts.push(`다음 전투 🍞 ${sign}`);
   }
 
   return parts.join(" | ");
@@ -5872,10 +6042,6 @@ function buildResourceBottomText(g: GameState): string {
   parts.push(`🃏 덱 ${g.deck.length}`);
   parts.push(`💤 F ${g.player.fatigue}`);
 
-  if (inCombat) {
-    parts.push(`🌾 S ${g.player.supplies}`);
-  }
-
   return parts.join(" | ");
 }
 
@@ -5892,7 +6058,7 @@ function renderBattleTitleRow(g: GameState) {
   const row = div("battleTitleRow");
   row.style.display = "flex";
   row.style.alignItems = "center";
-  row.style.gap = "12px";
+  row.style.gap = "calc(12 * var(--u))";
 
   const title = document.createElement("h2");
   title.textContent = "";
@@ -5902,12 +6068,12 @@ function renderBattleTitleRow(g: GameState) {
 
   const warn = divText("targetHintInline", "");
   warn.style.cssText =
-    "padding:5px 10px; border-radius:12px; border:1px solid rgba(0,0,0,.55);" +
+    "padding:calc(5 * var(--u)) calc(10 * var(--u)); border-radius:calc(12 * var(--u)); border:calc(1 * var(--u)) solid rgba(0,0,0,.55);" +
     "background: rgb(255, 0, 0);" +
-    "opacity:.9;" +
-    "font-weight:400; font-size:12px; line-height:1.2;" +
+    "opacity:1;" +
+    "font-weight:400; font-size:calc(12 * var(--u)); line-height:1.2;" +
     "white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" +
-    "width: min(240px, 92vw);" +
+    "width: min(calc(240 * var(--u)), 92vw);" +
     "max-width: none;" +
     "pointer-events:auto;";
 
@@ -5924,7 +6090,7 @@ function renderBattleTitleRow(g: GameState) {
   const right = div("battleTitleRight");
   right.style.cssText =
     "margin-left:auto;" +
-    "display:flex; align-items:center; gap:10px;" +
+    "display:flex; align-items:center; gap:calc(10 * var(--u));" +
     "flex: 0 0 auto;" +
     "white-space:nowrap;" +
     "position:relative;";
@@ -5936,9 +6102,9 @@ function renderBattleTitleRow(g: GameState) {
   right.appendChild(res);
 
   warn.style.position = "absolute";
-  warn.style.right = "207px";
-  warn.style.top = "calc(100% - 8px)";
-  warn.style.marginTop = "0px";
+  warn.style.right = "calc(207 * var(--u))";
+  warn.style.top = "calc(100% - calc(8 * var(--u)))";
+  warn.style.marginTop = "0";
   warn.style.zIndex = "5";
   warn.style.pointerEvents = hintText ? "auto" : "none";
   row.appendChild(warn);
@@ -6016,7 +6182,7 @@ function renderCombat(root: HTMLElement, g: GameState, actions: UIActions) {
 
   const slotsWrap = div("boardSlotsWrap");
 
-  slotsWrap.style.paddingTop = `${sx(6)}px`;
+  slotsWrap.style.paddingTop = `calc(${6} * var(--u))`;
 
   slotsWrap.appendChild(renderSlotsGrid(g, actions, "front"));
   slotsWrap.appendChild(renderSlotsGrid(g, actions, "back"));
@@ -6096,7 +6262,7 @@ function renderHandDock(g: GameState, actions: UIActions, targeting: boolean) {
     if (slot) {
       const r = slot.getBoundingClientRect();
       const centerX = r.left + r.width / 2;
-      controls.style.left = `${Math.round(centerX)}px`;
+      controls.style.left = lenFromDev(Math.round(centerX));
     }
 
     setEnterAction(() => actions.onAutoAdvance(), nextTurnBtn.disabled);
@@ -6160,9 +6326,7 @@ function alignEnemyHudToViewportCenter() {
   const top =
     topHudEl ? Math.round(topHudEl.getBoundingClientRect().bottom + gap) : safeTop;
 
-  hud.style.top = `${top}px`;
-
-  hud.style.top = "8px";
+  hud.style.top = "calc(8 * var(--u))";
   hud.style.left = "50%";
   hud.style.right = "auto";
   hud.style.transform = "translateX(-50%)";
@@ -6180,20 +6344,15 @@ function alignEnemyHudToViewportCenter() {
 
   const GAP = 14;
 
-  const oneW = Math.ceil(banners[0].getBoundingClientRect().width) || 460;
-  const capW = Math.max(320, Math.floor(window.innerWidth - 16));
-
-  const W1 = Math.min(capW, oneW);
-  const W2 = Math.min(capW, oneW * 2 + GAP);
-  const W3 = Math.min(capW, oneW * 3 + GAP * 2);
-
   wrap.style.display = "flex";
   wrap.style.flexWrap = "nowrap";
   wrap.style.justifyContent = "center";
   wrap.style.alignItems = "stretch";
-  (wrap.style as any).gap = `${GAP}px`;
-
-  hud.style.width = `${n === 1 ? W1 : n === 2 ? W2 : W3}px`;
+  (wrap.style as any).gap = `calc(${GAP} * var(--u))`;
+  hud.style.width = "auto";
+  hud.style.maxWidth = "calc(100vw - calc(16 * var(--u)))";
+  (wrap.style as any).maxWidth = "100%";
+  (wrap.style as any).overflowX = "auto";
   mover.style.width = "100%";
 }
 
@@ -6226,7 +6385,8 @@ function alignHandToBoardAnchor(_g: GameState) {
   const viewW = hand.clientWidth;
 
   if (rowW <= viewW + 1) {
-    row.style.transform = `translateX(${Math.round(deltaViewport)}px)`;
+    const dxvw = (deltaViewport / window.innerWidth) * 100;
+    row.style.transform = `translateX(${dxvw.toFixed(4)}vw)`;
     hand.scrollLeft = 0;
     return;
   }
@@ -6366,6 +6526,12 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
 
     renderDragOverlay(document.querySelector("#app") as HTMLElement, g);
     updateSlotHoverUI();}, { passive: true });
+
+  // Hover(툴팁) 고정 버그 방지: 마우스 버튼을 떼면 강제로 닫기
+  window.addEventListener("pointerup", (ev) => {
+    if ((ev as any).pointerType !== "mouse") return;
+    clearAllHover();
+  }, { capture: true, passive: true });
 
   window.addEventListener("pointerup", (ev) => {
     const g = getG();
@@ -6690,24 +6856,32 @@ function renderDragOverlay(_app: HTMLElement, g: GameState) {
   
   wrap.className = "dragCardPreview";
   wrap.style.position = "fixed";
-  wrap.style.left = `${Math.round(drag.x - (drag.grabDX ?? 20))}px`;
-  wrap.style.top  = `${Math.round(drag.y - (drag.grabDY ?? 20))}px`;
+  const leftVw = ((drag.x - (drag.grabDX ?? 20)) / window.innerWidth) * 100;
+  const topVh  = ((drag.y - (drag.grabDY ?? 20)) / window.innerHeight) * 100;
+  wrap.style.left = `${leftVw.toFixed(4)}vw`;
+  wrap.style.top  = `${topVh.toFixed(4)}vh`;
 
   const w = drag.previewW ?? 0;
   const h = drag.previewH ?? 0;
-  if (w > 0) wrap.style.width  = `${Math.round(w)}px`;
-  if (h > 0) wrap.style.height = `${Math.round(h)}px`;
+  if (w > 0) {
+    const wvw = (w / window.innerWidth) * 100;
+    wrap.style.width = `${wvw.toFixed(4)}vw`;
+  }
+  if (h > 0) {
+    const hvh = (h / window.innerHeight) * 100;
+    wrap.style.height = `${hvh.toFixed(4)}vh`;
+  }
 
   wrap.style.transform = "none";
   wrap.style.opacity = "1";
   wrap.style.filter = "none";
-  wrap.style.boxShadow = "0 16px 44px rgba(0,0,0,.65)";
+  wrap.style.boxShadow = "0 calc(16 * var(--u)) calc(44 * var(--u)) rgba(0,0,0,.65)";
   (wrap.style as any).backdropFilter = "none";
   wrap.style.isolation = "isolate";
   wrap.style.mixBlendMode = "normal";
 
   wrap.style.overflow = "hidden";
-  wrap.style.borderRadius = "0px";
+  wrap.style.borderRadius = "0";
   wrap.style.background = "transparent";
   wrap.style.clipPath = "inset(0)";
   wrap.appendChild(drag.previewEl);

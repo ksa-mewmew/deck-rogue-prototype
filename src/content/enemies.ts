@@ -217,11 +217,30 @@ export const ENEMIES = [
     maxHp: 26,
     intents: [
       { label: "냄새 맡기: 취약 +2 부여", acts: [{ op: "statusPlayer", key: "vuln", n: 2 }] },
-      { label: "덮치기: (S가 0이 아니면) 10 피해", acts: [{ op: "damagePlayerIfSuppliesPositive", n: 7 }] },
+      { label: "덮치기: (S가 0이 아니면) 7 피해", acts: [{ op: "damagePlayerIfSuppliesPositive", n: 7 }] },
       { label: "뜯어내기: S -2", acts: [{ op: "supplies", n: -2 }] },
     ],
   },
 
+  {
+    id: "archive_censor",
+    name: "서고의 검열관",
+    maxHp: 34,
+    intents: [
+      {
+        label: "검열 주문: 교란 +2 부여",
+        acts: [{ op: "statusPlayer", key: "disrupt", n: 2 }],
+      },
+      {
+        label: "압수: S -2",
+        acts: [{ op: "supplies", n: -2 }],
+      },
+      {
+        label: "깃펜 찌르기: 7 피해, 약화 +2 부여",
+        acts: [{ op: "damagePlayer", n: 7 }, { op: "statusPlayer", key: "weak", n: 2 }],
+      },
+    ],
+  },
 
 
 

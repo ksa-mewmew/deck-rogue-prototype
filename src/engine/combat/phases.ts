@@ -90,12 +90,14 @@ export function placeCard(g: GameState, cardUid: string, side: Side, idx: number
 
   g.usedThisTurn += 1;
   if (side === "front") g.frontPlacedThisTurn += 1;
+  (g.placedUidsThisTurn ??= []);
+  if (!g.placedUidsThisTurn.includes(cardUid)) g.placedUidsThisTurn.push(cardUid);
 
   logMsg(g, `[${cardNameWithUpgrade(g, cardUid)}]를 ${side === "front" ? "전열" : "후열"} ${idx}번에 배치`);
   runRelicHook(g, "onPlaceCard", { side, idx, cardUid });
 }
 
-function isTag(g: GameState, cardUid: string, tag: "EXHAUST" | "VANISH") {
+function isTag(g: GameState, cardUid: string, tag: "EXHAUST" | "VANISH" | "INSTALL" | "TOKEN") {
   const def = getCardDefFor(g, cardUid);
   return def.tags?.includes(tag) ?? false;
 }
@@ -158,15 +160,42 @@ function moveCardAfterUse(g: GameState, cardUid: string, usedSide: "front" | "ba
   g.cards[cardUid].zone = "discard";
 }
 
-function clearSlots(g: GameState) {
+function isInstalledHere(g: GameState, cardUid: string, usedSide: "front" | "back") {
+  const def = getCardDefFor(g, cardUid) as any;
+  if (!(def.tags?.includes("INSTALL"))) return false;
+
+  const w = def.installWhen as ("FRONT" | "BACK" | "BOTH" | "NONE" | undefined);
+  if (!w || w === "BOTH") return true;
+  if (w === "FRONT") return usedSide === "front";
+  if (w === "BACK") return usedSide === "back";
+  return false; // NONE
+}
+
+function clearSlots(g: GameState, force = false) {
   for (let i = 0; i < 3; i++) {
     const f = g.frontSlots[i];
-    if (f) moveCardAfterUse(g, f, "front");
-    g.frontSlots[i] = null;
+    if (f) {
+      if (!force && isInstalledHere(g, f, "front")) {
+        // 전열 설치 유지
+      } else {
+        moveCardAfterUse(g, f, "front");
+        g.frontSlots[i] = null;
+      }
+    } else {
+      g.frontSlots[i] = null;
+    }
 
     const b = g.backSlots[i];
-    if (b) moveCardAfterUse(g, b, "back");
-    g.backSlots[i] = null;
+    if (b) {
+      if (!force && isInstalledHere(g, b, "back")) {
+        // 후열 설치 유지
+      } else {
+        moveCardAfterUse(g, b, "back");
+        g.backSlots[i] = null;
+      }
+    } else {
+      g.backSlots[i] = null;
+    }
   }
 }
 
@@ -422,7 +451,7 @@ export function upkeepEndTurn(g: GameState) {
   }
 
 
-  const frontCount = g.frontPlacedThisTurn;
+  const frontCount = g.frontSlots.filter(Boolean).length;
   if (frontCount > 0) logMsg(g, `전열 유지비 처리: 전열 ${frontCount}장`);
 
   {

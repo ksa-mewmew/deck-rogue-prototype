@@ -15,6 +15,8 @@ function relicPool(g: GameState): RelicId[] {
     const def: any = (RELICS_BY_ID as any)[id];
     if (!def) return false;
     if (def.debugOnly) return false;
+    const tags = Array.isArray(def.tags) ? def.tags : [];
+    if (tags.includes("EVENT_ONLY")) return false;
     if (owned.has(id)) return false;
     return true;
   });

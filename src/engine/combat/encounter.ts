@@ -113,6 +113,7 @@ export function spawnEncounter(
       ["rat_swarm", "rat_swarm"],
       ["goblin_archer", "goblin_raider"],
       ["supply_hound", "goblin_raider"],
+      ["archive_censor"],
     ],
     [
       ["goblin_raider", "goblin_raider", "goblin_raider"],
@@ -122,6 +123,7 @@ export function spawnEncounter(
       ["gravity_echo"],
       ["gloved_hunter"],
       ["debt_collector"],
+      ["archive_censor", "slime"],
     ],
   ];
 
@@ -134,6 +136,7 @@ export function spawnEncounter(
     ["rock_golem", "gravity_echo"],
     ["goblin_raider", "goblin_raider", "watching_statue"],
     ["rat_swarm", "rat_swarm", "rat_swarm"],
+    ["archive_censor", "slime"],
   ];
 
   const elitePatternsByTier: string[][][] = [

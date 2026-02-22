@@ -154,20 +154,20 @@ export function renderDevConsole() {
     z-index: 60000;
     pointer-events: auto;
     background: rgba(0,0,0,.35);
-    backdrop-filter: blur(4px);
+    backdrop-filter: blur(calc(4 * var(--u)));
     display:flex; align-items:flex-end; justify-content:center;
-    padding: 12px;
+    padding: calc(12 * var(--u));
     box-sizing: border-box;
   `;
 
   const panel = document.createElement("div");
   panel.style.cssText = `
-    width: min(980px, 100%);
-    height: min(420px, 70vh);
-    border-radius: 16px;
-    border: 1px solid rgba(255,255,255,.14);
+    width: min(calc(980 * var(--u)), 100%);
+    height: min(calc(420 * var(--u)), 70vh);
+    border-radius: calc(16 * var(--u));
+    border: calc(1 * var(--u)) solid rgba(255,255,255,.14);
     background: rgba(10,12,14,.92);
-    box-shadow: 0 18px 60px rgba(0,0,0,.55);
+    box-shadow: 0 calc(18 * var(--u)) calc(60 * var(--u)) rgba(0,0,0,.55);
     display:flex;
     flex-direction: column;
     overflow:hidden;
@@ -175,9 +175,9 @@ export function renderDevConsole() {
 
   const header = document.createElement("div");
   header.style.cssText = `
-    padding: 10px 12px;
+    padding: calc(10 * var(--u)) calc(12 * var(--u));
     display:flex; align-items:center; justify-content:space-between;
-    border-bottom: 1px solid rgba(255,255,255,.10);
+    border-bottom: calc(1 * var(--u)) solid rgba(255,255,255,.10);
   `;
 
   const title = document.createElement("div");
@@ -185,16 +185,16 @@ export function renderDevConsole() {
   title.style.cssText = "font-weight:800; color:#fff; opacity:.95;";
 
   const btns = document.createElement("div");
-  btns.style.cssText = "display:flex; gap:8px;";
+  btns.style.cssText = "display:flex; gap:calc(8 * var(--u));";
 
   const mkBtn = (label: string, onClick: () => void) => {
     const b = document.createElement("button");
     b.type = "button";
     b.textContent = label;
     b.style.cssText = `
-      padding: 6px 10px;
-      border-radius: 10px;
-      border: 1px solid rgba(255,255,255,.14);
+      padding: calc(6 * var(--u)) calc(10 * var(--u));
+      border-radius: calc(10 * var(--u));
+      border: calc(1 * var(--u)) solid rgba(255,255,255,.14);
       background: rgba(255,255,255,.06);
       color: #fff;
       cursor: pointer;
@@ -220,10 +220,10 @@ export function renderDevConsole() {
   out.className = "devConsoleOut";
   out.style.cssText = `
     flex: 1 1 auto;
-    padding: 10px 12px;
+    padding: calc(10 * var(--u)) calc(12 * var(--u));
     overflow: auto;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 12px;
+    font-size: calc(12 * var(--u));
     line-height: 1.4;
     color: #ddd;
     white-space: pre-wrap;
@@ -242,22 +242,22 @@ export function renderDevConsole() {
 
   const inputRow = document.createElement("div");
   inputRow.style.cssText = `
-    border-top: 1px solid rgba(255,255,255,.10);
-    padding: 10px 12px;
-    display:flex; gap:10px; align-items:center;
+    border-top: calc(1 * var(--u)) solid rgba(255,255,255,.10);
+    padding: calc(10 * var(--u)) calc(12 * var(--u));
+    display:flex; gap:calc(10 * var(--u)); align-items:center;
   `;
 
   const hint = document.createElement("div");
   hint.className = "devConsoleHint";
   hint.style.cssText = `
-    margin-left: 10px;
+    margin-left: calc(10 * var(--u));
     max-width: 45%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     color: rgba(255,255,255,.55);
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 12px;
+    font-size: calc(12 * var(--u));
   `;
 
   const prompt = document.createElement("div");
@@ -269,14 +269,14 @@ export function renderDevConsole() {
   input.placeholder = "help / state / newrun ...";
   input.style.cssText = `
     flex: 1 1 auto;
-    padding: 10px 12px;
-    border-radius: 12px;
-    border: 1px solid rgba(255,255,255,.14);
+    padding: calc(10 * var(--u)) calc(12 * var(--u));
+    border-radius: calc(12 * var(--u));
+    border: calc(1 * var(--u)) solid rgba(255,255,255,.14);
     background: rgba(255,255,255,.06);
     color: #fff;
     outline: none;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 13px;
+    font-size: calc(13 * var(--u));
   `;
 
   const specs = getCmdSpecs();

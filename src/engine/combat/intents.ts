@@ -110,6 +110,7 @@ export function revealIntentsAndDisrupt(g: GameState) {
 
   g.attackedEnemyIndicesThisTurn = [];
   g.backUidsThisTurn = [];
+  g.placedUidsThisTurn = [];
   g.drawCountThisTurn = 0;
 
   g.phase = "REVEAL";

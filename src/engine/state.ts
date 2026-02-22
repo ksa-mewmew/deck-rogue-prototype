@@ -59,6 +59,8 @@ export function createInitialRunState(): RunState {
 
     items: [],
 
+    itemCap: 2,
+
     lastBattleWasElite: false,
     lastBattleWasBoss: false,
     eliteRelicOfferedThisBattle: false,
@@ -125,6 +127,7 @@ export function createInitialState(content: Content): GameState {
     pendingTargetQueue: [],
 
     backUidsThisTurn: [],
+    placedUidsThisTurn: [],
 
     victoryResolvedThisCombat: false,
 

@@ -7,7 +7,7 @@ import { getEventById } from "../content/events";
 import { getCardDefByIdWithUpgrade } from "../content/cards";
 import { canUpgradeUid, upgradeCardByUid, removeCardByUid, addCardToDeck } from "../content/rewards";
 import { healPlayer } from "./effects";
-import { addItemToInventory } from "./items";
+import { addItemToInventory, isItemInventoryFull } from "./items";
 import { getItemDefById } from "../content/items";
 
 function getGold(g: GameState): number {
@@ -105,8 +105,10 @@ function buildUpgradePickChoice(g: GameState): ChoiceState | null {
 
 
 function buildRemovePickChoice(g: GameState, title: string, prompt: string): ChoiceState | null {
+  // NOTE: "저주받은 보물"(goal_treasure)은 런의 핵심 목표 카드라 제거 선택지에서 제외
+  const CURSED_TREASURE_ID = "goal_treasure";
   const candidates = Object.values(g.cards)
-    .filter((c) => c.zone === "deck" || c.zone === "hand" || c.zone === "discard")
+    .filter((c) => (c.zone === "deck" || c.zone === "hand" || c.zone === "discard") && c.defId !== CURSED_TREASURE_ID)
     .map((c) => c.uid);
 
   if (candidates.length === 0) return null;
@@ -270,6 +272,20 @@ function applyShopChoiceKey(g: GameState, key: string): boolean {
       return true;
     }
 
+    if (isItemInventoryFull(g)) {
+      logMsg(g, "아이템 가방이 가득 찼습니다. 먼저 버리거나(우클릭) 사용하세요.");
+      pushUiToast(g, "WARN", "아이템 가방이 가득 찼습니다.", 1600);
+      openShopChoice(g, nodeId);
+      return true;
+    }
+
+    if (isItemInventoryFull(g)) {
+      logMsg(g, "아이템 가방이 가득 찼습니다. 먼저 버리거나(우클릭) 사용하세요.");
+      pushUiToast(g, "WARN", "아이템 가방이 가득 찼습니다.", 1600);
+      openShopChoice(g, nodeId);
+      return true;
+    }
+
     const price = Number(offer.priceGold ?? 0) || 0;
     if (getGold(g) < price) {
       logMsg(g, "골드가 부족합니다.");
@@ -278,7 +294,13 @@ function applyShopChoiceKey(g: GameState, key: string): boolean {
     }
 
     addGold(g, -price);
-    addItemToInventory(g, String(offer.itemId), "SHOP");
+    const ok = addItemToInventory(g, String(offer.itemId), "SHOP");
+    if (!ok) {
+      addGold(g, price);
+      logMsg(g, "상점: 아이템 구매 실패(환불)");
+      openShopChoice(g, nodeId);
+      return true;
+    }
     offer.sold = true;
 
     const nm = getItemDefById(String(offer.itemId))?.name ?? String(offer.itemId);
@@ -299,7 +321,7 @@ function applyShopChoiceKey(g: GameState, key: string): boolean {
 
     addGold(g, -priceG);
     addNextBattleSuppliesBonus(g, gainS);
-    logMsg(g, `상점: 보급 구매 (-🪙${priceG}, 다음 전투 🌾 +${gainS})`);
+    logMsg(g, `상점: 보급 구매 (-🪙${priceG}, 다음 전투 🍞 +${gainS})`);
     openShopChoice(g, nodeId);
     return true;
   }
@@ -315,7 +337,7 @@ function applyShopChoiceKey(g: GameState, key: string): boolean {
 
     addNextBattleSuppliesBonus(g, -costS);
     addGold(g, gainG);
-    logMsg(g, `상점: 보급 판매 (다음 전투 🌾 -${costS}, 🪙 +${gainG})`);
+    logMsg(g, `상점: 보급 판매 (다음 전투 🍞 -${costS}, 🪙 +${gainG})`);
     openShopChoice(g, nodeId);
     return true;
   }

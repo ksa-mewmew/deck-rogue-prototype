@@ -39,6 +39,15 @@ export function pickRandomEvent(): EventDef {
 }
 
 
+function pickOneAvoidLast<T extends { id: string }>(arr: T[], lastId?: string | null): T {
+  if (arr.length <= 1) return arr[0];
+  if (!lastId) return arr[Math.floor(Math.random() * arr.length)];
+  const filtered = arr.filter((x) => x.id !== lastId);
+  const pickFrom = filtered.length > 0 ? filtered : arr;
+  return pickFrom[Math.floor(Math.random() * pickFrom.length)];
+}
+
+
 function pickRandomEventFiltered(g: GameState): EventDef {
   const runAny = g.run as any;
   const seen: Record<string, number> = (runAny.eventsSeen ?? {}) as any;
@@ -50,7 +59,9 @@ function pickRandomEventFiltered(g: GameState): EventDef {
   });
 
   const pickFrom = pool.length > 0 ? pool : EVENTS;
-  return pickFrom[Math.floor(Math.random() * pickFrom.length)];
+
+  const lastEventId: string | null | undefined = (runAny.lastEventId as any) ?? null;
+  return pickOneAvoidLast(pickFrom, lastEventId);
 }
 
 
@@ -163,8 +174,10 @@ export const MAD_EVENTS: EventDef[] = [
   },
 ];
 
-export function pickRandomNightmareEvent(_g: GameState): EventDef {
-  return MAD_EVENTS[Math.floor(Math.random() * MAD_EVENTS.length)];
+export function pickRandomNightmareEvent(g: GameState): EventDef {
+  const runAny = g.run as any;
+  const lastEventId: string | null | undefined = (runAny.lastEventId as any) ?? null;
+  return pickOneAvoidLast(MAD_EVENTS, lastEventId);
 }
 
 

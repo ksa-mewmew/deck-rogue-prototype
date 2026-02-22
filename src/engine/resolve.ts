@@ -301,6 +301,27 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
         resolvePlayerEffects({ game: g, side: "front", cardUid: uid0 }, def.front);
         break;
       }
+      case "addCardToHand": {
+        const defId = e.defId;
+        const base = g.content.cardsById[defId];
+        if (!base) {
+          logMsg(g, `WARN: addCardToHand unknown defId: ${defId}`);
+          break;
+        }
+
+        const count = Math.max(1, (Number(e.n ?? 1) | 0));
+        const up = Math.max(0, (Number(e.upgrade ?? 0) | 0));
+
+        for (let i = 0; i < count; i++) {
+          g.uidSeq += 1;
+          const uid = String(g.uidSeq);
+          g.cards[uid] = { uid, defId, zone: "hand", upgrade: up } as any;
+          g.hand.push(uid);
+        }
+
+        logMsg(g, `손패에 [${base.name}${up > 0 ? " +" + up : ""}] ${count}장 추가`);
+        break;
+      }
 
       default: {
         const _exhaustive: never = e;

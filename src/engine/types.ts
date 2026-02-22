@@ -4,7 +4,7 @@ export type Zone = "deck" | "hand" | "discard" | "front" | "back" | "exhausted" 
 export type Side = "front" | "back";
 
 export type StatusKey = "vuln" | "weak" | "bleed" | "disrupt";
-export type CardTag = "EXHAUST" | "VANISH";
+export type CardTag = "EXHAUST" | "VANISH" | "INSTALL" | "TOKEN";
 export type CardRarity = "BASIC" | "COMMON" | "SPECIAL" | "RARE" | "MADNESS";
 export type RelicId = string;
 export type ItemId = string;
@@ -112,11 +112,12 @@ export type CardData = {
   design?: string;
   exhaustWhen?: ExhaustWhen;
   vanishWhen?: ExhaustWhen;
+  installWhen?: ExhaustWhen;
   upgrades?: Array<
     Partial<
       Pick<
         CardData,
-        "name" | "frontText" | "backText" | "front" | "back" | "tags" | "onWinWhileInBack" | "exhaustWhen" | "vanishWhen"
+        "name" | "frontText" | "backText" | "front" | "back" | "tags" | "onWinWhileInBack" | "exhaustWhen" | "vanishWhen" | "installWhen"
       >
     >
   >;
@@ -241,7 +242,9 @@ export type PlayerEffect =
   | { op: "maxHp"; n: number }
   | { op: "hp"; n: number }
   | { op: "clearStatusSelf"; key: StatusKey }
-  | { op: "damageEnemyFormula"; target: "select" | "random" | "all"; kind: string };
+  | { op: "damageEnemyFormula"; target: "select" | "random" | "all"; kind: string }
+  | { op: "damageEnemyFormula"; target: "select" | "random" | "all"; kind: string }
+  | { op: "addCardToHand"; defId: string; n?: number; upgrade?: number };
 
 export type ItemData = {
   id: ItemId;
@@ -418,6 +421,10 @@ export type RunState = {
   // 아이템(소모품)
   items?: ItemId[];
 
+  // 아이템 보유 한도(기본 2, 유물 등으로 확장 가능)
+  itemCap?: number;
+
+
   pendingElite: boolean;
   lastBattleWasElite: boolean;
   lastBattleWasBoss: boolean;
@@ -512,6 +519,7 @@ export type GameState = {
   pendingTargetQueue: PendingTarget[];
 
   backUidsThisTurn: string[];
+  placedUidsThisTurn: string[];
 
   time: number;
 
