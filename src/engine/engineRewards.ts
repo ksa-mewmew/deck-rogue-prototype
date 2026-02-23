@@ -1,51 +1,46 @@
 import type { ChoiceOption, ChoiceState, GameState, ShopState, ShopCardOffer } from "./types";
-import { addCardToDeck, offerRewardTrio, removeCardByUid, REWARD_POOL } from "../content/rewards";
+import { addCardToDeck, offerRewardN, removeCardByUid, REWARD_POOL } from "../content/rewards";
 import { closeChoice, enqueueChoice } from "./choice";
-import { logMsg } from "./rules";
+import { logMsg, pushUiToast } from "./rules";
 import { getCardDefByIdWithUpgrade } from "../content/cards";
 import { offerRelicSingleContent } from "../content/relicRewards";
 import { ITEMS, getItemDefById } from "../content/items";
 import { RELICS_BY_ID } from "../content/relicsContent";
 import { grantRelic } from "./relics";
 import { addItemToInventory } from "./items";
+import { GOD_LINES, faithCardRewardCount, getPatronGodOrNull, isHostile, shopPriceGold } from "./faith";
 
 export function openBattleCardRewardChoice(g: GameState, opts?: { itemOfferId?: string; itemSource?: string }) {
   const ctx: any = (g.run as any).lastBattleWasBoss ? "BOSS" : g.run.lastBattleWasElite ? "ELITE" : "BATTLE";
-  const offers = offerRewardTrio(g, ctx);
-  if (!offers) return;
+  const n = faithCardRewardCount(g);
+  const offers = offerRewardN(g, ctx, n);
+  if (!offers || offers.length === 0) return;
 
-  const [a, b, c] = offers;
+  // 첫 번째 인간: 보상 화면 토스트
+  if (getPatronGodOrNull(g) === "first_human") {
+    pushUiToast(g, "INFO", GOD_LINES.first_human.reward, 1800);
+    logMsg(g, GOD_LINES.first_human.reward);
+  } else if (isHostile(g, "first_human")) {
+    pushUiToast(g, "WARN", GOD_LINES.first_human.hostileReward, 1800);
+    logMsg(g, GOD_LINES.first_human.hostileReward);
+  }
 
-  const da = getCardDefByIdWithUpgrade(g.content, a.defId, a.upgrade);
-  const db = getCardDefByIdWithUpgrade(g.content, b.defId, b.upgrade);
-  const dc = getCardDefByIdWithUpgrade(g.content, c.defId, c.upgrade);
-
-  const la = `${da.name}${a.upgrade > 0 ? ` +${a.upgrade}` : ""}`;
-  const lb = `${db.name}${b.upgrade > 0 ? ` +${b.upgrade}` : ""}`;
-  const lc = `${dc.name}${c.upgrade > 0 ? ` +${c.upgrade}` : ""}`;
+  const options: ChoiceOption[] = offers.map((o) => {
+    const def = getCardDefByIdWithUpgrade(g.content, o.defId, o.upgrade);
+    const label = `${def.name}${o.upgrade > 0 ? ` +${o.upgrade}` : ""}`;
+    return {
+      key: `pick:${o.defId}:${o.upgrade}`,
+      label,
+      detail: `전열: ${def.frontText} / 후열: ${def.backText}`,
+    };
+  });
+  options.push({ key: "skip", label: "생략", detail: "" });
 
   const choice: ChoiceState = {
     kind: "REWARD",
     title: "전투 보상",
     prompt: "카드 1장을 선택하거나 생략합니다.",
-    options: [
-      {
-        key: `pick:${a.defId}:${a.upgrade}`,
-        label: la,
-        detail: `전열: ${da.frontText} / 후열: ${da.backText}`,
-      },
-      {
-        key: `pick:${b.defId}:${b.upgrade}`,
-        label: lb,
-        detail: `전열: ${db.frontText} / 후열: ${db.backText}`,
-      },
-      {
-        key: `pick:${c.defId}:${c.upgrade}`,
-        label: lc,
-        detail: `전열: ${dc.frontText} / 후열: ${dc.backText}`,
-      },
-      { key: "skip", label: "생략", detail: "" },
-    ],
+    options,
   };
 
   const itemOfferId = opts?.itemOfferId;
@@ -53,7 +48,7 @@ export function openBattleCardRewardChoice(g: GameState, opts?: { itemOfferId?: 
 
   enqueueChoice(g, choice, {
     kind: "BATTLE_REWARD",
-    offers: [a, b, c],
+    offers: offers as any,
     itemOfferId,
     itemSource,
     cardDecision: undefined,
@@ -430,6 +425,18 @@ function ensureShopState(g: GameState, nodeId: string): ShopState {
 export function openShopChoice(g: GameState, nodeId: string) {
   const shop = ensureShopState(g, nodeId);
 
+  // shop visit toasts (1회)
+  if (getPatronGodOrNull(g) === "first_human" && !(shop as any)._firstHumanShopToastShown) {
+    (shop as any)._firstHumanShopToastShown = true;
+    pushUiToast(g, "WARN", GOD_LINES.first_human.shop, 2200);
+    logMsg(g, GOD_LINES.first_human.shop);
+  }
+  if (isHostile(g, "card_dealer") && !(shop as any)._cardDealerHostileShopToastShown) {
+    (shop as any)._cardDealerHostileShopToastShown = true;
+    pushUiToast(g, "WARN", GOD_LINES.card_dealer.hostileShop, 2200);
+    logMsg(g, GOD_LINES.card_dealer.hostileShop);
+  }
+
   const options: ChoiceOption[] = [];
   let sep = 0;
 
@@ -445,12 +452,13 @@ export function openShopChoice(g: GameState, nodeId: string) {
       continue;
     }
 
+    const priceGold = shopPriceGold(g, o.priceGold);
     const def = getCardDefByIdWithUpgrade(g.content, o.defId, o.upgrade ?? 0);
-    const detail = `가격: 🪙${o.priceGold}
+    const detail = `가격: 🪙${priceGold}
 
 전열: ${def.frontText}
 후열: ${def.backText}`;
-    options.push({ key: `shop:card:${i}`, label: `${name}${upTxt} (🪙${o.priceGold})`, detail });
+    options.push({ key: `shop:card:${i}`, label: `${name}${upTxt} (🪙${priceGold})`, detail });
   }
 
   options.push({ key: `shop:sep:${sep++}`, label: "—", detail: "" });
@@ -467,8 +475,9 @@ export function openShopChoice(g: GameState, nodeId: string) {
         continue;
       }
 
-      const detail = `가격: 🪙${it.priceGold}\n\n${def?.text ?? ""}`;
-      options.push({ key: `shop:item:${i}`, label: `${name} (🪙${it.priceGold})`, detail });
+      const priceGold = shopPriceGold(g, it.priceGold);
+      const detail = `가격: 🪙${priceGold}\n\n${def?.text ?? ""}`;
+      options.push({ key: `shop:item:${i}`, label: `${name} (🪙${priceGold})`, detail });
     }
 
     options.push({ key: `shop:sep:${sep++}`, label: "—", detail: "" });
@@ -478,9 +487,13 @@ export function openShopChoice(g: GameState, nodeId: string) {
   const upLabel = shop.usedUpgrade ? "카드 강화 (사용 완료)" : "카드 강화";
   const rmLabel = shop.usedRemove ? "카드 제거 (사용 완료)" : "카드 제거";
 
-  options.push({ key: "shop:service:upgrade", label: upLabel, detail: shop.usedUpgrade ? "" : "가격: 🪙25 카드 1장을 강화합니다." });
-  options.push({ key: "shop:service:remove", label: rmLabel, detail: shop.usedRemove ? "" : "가격: 🪙25 덱에서 카드 1장을 제거합니다." });
-  options.push({ key: "shop:supply:buy", label: "보급 구매", detail: "-🪙6, 다음 전투 보급 🍞 +3" });
+  const upPrice = shopPriceGold(g, 25);
+  const rmPrice = shopPriceGold(g, 25);
+  const buySPrice = shopPriceGold(g, 6);
+
+  options.push({ key: "shop:service:upgrade", label: upLabel, detail: shop.usedUpgrade ? "" : `가격: 🪙${upPrice} 카드 1장을 강화합니다.` });
+  options.push({ key: "shop:service:remove", label: rmLabel, detail: shop.usedRemove ? "" : `가격: 🪙${rmPrice} 덱에서 카드 1장을 제거합니다.` });
+  options.push({ key: "shop:supply:buy", label: "보급 구매", detail: `-🪙${buySPrice}, 다음 전투 보급 🍞 +3` });
   options.push({ key: "shop:supply:sell", label: "보급 판매", detail: "다음 전투 보급 🍞 -3, +🪙4" });
 
   options.push({ key: "shop:leave", label: "나가기", detail: "" });

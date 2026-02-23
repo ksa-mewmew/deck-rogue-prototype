@@ -6,6 +6,7 @@ import { runRelicHook, checkRelicUnlocks, getUnlockProgress, grantRelic } from "
 import { openBattleCardRewardChoice, openEliteRelicOfferChoice, openBossRelicOfferChoice } from "../engineRewards";
 import { _cleanupBattleTransientForVictory } from "./phases";
 import { rollBattleItemDrop } from "../items";
+import { GOD_LINES, getPatronGodOrNull, isHostile } from "../faith";
 
 
 function shuffleInPlace<T>(a: T[]) {
@@ -131,10 +132,29 @@ export function checkEndConditions(g: GameState) {
         runAny.pendingEventWinGold = 0;
       }
 
+      // 카드 딜러(적대): 전투 골드 보상 없음
+      if (isHostile(g, "card_dealer")) {
+        gainGold = 0;
+        runAny.pendingEventWinGold = 0;
+      }
+
       if (gainGold !== 0) {
         runAny.gold = curGold + gainGold;
         logMsg(g, `전투 보상: 🪙${gainGold}`);
         pushUiToast(g, "GOLD", `🪙 +${gainGold}`, 1600);
+      }
+
+      // 카드 딜러(후원 -): 30% 확률로 🪙 -10
+      if (getPatronGodOrNull(g) === "card_dealer") {
+        if (Math.random() < 0.3) {
+          const now = Number(runAny.gold ?? 0) || 0;
+          const lost = Math.min(10, now);
+          runAny.gold = now - lost;
+          pushUiToast(g, "WARN", GOD_LINES.card_dealer.victoryFee, 1800);
+          logMsg(g, GOD_LINES.card_dealer.victoryFee);
+          if (lost > 0) pushUiToast(g, "GOLD", `🪙 -${lost}`, 1600);
+          logMsg(g, `카드 딜러: 수수료 🪙 -${lost}`);
+        }
       }
     }
 

@@ -2,6 +2,7 @@ import type { GameState } from "../engine/types";
 import { shuffle, logMsg, pickOne, madnessP } from "../engine/rules";
 import { getCardDefFor } from "./cards";
 import { currentTotalDeckLikeSize } from "../engine/combat";
+import { awakenMadness, openMadnessTemptChoice, isForgeHostile } from "../engine/faith";
 
 export function obtainTreasure(g: GameState) {
   if (g.run.treasureObtained) return;
@@ -19,6 +20,10 @@ export function obtainTreasure(g: GameState) {
 
   repopulateDungeonAfterTreasure(g);
   logMsg(g, "보물이 울부짖자, 던전의 모든 방이 다시 채워집니다...");
+
+  // 광기(0) 각성: 보물 즉시 1회 선택
+  awakenMadness(g);
+  openMadnessTemptChoice(g);
 }
 
 function repopulateDungeonAfterTreasure(g: GameState) {
@@ -320,14 +325,15 @@ function rewardBiasForContext(g: GameState, ctx: RewardPickContext): Parameters<
   return { mult3, mult12, mult20 };
 }
 
-export function offerRewardTrio(g: GameState, ctx: RewardPickContext): [OfferedCard, OfferedCard, OfferedCard] {
+export function offerRewardN(g: GameState, ctx: RewardPickContext, n: number): OfferedCard[] {
+  const wantN = Math.max(1, Math.min(6, Math.floor(Number(n) || 0)));
   const f = g.player?.fatigue ?? 0;
 
   const junk: OfferedCard = { defId: pickOne(JUNK_REWARD_POOL) as any, upgrade: 0 };
 
-  const pickNormalTrio = (): OfferedCard[] => {
+  const pickNormal = (): OfferedCard[] => {
     const opt = rewardBiasForContext(g, ctx);
-    return offerNFromPool(g, REWARD_POOL, 3, opt);
+    return offerNFromPool(g, REWARD_POOL, wantN, opt);
   };
 
   const maybeMad = (c: OfferedCard): OfferedCard => {
@@ -336,25 +342,29 @@ export function offerRewardTrio(g: GameState, ctx: RewardPickContext): [OfferedC
     return offerOneFromPool(g, MAD_REWARD_POOL);
   };
 
-  let picks: OfferedCard[] = pickNormalTrio();
-  while (picks.length < 3) picks.push({ defId: "arrow", upgrade: 0 });
+  let picks: OfferedCard[] = pickNormal();
+  while (picks.length < wantN) picks.push({ defId: "arrow", upgrade: 0 });
 
-  // 피로도에 따른 정크/붕괴(기존 감각 유지, 3슬롯 버전)
+  // 피로도에 따른 정크/붕괴(기존 감각 유지, N슬롯 버전)
   if (f >= 12) {
-    const a = offerOneFromPool(g, MAD_REWARD_POOL);
-    const b = offerOneFromPool(g, MAD_REWARD_POOL);
-    const c = Math.random() < 0.55 ? offerOneFromPool(g, MAD_REWARD_POOL) : junk;
-    picks = [a, b, c];
+    // 대부분 광기, 마지막은 정크/광기 변동
+    const next: OfferedCard[] = [];
+    for (let i = 0; i < wantN; i++) {
+      const isLast = i === wantN - 1;
+      if (isLast) next.push(Math.random() < 0.55 ? offerOneFromPool(g, MAD_REWARD_POOL) : junk);
+      else next.push(offerOneFromPool(g, MAD_REWARD_POOL));
+    }
+    picks = next;
   } else if (f >= 9) {
     // 9~11: 정크 1칸 고정
-    const idx = Math.floor(Math.random() * 3);
+    const idx = Math.floor(Math.random() * wantN);
     picks[idx] = junk;
     picks = picks.map(maybeMad);
   } else if (f >= 7) {
     // 7~8: 정크 오염 확률
     const pJunk = f === 7 ? 0.25 : 0.45;
     if (Math.random() < pJunk) {
-      const idx = Math.floor(Math.random() * 3);
+      const idx = Math.floor(Math.random() * wantN);
       picks[idx] = junk;
     }
     picks = picks.map(maybeMad);
@@ -372,6 +382,12 @@ export function offerRewardTrio(g: GameState, ctx: RewardPickContext): [OfferedC
     (g.run as any).rewardPityNonElite = (Number((g.run as any).rewardPityNonElite ?? 0) || 0) + 1;
   }
 
+  return picks.slice(0, wantN);
+}
+
+export function offerRewardTrio(g: GameState, ctx: RewardPickContext): [OfferedCard, OfferedCard, OfferedCard] {
+  const picks = offerRewardN(g, ctx, 3);
+  while (picks.length < 3) picks.push({ defId: "arrow", upgrade: 0 });
   return [picks[0], picks[1], picks[2]] as any;
 }
 
@@ -429,6 +445,8 @@ export function removeCardByUid(g: GameState, uid: string): boolean {
 }
 
 export function canUpgradeUid(g: GameState, uid: string): boolean {
+  // 화로의 주인 적대: 강화 불가
+  if (isForgeHostile(g)) return false;
   const inst = g.cards[uid];
   if (!inst) return false;
   const def = g.content.cardsById[inst.defId];

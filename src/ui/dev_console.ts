@@ -6,6 +6,7 @@ import { checkEndConditions } from "../engine/combat";
 import { grantRelic, applyPendingRelicActivations } from "../engine/relics";
 import { listAllCardDefIds } from "../content";
 import { listAllRelicIds } from "../content/relicsContent";
+import { ensureFaith, openGodTemptChoice, godName } from "../engine/faith";
 
 export type DevConsoleActions = {
   onNewRun: () => void;
@@ -116,6 +117,14 @@ function getCmdSpecs(): CmdSpec[] {
         if (parts.length <= 2) return listAllItemIdsFromG(g);
         return [];
       },
+    },
+
+    { name: "faith", desc: "print faith state" },
+    {
+      name: "tempt",
+      args: "<dream_shadow|wing_artery|forge_master>",
+      desc: "open a god temptation choice",
+      suggest: () => ["dream_shadow","wing_artery","forge_master"],
     },
   ];
 }
@@ -467,6 +476,8 @@ function runDevCommand(raw: string) {
       "log <text...>",
       "gold <n>",
       "additem <itemId> [n=1]",
+      "faith",
+      "tempt <dream_shadow|wing_artery|forge_master>",
     ].join("\n"));
     return;
   }
@@ -485,6 +496,27 @@ function runDevCommand(raw: string) {
       items: ((g.run as any).items ?? []),
     }, null, 2));
     
+    return;
+  }
+
+  if (cmd === "faith") {
+    const f = ensureFaith(g);
+    out(JSON.stringify({
+      chosen: f.chosen,
+      offered: f.offered.map(godName),
+      points: Object.fromEntries(f.offered.map((id) => [godName(id), f.points[id] ?? 0])),
+      focus: godName(f.focus),
+      patron: (f.points[f.focus] ?? 0) >= 3 ? godName(f.focus) : null,
+    }, null, 2));
+    return;
+  }
+
+  if (cmd === "tempt") {
+    const id = (a1 ?? "") as any;
+    if (!id) { out("ERR: tempt <dream_shadow|wing_artery|forge_master>"); return; }
+    openGodTemptChoice(g, id);
+    c.rerender();
+    out(`OK: tempt ${id}`);
     return;
   }
 

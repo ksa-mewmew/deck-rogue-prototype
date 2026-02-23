@@ -37,6 +37,23 @@ import { getRelicDisplay, getUnlockProgress, checkRelicUnlocks } from "../engine
 
 
 import { buildIntentPreview } from "../engine/intentPreview";
+import {
+  GOD_LINES,
+  ensureFaith,
+  getMadnessBane,
+  getMadnessBoon,
+  getPatronGodOrNull,
+  godAbilityBlock,
+  godArt,
+  godName,
+  isForgeHostile,
+  isHostile,
+  onEnterRestExplorationHooks,
+  openFaithStartChoice,
+  openGodTemptChoice,
+  pickTemptingGod,
+  wingArteryMoveDelta,
+} from "../engine/faith";
 
 import { setSOnlyHud } from "./s_only_hud";
 
@@ -105,6 +122,7 @@ const RULEBOOK_TEXT = `# Deck Rogue Prototype — 룰북 (플레이어용)
 let _ASSET_BASE: string | null = null;
 
 let _itemTip: HTMLDivElement | null = null;
+let _faithTip: HTMLDivElement | null = null;
 
 function ensureItemTip(): HTMLDivElement {
   if (_itemTip) return _itemTip;
@@ -185,6 +203,99 @@ function wireItemHover(el: HTMLElement, itemId: string) {
   el.addEventListener("mouseenter", (ev) => showItemTip(itemId, ev as MouseEvent));
   el.addEventListener("mousemove", (ev) => moveItemTip((ev as MouseEvent).clientX, (ev as MouseEvent).clientY));
   el.addEventListener("mouseleave", () => hideItemTip());
+}
+
+// =========================
+// Faith badge tooltip (reuses item/relic tip look)
+// =========================
+
+function ensureFaithTip(): HTMLDivElement {
+  if (_faithTip) return _faithTip;
+  const tip = document.createElement("div");
+  tip.id = "faithHoverTip";
+  tip.className = "itemHoverTip relicHoverTip";
+  tip.style.pointerEvents = "none";
+  tip.style.position = "fixed";
+  tip.style.left = "0";
+  tip.style.top = "0";
+  // dev console(100000)보다 위로
+  tip.style.zIndex = "120000";
+  document.body.appendChild(tip);
+  _faithTip = tip;
+  return tip;
+}
+
+function setFaithTipContent(g: GameState) {
+  const tip = ensureFaithTip();
+  const f = ensureFaith(g);
+  tip.innerHTML = "";
+
+  const offered = f.offered as any as Array<"dream_shadow" | "wing_artery" | "forge_master">;
+
+  const title = document.createElement("div");
+  title.className = "relicTipTitle";
+  const patron = getPatronGodOrNull(g);
+  title.textContent = `후원: ${patron ? godName(patron) : "없음"} / 포커스: ${godName(f.focus)}`;
+
+  const body = document.createElement("div");
+  body.className = "relicTipBody";
+  body.style.whiteSpace = "pre-wrap";
+
+  const blocks = offered.map((id) => {
+    const pts = f.points[id] ?? 0;
+    return `${godName(id)}: ${pts}점\n${godAbilityBlock(id)}`;
+  });
+  body.textContent = blocks.join("\n\n");
+
+  tip.appendChild(title);
+  tip.appendChild(body);
+}
+
+function moveFaithTip(clientX: number, clientY: number) {
+  const tip = ensureFaithTip();
+
+  const u = unitLenDev();
+  const padU = 12;
+  const offU = 14;
+  const pad = padU * u;
+  const off = offU * u;
+
+  let x = clientX + off;
+  let y = clientY + off;
+
+  tip.style.left = lenFromDev(x);
+  tip.style.top = lenFromDev(y);
+
+  const r = tip.getBoundingClientRect();
+  if (x + r.width + pad > window.innerWidth) x = window.innerWidth - r.width - pad;
+  if (y + r.height + pad > window.innerHeight) y = window.innerHeight - r.height - pad;
+  if (x < pad) x = pad;
+  if (y < pad) y = pad;
+
+  tip.style.left = lenFromDev(Math.round(x));
+  tip.style.top = lenFromDev(Math.round(y));
+}
+
+function showFaithTip(g: GameState, e: MouseEvent) {
+  setFaithTipContent(g);
+  const tip = ensureFaithTip();
+  tip.classList.add("show");
+  moveFaithTip(e.clientX, e.clientY);
+  requestAnimationFrame(() => moveFaithTip(e.clientX, e.clientY));
+}
+
+function hideFaithTip() {
+  const tip = ensureFaithTip();
+  tip.classList.remove("show");
+}
+
+function wireFaithBadgeHover(el: HTMLElement) {
+  el.addEventListener("mouseenter", (ev) => {
+    if (!currentG) return;
+    showFaithTip(currentG, ev as MouseEvent);
+  });
+  el.addEventListener("mousemove", (ev) => moveFaithTip((ev as MouseEvent).clientX, (ev as MouseEvent).clientY));
+  el.addEventListener("mouseleave", () => hideFaithTip());
 }
 
 function getAssetBase(): string {
@@ -708,7 +819,13 @@ export function createOrLoadGame(content: any) {
   const loaded = loadGame();
   if (!loaded) return createInitialState(content);
 
-  return hydrateLoadedState(loaded.state, content);
+  const g = hydrateLoadedState(loaded.state, content);
+  // 구버전 세이브에도 신앙 상태를 보정하고, 아직 선택하지 않았다면 선택 화면을 띄운다.
+  const f = ensureFaith(g);
+  if (!g.choice && !f.chosen) {
+    openFaithStartChoice(g);
+  }
+  return g;
 }
 
 
@@ -2114,8 +2231,17 @@ function visionParamsFromState(g: GameState): VisionParams {
     noise = clamp01(noise + tier * 0.07);
   }
 
+  // 신앙: 밝은 어둠(후원 +) — 시야 3
+  {
+    const patron = getPatronGodOrNull(g);
+    if (patron === "bright_darkness") {
+      presenceR = Math.max(presenceR, 3);
+      typeR = Math.max(typeR, 3);
+    }
+  }
+
   
-  const f = Math.max(0, Number(g.player.fatigue ?? 0) || 0);
+  /*const f = Math.max(0, Number(g.player.fatigue ?? 0) || 0);
   if (f > 0) {
     
     const losePresence = Math.floor(f / 14);
@@ -2127,7 +2253,7 @@ function visionParamsFromState(g: GameState): VisionParams {
     detailR -= loseDetail;
 
     noise = clamp01(noise + Math.min(0.30, f * 0.015));
-  }
+  }*/
 
   presenceR = clampInt(presenceR, 0, 99);
   typeR = clampInt(typeR, 0, presenceR);
@@ -2153,6 +2279,11 @@ function perceivedKindForNode(
   reveal: 0 | 1 | 2 | 3,
   vp: VisionParams
 ): { shown: NodeType | null; label: string; certainty: "HIDDEN" | "PRESENCE" | "TYPE" | "DETAIL" } {
+
+  // 밝은 어둠(적대): 지도 정보는 전부 '?'
+  if (isHostile(g, "bright_darkness")) {
+    return { shown: null, label: "?", certainty: "HIDDEN" };
+  }
 
   if (reveal === 0) return { shown: null, label: "보이지 않음", certainty: "HIDDEN" };
   if (reveal === 1) return { shown: null, label: "무언가", certainty: "PRESENCE" };
@@ -2879,7 +3010,25 @@ function renderMapNodeSelect(root: HTMLElement, g: GameState, actions: UIActions
   root.appendChild(wrap);
 }
 function renderNodeSelect(root: HTMLElement, g: GameState, actions: UIActions) {
-  ensureGraphRuntime(g);
+  const { map } = ensureGraphRuntime(g);
+
+  // 밝은 어둠: 노드셀렉트 진입 토스트(스팸 방지)
+  {
+    const runAny = g.run as any;
+    const key = `${String(map.pos ?? "")}::${Number(runAny.timeMove ?? 0) || 0}`;
+    if (runAny._bdNodeToastKey !== key) {
+      runAny._bdNodeToastKey = key;
+      const patron = getPatronGodOrNull(g);
+      if (patron === "bright_darkness") {
+        pushUiToast(g, "INFO", GOD_LINES.bright_darkness.nodeSelect, 1800);
+        logMsg(g, GOD_LINES.bright_darkness.nodeSelect);
+      }
+      if (isHostile(g, "bright_darkness")) {
+        pushUiToast(g, "WARN", GOD_LINES.bright_darkness.hostileMap, 2200);
+        logMsg(g, GOD_LINES.bright_darkness.hostileMap);
+      }
+    }
+  }
   renderMapNodeSelect(root, g, actions);
 }
 
@@ -3147,7 +3296,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       if (!neigh.includes(toId)) return;
 
       
-      runAny.timeMove = Number(runAny.timeMove ?? 0) + 1;
+      runAny.timeMove = Number(runAny.timeMove ?? 0) + wingArteryMoveDelta(g);
       map.visionNonce = Number(map.visionNonce ?? 0) + 1;
 
       
@@ -3241,6 +3390,18 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         }
       }
 
+      // 광기(적대) 3: 전투가 아닌 노드에서도 50% 확률로 전투 발생
+      {
+        const bane = getMadnessBane(g);
+        if (bane === 3 && (actualKind === "EVENT" || actualKind === "REST" || actualKind === "SHOP")) {
+          if (Math.random() < 0.5) {
+            actualKind = "BATTLE";
+            logMsg(g, "광기(적대): 던전이 뒤틀려 전투가 발생합니다...");
+            pushUiToast(g, "WARN", "광기의 힘이 길을 막아섭니다.", 1800);
+          }
+        }
+      }
+
       if (actualKind === "START") {
         render(g, actions);
         return;
@@ -3262,17 +3423,38 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         (node as any).lastClearedMove = tmNow;
         const highF = (g.player.fatigue ?? 0) >= 10;
 
+        // 신앙/적대 훅 (화로 적대: 카드 제거, 꿈그림자 적대: 방해 토스트 등)
+        onEnterRestExplorationHooks(g);
+
+        const patron = getPatronGodOrNull(g);
+        const dreamHostile = isHostile(g, "dream_shadow");
+        const forgeHostile = isForgeHostile(g);
+
+        const healDetail =
+          dreamHostile ? "회복량 0" :
+          patron === "dream_shadow" ? "항상 최대 체력 (F +3)" :
+          "HP +15";
+
+        const upgradeDetail =
+          forgeHostile ? "(불가)" :
+          (patron === "dream_shadow" || dreamHostile) ? "카드 1장 강화 (피로만큼 피해)" :
+          "카드 1장 강화";
+
+        const optionsBase = [
+          { key: "rest:heal", label: "회복", detail: healDetail },
+          { key: "rest:clear_f", label: "정비", detail: "F -3" },
+          { key: "rest:upgrade", label: "강화", detail: upgradeDetail },
+          { key: "rest:skip", label: "떠나기" },
+        ];
+
+        const options = forgeHostile ? optionsBase.filter((o) => o.key !== "rest:upgrade") : optionsBase;
+
         g.choice = {
           kind: "EVENT",
           title: "휴식",
           art: assetUrl("assets/events/event_rest.png"),
           prompt: highF ? "피로가 너무 높아 시간이 더 걸릴 수 있습니다." : "캠프에 잠시 머문다.",
-          options: [
-            { key: "rest:heal", label: "회복", detail: "HP +15" },
-            { key: "rest:clear_f", label: "정비", detail: "F -3" },
-            { key: "rest:upgrade", label: "강화", detail: "카드 1장 강화" },
-            { key: "rest:skip", label: "떠나기" },
-          ],
+          options,
         } as any;
 
         g.choiceCtx = { kind: "REST", highF } as any;
@@ -3300,6 +3482,20 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         (node as any).lastClearedMove = tmNow;
         const runAny2: any = g.run;
         runAny2.ominousProphecySeen ??= false;
+
+        // 신의 유혹(4): 이벤트를 대체해서 등장
+        {
+          const f = ensureFaith(g);
+          if (f.chosen) {
+            const tempter = pickTemptingGod(g);
+            const P_TEMPT = 0.25;
+            if (tempter && Math.random() < P_TEMPT) {
+              openGodTemptChoice(g, tempter);
+              render(g, actions);
+              return;
+            }
+          }
+        }
 
         const OMEN_CHANCE = 0.3;
         let ev = pickEventByMadness(g);
@@ -3522,6 +3718,21 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
 
       
       if (actualKind === "BATTLE" || actualKind === "ELITE") {
+        // 광기(수락) 3: 50% 확률로 전투 노드에서도 전투가 발생하지 않음 (보스 제외)
+        {
+          const boon = getMadnessBoon(g);
+          if (boon === 3 && Math.random() < 0.5) {
+            node.cleared = true;
+            node.kind = "EMPTY";
+            (node as any).lastClearedMove = tmNow;
+            if (actualKind === "ELITE") (node as any).noRespawn = true;
+            logMsg(g, "광기: 전투가 어딘가로 사라졌다...");
+            pushUiToast(g, "INFO", "전투가 일어나지 않았습니다.", 1600);
+            render(g, actions);
+            return;
+          }
+        }
+
         node.cleared = true;
         node.kind = "EMPTY";
         (node as any).lastClearedMove = tmNow;
@@ -3934,14 +4145,24 @@ export function ensureFloatingNewRunButton() {
   const btn = document.createElement("button");
   btn.className = "floatingNewRun";
   btn.type = "button";
-  btn.textContent = "새로운 런";
+  btn.textContent = "";
+
+  // Label only. (Faith score is shown in a separate badge next to the button.)
+  const label = document.createElement("span");
+  label.className = "floatingNewRunLabel";
+  label.textContent = "새로운 런";
+  btn.appendChild(label);
 
   btn.style.cssText = `
     position: fixed;
     top: calc(env(safe-area-inset-top, 0) + calc(10 * var(--u)));
     left: calc(env(safe-area-inset-left, 0) + calc(10 * var(--u)));
     pointer-events: auto;
-    z-index: var(--zChrome);
+    z-index: calc(var(--zChrome) + 10000);
+
+    display: flex;
+    align-items: center;
+    gap: calc(10 * var(--u));
 
     padding: calc(10 * var(--u)) calc(12 * var(--u));
     border-radius: calc(14 * var(--u));
@@ -3962,6 +4183,33 @@ export function ensureFloatingNewRunButton() {
   });
 
   document.body.appendChild(btn);
+}
+
+function ensureFloatingFaithBadge() {
+  if (document.querySelector(".floatingFaithBadge")) return;
+  const badge = document.createElement("div");
+  badge.className = "floatingFaithBadge";
+  badge.textContent = "";
+  badge.style.right = "auto";
+  badge.style.bottom = "auto";
+  wireFaithBadgeHover(badge);
+  document.body.appendChild(badge);
+}
+
+function updateFloatingFaithScore(g: GameState) {
+  const badge = document.querySelector<HTMLElement>(".floatingFaithBadge");
+  const btn = document.querySelector<HTMLElement>(".floatingNewRun");
+  if (!badge || !btn) return;
+  const f = ensureFaith(g);
+  const a = f.points[f.offered[0]] ?? 0;
+  const b = f.points[f.offered[1]] ?? 0;
+  const c = f.points[f.offered[2]] ?? 0;
+
+  const r = btn.getBoundingClientRect();
+  badge.style.left = `${Math.round(r.right + 8)}px`;
+  badge.style.top = `${Math.round(r.top)}px`;
+  badge.style.right = "auto";
+  badge.textContent = `신앙 ${a}·${b}·${c}`;
 }
 
 
@@ -3990,6 +4238,8 @@ export function render(g: GameState, actions: UIActions) {
 
   floatingNewRunHandler = () => actions.onNewRun();
   ensureFloatingNewRunButton();
+  ensureFloatingFaithBadge();
+  updateFloatingFaithScore(g);
   ensureBgLayer();
 
   if (!(render as any)._logInitDone) {
@@ -5131,7 +5381,7 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
   const backdrop = div("choice-backdrop");
   backdrop.style.cssText =
     "position:absolute; inset:0;" +
-    "background: rgba(0,0,0,.72);" +
+    "background: rgba(0,0,0,1);" +
     "backdrop-filter: blur(calc(4 * var(--u)));" +
     "-webkit-backdrop-filter: blur(calc(4 * var(--u)));" +
     "pointer-events:auto;";
@@ -5171,6 +5421,120 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
     promptEl.style.cssText =
       `margin:0 0 calc(${12} * var(--u)) 0; font-size:calc(${PROMPT_FS} * var(--u)); line-height:1.25; opacity:.95;`;
     panel.appendChild(promptEl);
+  }
+
+  // =========================
+  // Faith start: BIG selection UI
+  // =========================
+  
+  if (c.kind === "FAITH" && (g.choiceCtx as any)?.kind === "FAITH_START") {
+    panel.style.cssText +=
+      `width:min(100vw, calc(${1800} * var(--u))); height:90vh;` +
+      `max-height:94vh; overflow:auto;` +
+      `padding:calc(${18} * var(--u)) calc(${18} * var(--u));` +
+      `border-radius:calc(${18} * var(--u));` +
+      `border:calc(1 * var(--u)) solid rgba(255,255,255,.16);` +
+      `background:rgba(0,0,0,1);` +
+      `box-shadow: 0 calc(18 * var(--u)) calc(60 * var(--u)) rgba(0,0,0,1);` +
+      `font-family:"Mulmaru", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;`;
+
+    const f = ensureFaith(g);
+    const offered = f.offered as any as Array<"dream_shadow" | "wing_artery" | "forge_master">;
+
+    const sub = div("faith-sub");
+    sub.style.cssText =
+      `margin:0 0 calc(${14} * var(--u)) 0;` +
+      `font-size:calc(${13} * var(--u)); opacity:.92; line-height:1.35;`;
+    sub.textContent = "선택한 신은 신앙 5로 시작합니다. 유혹 수락 시: 유혹한 신 +1 / 현재 포커스 -1. 포커스 점수 ≥3이면 후원 패시브가 활성화됩니다.";
+    panel.appendChild(sub);
+
+    const grid = div("faith-grid");
+    grid.style.cssText =
+      `display:grid; grid-template-columns:repeat(3, minmax(0, 1fr));` +
+      `gap:calc(${14} * var(--u));`;
+
+    const makeGodCard = (id: "dream_shadow" | "wing_artery" | "forge_master") => {
+      const card = div("faith-godCard");
+      card.style.cssText =
+        `display:flex; flex-direction:column;` +
+        `border-radius:calc(${16} * var(--u)); display:flex; align-items:center; justify-content:center;` +
+        `border:calc(1 * var(--u)) solid rgba(255,255,255,.14);` +
+        `background:#101010;` +
+        `overflow:hidden;` +
+        `min-height:calc(${640} * var(--u));`;
+
+      const imgWrap = div("faith-imgWrap");
+      imgWrap.style.cssText =
+        `width:70%; aspect-ratio: 1/1; height:auto;` +
+        `background:rgba(0,0,0,0);` +
+        `border-bottom:calc(1 * var(--u)) solid rgba(255,255,255,.10);` +
+        `position:relative; overflow:hidden;`;
+
+      const img = document.createElement("img");
+      img.alt = godName(id);
+      img.src = assetUrl(godArt(id));
+      (img.style as any).imageRendering = "pixelated";
+      img.style.cssText =
+        `position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:50% 35%;` +
+        `transform: scale(1.09); transform-origin: 50% 50%;` +
+        `image-rendering: pixelated; image-rendering: crisp-edges;`;
+      img.onerror = () => {
+        // 이미지가 없으면 그냥 배경만
+        img.remove();
+        const ph = div("faith-imgPh");
+        ph.textContent = "(illustration)";
+        ph.style.cssText =
+          `position:absolute; inset:0; display:flex; align-items:center; justify-content:center;` +
+          `opacity:.35; font-size:calc(${14} * var(--u));`;
+        imgWrap.appendChild(ph);
+      };
+
+      imgWrap.appendChild(img);
+      card.appendChild(imgWrap);
+
+      const body = div("faith-body");
+      body.style.cssText =
+        `display:flex; flex-direction:column; gap:calc(${10} * var(--u));` +
+        `padding:calc(${12} * var(--u));`;
+
+      const nameEl = document.createElement("div");
+      nameEl.textContent = godName(id);
+      nameEl.style.cssText =
+        `font-size:calc(${20} * var(--u)); font-weight:900; letter-spacing: 0.3em;` +
+        `width:100%; text-align:center;`;
+      body.appendChild(nameEl);
+
+      const pre = document.createElement("pre");
+      pre.textContent = godAbilityBlock(id);
+      pre.style.cssText =
+        `margin:0; padding:calc(${10} * var(--u));` +
+        `white-space:pre-wrap; line-height:1.35;` +
+        `font-size:calc(${13} * var(--u));` +
+        `border:calc(1 * var(--u)) solid rgba(255,255,255,.10);` +
+        `background:rgba(0,0,0,1);` +
+        `font-family:"Mulmaru", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;`;
+      body.appendChild(pre);
+
+      const pickBtn = button("선택", () => actions.onChooseChoice(`faith:choose:${id}`), false);
+      pickBtn.style.cssText +=
+        `margin-top:auto; width:100%;` +
+        `font-size:calc(${15} * var(--u));` +
+        `padding:calc(${12} * var(--u)) calc(${12} * var(--u));` +
+        `border-radius:calc(${12} * var(--u));`;
+      body.appendChild(pickBtn);
+
+      card.appendChild(body);
+      return card;
+    };
+
+    for (const id of offered) grid.appendChild(makeGodCard(id));
+    panel.appendChild(grid);
+
+    padWrap.appendChild(panel);
+    overlayEl.appendChild(backdrop);
+    overlayEl.appendChild(padWrap);
+    document.body.appendChild(overlayEl);
+    return;
   }
 
 
@@ -5256,8 +5620,8 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
     const illuBox = div("choice-illuBox");
     illuBox.style.cssText =
       "width:100%; aspect-ratio:1/1;" +
-      `border-radius:calc(${18} * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.16);` +
-      "background:rgba(0,0,0,.35);" +
+      `border-radius:calc(${18} * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,1);` +
+      "background:rgba(0,0,0,1);" +
       "position:relative; overflow:hidden;" +
       "box-shadow: 0 calc(10 * var(--u)) calc(30 * var(--u)) rgba(0,0,0,.35);";
 
@@ -5432,8 +5796,8 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
       const illuBox = div("choice-illuBox");
       illuBox.style.cssText =
         "width:100%; aspect-ratio:1/1;" +
-        `border-radius:calc(${18} * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.16);` +
-        "background:rgba(0,0,0,.35);" +
+        `border-radius:calc(${18} * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,1);` +
+        "background:rgba(0,0,0,1);" +
         "position:relative; overflow:hidden;" +
         "box-shadow: 0 calc(10 * var(--u)) calc(30 * var(--u)) rgba(0,0,0,.35);";
 
@@ -5784,8 +6148,8 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
       const illuBox = div("choice-illuBox");
       illuBox.style.cssText =
         "width:100%; aspect-ratio:1/1;" +
-        `border-radius:calc(${18} * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.16);` +
-        "background:rgba(0,0,0,.35);" +
+        `border-radius:calc(${18} * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,1);` +
+        "background:rgba(0,0,0,1);" +
         "position:relative; overflow:hidden;" +
         "box-shadow: 0 calc(10 * var(--u)) calc(30 * var(--u)) rgba(0,0,0,.35);";
 

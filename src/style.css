@@ -36,9 +36,10 @@
   --zHandDock: 2000;
 
   --zChrome: 60000;      /* 항상 클릭 가능한 크롬/고정 UI */
-  --zChoiceBackdrop: 49000;
-  --zChoicePanel: 51000;
-  --zChoice: 52000;
+  /* Choice overlay (must sit above player HUD / chrome) */
+  --zChoiceBackdrop: 60000;
+  --zChoicePanel: 62000;
+  --zChoice: 63000;
 
   --zRelicHud: 65000;
   --zRelicModal: 70000;
@@ -317,7 +318,7 @@ html{ font-size: calc(16 * var(--u)); }
   font-display: swap;
 }
 
-html, body, #app, button, input, textarea, select{
+html, body, #app, button, input, textarea, select, .choice-panel{
   font-family: "Mulmaru", ui-sans-serif, system-ui, -apple-system,
                "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif !important;
 }
@@ -422,7 +423,7 @@ html, body, #app,
   position: fixed;
   top:   calc(var(--safeT) + calc(8 * var(--u)));
   right: calc(var(--safeR) + calc(10 * var(--u)));
-  z-index: var(--zChrome);
+  z-index: calc(var(--zChrome)+10000);
   pointer-events: auto;
 }
 .topHudRight *{ pointer-events:auto; }
@@ -1319,9 +1320,10 @@ html, body, #app,
 .combatControls{
   position: absolute;
   justify-content: center;
-  top: 0;
-  transform: translate(0%, calc(2000% - var(--combatCtrlLift)));
-  z-index: 1;
+  left: 100rem;
+  top: 40rem;
+  transform: translate(450%, calc(90% - var(--combatCtrlLift)));
+  z-index: 1000;
   pointer-events: auto;
 
   /* 기존 위치 강제 무효화 */
@@ -1428,10 +1430,34 @@ html, body, #app,
   position: fixed;
   top:  calc(var(--safeT) + calc(8 * var(--u)));
   left: calc(var(--safeL) + calc(10 * var(--u)));
-  z-index: var(--zChrome);
+  z-index: calc(var(--zChrome) + 10000);
   pointer-events: auto;
 }
 .newRunBtn *{ pointer-events:auto !important; }
+
+/* 새 런 버튼 옆 신앙 배지 */
+.floatingFaithBadge{
+  position: fixed;
+  z-index: calc(var(--zChrome) + 10000);
+  pointer-events: auto;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: calc(8 * var(--u)) calc(10 * var(--u));
+  border-radius: calc(999 * var(--u));
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.18);
+  background: rgba(0,0,0,1);
+  color: rgba(255,255,255,.92);
+
+  font-size: calc(13 * var(--u));
+  line-height: 1;
+  white-space: nowrap;
+
+  font-family: "Mulmaru", ui-sans-serif, system-ui, -apple-system,
+               "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif !important;
+}
 
 /* 타겟 힌트(HUD 근처) */
 .targetHintInline{
@@ -1603,9 +1629,10 @@ pre.choice-detail,
   position: fixed;
   inset: 0;
   z-index: var(--zChoiceBackdrop) !important;
-  pointer-events: none !important;
+  pointer-events: auto !important;
 
-  background: transparent !important;
+  /* Faith selection should black out the screen (no transparency) */
+  background: rgba(0,0,0,0) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 
@@ -1617,9 +1644,8 @@ pre.choice-detail,
 
 /* 배경 제거(완전 투명) */
 .choice-backdrop{
-  display: none !important;
-  pointer-events: none !important;
-  background: transparent !important;
+  pointer-events: auto !important;
+  background: rgba(0, 0, 0, 0) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
@@ -1653,6 +1679,9 @@ pre.choice-detail,
   border-radius: var(--choicePanelR);
   background: rgba(0,0,0,1);
   box-shadow: 0 calc(18 * var(--u)) calc(60 * var(--u)) rgba(0,0,0,1);
+
+  /* Ensure Mulmaru inside choice panels (esp. Faith) */
+  font-family: "Mulmaru", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
 }
 
 

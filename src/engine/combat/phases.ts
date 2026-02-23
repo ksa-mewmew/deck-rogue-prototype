@@ -1,11 +1,23 @@
 import type { EnemyEffect, EnemyState, GameState, Side } from "../types";
-import { aliveEnemies, clampMin, logMsg, shuffle, applyStatusTo } from "../rules";
+import { aliveEnemies, clampMin, logMsg, shuffle, applyStatusTo, pushUiToast } from "../rules";
 import { applyDamageToPlayer, cleanupPendingTargetsIfNoEnemies } from "../effects";
 import { resolvePlayerEffects } from "../resolve";
 import { getCardDefFor, cardNameWithUpgrade } from "../../content/cards";
 import { runRelicHook, checkRelicUnlocks, getUnlockProgress, isRelicActive } from "../relics";
 import { revealIntentsAndDisrupt, __SOUL_WARN_INTENT_INDEX } from "./intents";
 import { checkEndConditions } from "./victory";
+import {
+  GOD_LINES,
+  applyFaithCombatStartHooks,
+  applyFaithOnCardUsedHooks,
+  applyFaithUpkeepEndTurnHooks,
+  applyMadnessCombatStartHooks,
+  applyWingArteryEvery5Turns,
+  combatStartDrawDeltaFromFaith,
+  ensureFaith,
+  getPatronGodOrNull,
+  wingArteryBaseSuppliesBonus,
+} from "../faith";
 
 export function startCombat(g: GameState) {
   g.combatTurn = 1;
@@ -36,6 +48,11 @@ export function startCombat(g: GameState) {
   g.usedThisTurn = 0;
   g.frontPlacedThisTurn = 0;
 
+  // per-turn flags
+  (g as any)._gainedBlockThisTurn = false;
+  (g as any)._indifferentHostileWarnedThisTurn = false;
+  (g as any)._rabbitHuntBlockToastShownThisCombat = false;
+
   g.winHooksAppliedThisCombat = false;
   g.victoryResolvedThisCombat = false;
 
@@ -43,10 +60,27 @@ export function startCombat(g: GameState) {
   (g.run as any).itemOfferedThisBattle = false;
 
   const bonus = g.run.nextBattleSuppliesBonus ?? 0;
-  g.player.supplies = Math.max(0, 7 + bonus);
+  const baseBonus = wingArteryBaseSuppliesBonus(g);
+  g.player.supplies = Math.max(0, 7 + bonus + baseBonus);
   if (bonus !== 0) {
     logMsg(g, `다음 전투 S 변동: ${bonus}`);
     g.run.nextBattleSuppliesBonus = 0;
+  }
+  if (baseBonus !== 0) {
+    logMsg(g, `후원 효과: 시작 보급 +${baseBonus} (현재 ${g.player.supplies})`);
+  }
+
+  // 화로의 주인: 첫 전투 토스트 1회
+  {
+    const patron = getPatronGodOrNull(g);
+    if (patron === "forge_master") {
+      const f = ensureFaith(g);
+      if (!f.forgeIntroShown) {
+        f.forgeIntroShown = true;
+        pushUiToast(g, "INFO", GOD_LINES.forge_master.firstBattle, 2000);
+        logMsg(g, GOD_LINES.forge_master.firstBattle);
+      }
+    }
   }
 
   g.player.immuneToDisruptThisTurn = false;
@@ -58,7 +92,33 @@ export function startCombat(g: GameState) {
   g.drawCountThisTurn = 0;
   g.attackedEnemyIndicesThisTurn = [];
 
-  drawCards(g, 4);
+  // 광기(boon/bane) 전투 시작 훅
+  applyMadnessCombatStartHooks(g);
+
+  // 신앙 전투 시작 훅(상태/방어/토스트)
+  applyFaithCombatStartHooks(g);
+
+  // 전투 시작 드로우
+  {
+    const runAny = g.run as any;
+    let n = 4;
+    n += combatStartDrawDeltaFromFaith(g);
+
+    const once = Number(runAny.nextCombatDrawDelta ?? 0) || 0;
+    if (once !== 0) {
+      n += once;
+      runAny.nextCombatDrawDelta = 0;
+    }
+
+    const rh = Number(runAny.rabbitHuntDrawBoostBattles ?? 0) || 0;
+    if (rh > 0) {
+      n += 1;
+      runAny.rabbitHuntDrawBoostBattles = rh - 1;
+    }
+
+    n = Math.max(0, n);
+    drawCards(g, n);
+  }
   
   revealIntentsAndDisrupt(g);
   g.phase = "PLACE";
@@ -92,6 +152,9 @@ export function placeCard(g: GameState, cardUid: string, side: Side, idx: number
   if (side === "front") g.frontPlacedThisTurn += 1;
   (g.placedUidsThisTurn ??= []);
   if (!g.placedUidsThisTurn.includes(cardUid)) g.placedUidsThisTurn.push(cardUid);
+
+  // 신앙: 카드 사용 훅(임계치)
+  applyFaithOnCardUsedHooks(g);
 
   logMsg(g, `[${cardNameWithUpgrade(g, cardUid)}]를 ${side === "front" ? "전열" : "후열"} ${idx}번에 배치`);
   runRelicHook(g, "onPlaceCard", { side, idx, cardUid });
@@ -425,6 +488,9 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
 
 export function upkeepEndTurn(g: GameState) {
   if (g.phase !== "UPKEEP") return;
+
+  // 신앙: 턴 종료 훅(0장 사용 보상, 방어 미획득 페널티 등)
+  applyFaithUpkeepEndTurnHooks(g);
   logMsg(g, "=== 유지비 / 상태 처리 ===");
 
   // Unlock progress for relic activation: end turn with weak / skip turn
@@ -549,6 +615,13 @@ export function drawStepStartNextTurn(g: GameState) {
   g.attackedEnemyIndicesThisTurn = [];
   g.drawCountThisTurn = 0;
   g.combatTurn = (g.combatTurn ?? 0) + 1;
+
+  // per-turn flags reset
+  (g as any)._gainedBlockThisTurn = false;
+  (g as any)._indifferentHostileWarnedThisTurn = false;
+
+  // 날개의 동맥: 5턴마다 F +1
+  applyWingArteryEvery5Turns(g);
 }
 
 export function drawCards(g: GameState, n: number): number {

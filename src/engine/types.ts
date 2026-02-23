@@ -17,6 +17,43 @@ export type UiToast = {
 };
 
 
+// =========================
+// Faith
+// =========================
+export type GodId =
+  | "dream_shadow"
+  | "wing_artery"
+  | "forge_master"
+  | "bright_darkness"
+  | "indifferent_one"
+  | "armored_tiger"
+  | "first_human"
+  | "card_dealer"
+  | "rabbit_hunt"
+  | "madness";
+
+export type FaithState = {
+  offered: [GodId, GodId, GodId];
+  points: Record<GodId, number>;
+  focus: GodId;
+  lastFocus: GodId;
+  chosen: boolean;
+  // 적대(배교) 상태. true면 해당 신의 패시브는 적대 효과로 대체되고, 유혹 후보에서도 제외.
+  hostile?: Partial<Record<GodId, boolean>>;
+  // 유혹 연속 방지용
+  lastTempter?: GodId;
+
+  // 광기(0)
+  madnessAwakened?: boolean; // 보물 이후 각성
+  madnessTemptUsed?: boolean; // 보물 즉시 1회 선택 소진
+  madnessAccepted?: boolean; // 광기 수락 여부
+  madnessBoon?: 1 | 2 | 3; // 수락 시 적용되는 긍정
+  madnessBane?: 1 | 2 | 3; // 거부 시(적대) 적용되는 부정
+  // 확장용 플래그(나중에 쓰기 편하게)
+  forgeIntroShown?: boolean;
+};
+
+
 export type NodeType = "BATTLE" | "ELITE" | "REST" | "TREASURE" | "EVENT" | "SHOP";
 
 // =========================
@@ -89,7 +126,16 @@ export type ChoiceOption = {
 };
 
 export type ChoiceState = {
-  kind: "EVENT" | "REWARD" | "PICK_CARD" | "VIEW_PILE" | "UPGRADE_PICK" | "RELIC";
+  kind:
+    | "EVENT"
+    | "REWARD"
+    | "PICK_CARD"
+    | "VIEW_PILE"
+    | "UPGRADE_PICK"
+    | "RELIC"
+    | "FAITH"
+    | "GOD_TEMPT"
+    | "MADNESS_TEMPT";
   title: string;
   prompt?: string;
   art?: string;
@@ -443,6 +489,9 @@ export type RunState = {
   shops?: Record<MapNodeId, ShopState>;
 
   gold?: number;
+
+  // 신앙
+  faith?: FaithState;
 };
 
 export type Content = {
@@ -468,7 +517,10 @@ export type ChoiceCtx =
   | { kind: "RELIC_OFFER"; offerIds: string[]; source?: "BOSS" | "ELITE" | "PAID" | string }
   | { kind: "SHOP"; nodeId: string }
   | { kind: "UPGRADE_PICK"; returnTo?: { kind: "SHOP"; nodeId: string }; priceGold?: number }
-  | { kind: "REMOVE_PICK"; returnTo?: { kind: "SHOP"; nodeId: string }; priceGold?: number };
+  | { kind: "REMOVE_PICK"; returnTo?: { kind: "SHOP"; nodeId: string }; priceGold?: number }
+  | { kind: "FAITH_START"; offered: [GodId, GodId, GodId] }
+  | { kind: "GOD_TEMPT"; tempter: GodId }
+  | { kind: "MADNESS_TEMPT"; offerBoon: 1 | 2 | 3; offerBane: 1 | 2 | 3 };
   
 export type ChoiceFrame = { choice: ChoiceState; ctx: ChoiceCtx };
 

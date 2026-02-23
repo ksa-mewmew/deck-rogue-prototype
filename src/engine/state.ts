@@ -1,6 +1,7 @@
 import type { CardInstance, Content, GameState, RunState } from "./types";
 import { logMsg, shuffle } from "./rules";
 import { generateDungeonMap } from "./map";
+import { ensureFaith, openFaithStartChoice } from "./faith";
 
 function nextUid(g: GameState): string {
   g.uidSeq += 1;
@@ -144,6 +145,10 @@ export function createInitialState(content: Content): GameState {
 
   makeBasicDeck(g);
   logMsg(g, "새 런 시작.");
+
+  // 신앙 선택(런 시작 시 1회)
+  ensureFaith(g);
+  openFaithStartChoice(g);
 
   return g;
 }

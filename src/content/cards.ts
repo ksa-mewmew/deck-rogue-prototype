@@ -162,6 +162,17 @@ export const CARDS: CardData[] = [
     back: [{ op: "supplies", n: -1 }, { op: "fatigue", n: 1 }],
   },
 
+  // 저주 카드
+  {
+    id: "debt_paper",
+    name: "빚 문서",
+    rarity: "BASIC",
+    frontText: "아무 일도 일어나지 않습니다.",
+    backText: "아무 일도 일어나지 않습니다.",
+    front: [],
+    back: [],
+  },
+
   // 파밍 카드 0.1.0 5장
   {
     id: "berserk",

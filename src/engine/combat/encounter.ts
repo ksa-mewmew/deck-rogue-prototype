@@ -1,5 +1,6 @@
 import type { EnemyState, GameState } from "../types";
 import { logMsg, pickOne } from "../rules";
+import { getMadnessBane } from "../faith";
 import { BOSS_OMEN_HINT } from "../../content";
 
 export function escapeRequiredNodePicks(deckSizeAtTreasure: number, baseReq = 10, baseDeck = 16) {
@@ -10,7 +11,7 @@ export function escapeRequiredNodePicks(deckSizeAtTreasure: number, baseReq = 10
 
 export function enemyStateFromId(g: GameState, enemyId: string): EnemyState {
   const def = g.content.enemiesById[enemyId];
-  return {
+  const e: EnemyState = {
     id: def.id,
     name: def.name,
     hp: def.maxHp,
@@ -25,6 +26,14 @@ export function enemyStateFromId(g: GameState, enemyId: string): EnemyState {
     soulArmed: enemyId === "boss_soul_stealer" ? false : undefined,
     soulWillNukeThisTurn: enemyId === "boss_soul_stealer" ? false : undefined,
   };
+
+  // 광기(적대) 1: 모든 적 HP +10
+  if (getMadnessBane(g) === 1) {
+    e.maxHp += 10;
+    e.hp += 10;
+  }
+
+  return e;
 }
 
 function patternAllowedByCooldown(g: GameState, pattern: string[], nowBattleNo: number, cooldownBattles = 5) {

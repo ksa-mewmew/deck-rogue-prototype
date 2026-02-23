@@ -1,13 +1,40 @@
 import type { GameState, EnemyState, PlayerDamageKind } from "./types";
-import { logMsg, clampMin, aliveEnemies } from "./rules";
+import { logMsg, clampMin, aliveEnemies, pushUiToast } from "./rules";
 import { checkEndConditions } from "./combat";
 import { modifyDamageByRelics, notifyDamageAppliedByRelics, checkRelicUnlocks, getUnlockProgress, isRelicActive } from "./relics";
 
 
 export function addBlock(g: GameState, n: number) {
   if (n <= 0) return;
-  g.player.block += n;
-  logMsg(g, `방어(블록) +${n} (현재 ${g.player.block})`);
+
+  let amount = n;
+
+  // 토끼 사냥(후원 -): 방어도 획득량 -25%(내림)
+  // NOTE: faith.ts를 직접 import하지 않고, 런 상태를 가볍게 읽습니다(순환 의존 최소화).
+  try {
+    const runAny: any = g.run as any;
+    const f: any = runAny?.faith;
+    const focus = String(f?.focus ?? "");
+    const hostile = !!f?.hostile?.[focus];
+    const pts = Number(f?.points?.[focus] ?? 0) || 0;
+    const patron = focus && focus !== "madness" && !hostile && pts >= 3 ? focus : null;
+
+    if (patron === "rabbit_hunt") {
+      const reduced = Math.floor(amount * 0.75);
+      amount = reduced;
+      if (amount > 0 && !(g as any)._rabbitHuntBlockToastShownThisCombat) {
+        (g as any)._rabbitHuntBlockToastShownThisCombat = true;
+        pushUiToast(g, "WARN", "가벼운 방패는 잘 부러집니다.", 1600);
+        logMsg(g, "토끼 사냥: 방어 획득량 -25% (내림)");
+      }
+    }
+  } catch {}
+
+  if (amount <= 0) return;
+
+  g.player.block += amount;
+  (g as any)._gainedBlockThisTurn = true;
+  logMsg(g, `방어(블록) +${amount} (현재 ${g.player.block})`);
 }
 
 export function addSupplies(g: GameState, n: number) {

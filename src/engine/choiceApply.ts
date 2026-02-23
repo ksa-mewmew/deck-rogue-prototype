@@ -9,6 +9,19 @@ import { canUpgradeUid, upgradeCardByUid, removeCardByUid, addCardToDeck } from 
 import { healPlayer } from "./effects";
 import { addItemToInventory, isItemInventoryFull } from "./items";
 import { getItemDefById } from "../content/items";
+import {
+  acceptMadness,
+  acceptTemptation,
+  applyDreamShadowRestHeal,
+  applyDreamShadowRestUpgradePenalty,
+  applyTemptationEffect,
+  chooseStartingGod,
+  ensureFaith,
+  godName,
+  isForgeHostile,
+  rejectMadness,
+  shopPriceGold,
+} from "./faith";
 
 function getGold(g: GameState): number {
   return Number((g.run as any).gold ?? 0) || 0;
@@ -142,8 +155,11 @@ function applyRestChoiceKey(g: GameState, key: string): boolean {
 
   if (key === "rest:heal") {
     applyRestHighF(g, highF);
-    healPlayer(g, 15)
-    logMsg(g, "휴식: HP +15");
+    const handled = applyDreamShadowRestHeal(g);
+    if (!handled.healed) {
+      healPlayer(g, 15);
+      logMsg(g, "휴식: HP +15");
+    }
     clearAllChoices(g);
     g.phase = "NODE";
     applyPendingRelicActivations(g);
@@ -161,6 +177,17 @@ function applyRestChoiceKey(g: GameState, key: string): boolean {
   }
 
   if (key === "rest:upgrade") {
+    if (isForgeHostile(g)) {
+      logMsg(g, "강화할 수 없습니다.");
+      clearAllChoices(g);
+      g.phase = "NODE";
+      applyPendingRelicActivations(g);
+      return true;
+    }
+
+    // 꿈그림자: 강화 선택 시 피로만큼 피해 (후원(-) / 적대)
+    applyDreamShadowRestUpgradePenalty(g);
+
     const all = Object.values(g.cards).filter((c) => c.zone === "deck" || c.zone === "hand" || c.zone === "discard");
     const candidates = all.filter((c) => canUpgradeUid(g, c.uid));
 
@@ -241,7 +268,7 @@ function applyShopChoiceKey(g: GameState, key: string): boolean {
       return true;
     }
 
-    const price = Number(offer.priceGold ?? 0) || 0;
+    const price = shopPriceGold(g, Number(offer.priceGold ?? 0) || 0);
     if (getGold(g) < price) {
       logMsg(g, "골드가 부족합니다.");
       openShopChoice(g, nodeId);
@@ -286,7 +313,7 @@ function applyShopChoiceKey(g: GameState, key: string): boolean {
       return true;
     }
 
-    const price = Number(offer.priceGold ?? 0) || 0;
+    const price = shopPriceGold(g, Number(offer.priceGold ?? 0) || 0);
     if (getGold(g) < price) {
       logMsg(g, "골드가 부족합니다.");
       openShopChoice(g, nodeId);
@@ -311,7 +338,7 @@ function applyShopChoiceKey(g: GameState, key: string): boolean {
 
   // 보급
   if (key === "shop:supply:buy") {
-    const priceG = 6;
+    const priceG = shopPriceGold(g, 6);
     const gainS = 3;
     if (getGold(g) < priceG) {
       logMsg(g, "골드가 부족합니다.");
@@ -350,7 +377,7 @@ function applyShopChoiceKey(g: GameState, key: string): boolean {
       return true;
     }
 
-    const price = 25;
+    const price = shopPriceGold(g, 25);
     if (getGold(g) < price) {
       logMsg(g, "골드가 부족합니다.");
       openShopChoice(g, nodeId);
@@ -375,7 +402,7 @@ function applyShopChoiceKey(g: GameState, key: string): boolean {
       return true;
     }
 
-    const price = 25;
+    const price = shopPriceGold(g, 25);
     if (getGold(g) < price) {
       logMsg(g, "골드가 부족합니다.");
       openShopChoice(g, nodeId);
@@ -472,6 +499,135 @@ export function applyChoiceKey(g: GameState, key: string): boolean {
   }
 
   if (c.kind === "REWARD") return applyRewardChoiceKey(g, key);
+
+  // =========================
+  // Faith (MVP)
+  // =========================
+  if (c.kind === "FAITH") {
+    if (!g.choiceCtx || g.choiceCtx.kind !== "FAITH_START") return false;
+    if (!key.startsWith("faith:choose:")) return false;
+    const id = key.slice("faith:choose:".length) as any;
+    chooseStartingGod(g, id);
+    ensureFaith(g);
+    clearAllChoices(g);
+    g.phase = "NODE";
+    applyPendingRelicActivations(g);
+    return true;
+  }
+
+  if (c.kind === "GOD_TEMPT") {
+    const ctx = g.choiceCtx;
+    if (!ctx || ctx.kind !== "GOD_TEMPT") return false;
+    const tempter = ctx.tempter;
+
+    if (key === "tempt:reject") {
+      logMsg(g, `유혹 거부: ${godName(tempter)}`);
+      clearAllChoices(g);
+      g.phase = "NODE";
+      applyPendingRelicActivations(g);
+      return true;
+    }
+
+    if (key === "tempt:accept") {
+      // 첫 번째 인간: 카드 '선택' 복제 (후속 PICK_CARD)
+      if (tempter === ("first_human" as any)) {
+        // 비용/신앙 이동은 수락 시점에 확정
+        g.player.fatigue = (g.player.fatigue ?? 0) + 3;
+        logMsg(g, "유혹: 피로 +3");
+        acceptTemptation(g, tempter);
+
+        const candidates = Object.values(g.cards)
+          .filter((cc) => (cc.zone === "deck" || cc.zone === "hand" || cc.zone === "discard") && cc.defId !== "goal_treasure")
+          .map((cc) => cc.uid);
+
+        const options: ChoiceOption[] = [
+          ...candidates.map((uid) => {
+            const card = g.cards[uid];
+            const def = getCardDefByIdWithUpgrade(g.content, card.defId, card.upgrade ?? 0);
+            const nm = (g.content.cardsById[card.defId]?.name ?? card.defId);
+            const label = (card.upgrade ?? 0) > 0 ? `${nm} +${card.upgrade}` : nm;
+            return { key: `dup:${uid}`, label, detail: `전열: ${def.frontText} / 후열: ${def.backText}`, cardUid: uid };
+          }),
+          { key: "skip", label: "복제하지 않는다" },
+        ];
+
+        setChoice(
+          g,
+          {
+            kind: "PICK_CARD",
+            title: "복제",
+            prompt: "복제할 카드 1장을 선택하세요.",
+            options,
+          },
+          { kind: "FIRST_HUMAN_DUP" } as any
+        );
+        return true;
+      }
+
+      applyTemptationEffect(g, tempter);
+      acceptTemptation(g, tempter);
+      clearAllChoices(g);
+      g.phase = "NODE";
+      applyPendingRelicActivations(g);
+      return true;
+    }
+
+    return false;
+  }
+
+  if (c.kind === "PICK_CARD") {
+    const anyCtx = g.choiceCtx as any;
+    if (anyCtx?.kind !== "FIRST_HUMAN_DUP") return false;
+
+    if (key === "skip") {
+      logMsg(g, "복제 취소");
+      clearAllChoices(g);
+      g.phase = "NODE";
+      applyPendingRelicActivations(g);
+      return true;
+    }
+
+    if (key.startsWith("dup:")) {
+      const uid = key.slice("dup:".length);
+      const card = g.cards[uid];
+      if (!card) {
+        logMsg(g, "복제 실패: 카드를 찾을 수 없습니다.");
+      } else {
+        addCardToDeck(g, card.defId, { upgrade: Number(card.upgrade ?? 0) || 0 });
+        const nm = (g.content.cardsById[card.defId]?.name ?? card.defId);
+        const label = (card.upgrade ?? 0) > 0 ? `${nm} +${card.upgrade}` : nm;
+        logMsg(g, `유혹: 카드 복제 (${label})`);
+      }
+      clearAllChoices(g);
+      g.phase = "NODE";
+      applyPendingRelicActivations(g);
+      return true;
+    }
+
+    return false;
+  }
+
+  if (c.kind === "MADNESS_TEMPT") {
+    const ctx = g.choiceCtx as any;
+    if (!ctx || ctx.kind !== "MADNESS_TEMPT") return false;
+
+    if (key === "madness:accept") {
+      acceptMadness(g, ctx.offerBoon);
+      clearAllChoices(g);
+      g.phase = "NODE";
+      applyPendingRelicActivations(g);
+      return true;
+    }
+
+    if (key === "madness:reject") {
+      rejectMadness(g, ctx.offerBane);
+      clearAllChoices(g);
+      g.phase = "NODE";
+      applyPendingRelicActivations(g);
+      return true;
+    }
+    return false;
+  }
 
   if (c.kind === ("UPGRADE_PICK" as any)) {
     if (key === "skip") {
