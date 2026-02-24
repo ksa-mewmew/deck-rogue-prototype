@@ -7091,15 +7091,29 @@ function renderSlotsGrid(g: GameState, actions: UIActions, side: Side) {
   const hasSelected = !!g.selectedHandCardUid;
   const slots = side === "front" ? g.frontSlots : g.backSlots;
 
-  for (let i = 0; i < 3; i++) {
-    const disabled = side === "back" ? !!g.backSlotDisabled?.[i] : false;
 
-    const s = div("slot" + (disabled ? " disabled" : ""));
+  const runAny: any = g.run as any;
+  const capRaw = Number(side === "front" ? runAny.slotCapFront : runAny.slotCapBack);
+  const cap = Math.max(3, Math.min(4, Math.floor(Number.isFinite(capRaw) ? capRaw : 3)));
+
+  for (let i = 0; i < slots.length; i++) {
+    const disabled = side === "back" ? !!g.backSlotDisabled?.[i] : false;
+    const locked = i >= cap;
+
+    const s = div("slot" + (disabled ? " disabled" : "") + (locked ? " locked" : ""));
     s.dataset.slotSide = side;
     s.dataset.slotIndex = String(i);
 
+    if (locked) {
+      const lk = div("slotLock");
+      lk.textContent = "🔒";
+      s.appendChild(lk);
+      grid.appendChild(s);
+      continue;
+    }
+
     if (hoverSlot && hoverSlot.side === side && hoverSlot.idx === i) s.classList.add("dropHover");
-    if (hasSelected && !disabled) s.classList.add("placeable");
+    if (hasSelected && !disabled && !locked) s.classList.add("placeable");
 
     const uid = slots[i];
     if (uid) {
@@ -7471,6 +7485,11 @@ function hitTestSlot(x: number, y: number, g: GameState): SlotDrop | null {
 
   const side = slot.dataset.slotSide as Side;
   const idx = Number(slot.dataset.slotIndex);
+
+  const runAny: any = g.run as any;
+  const capRaw = Number(side === "front" ? runAny.slotCapFront : runAny.slotCapBack);
+  const cap = Math.max(3, Math.min(4, Math.floor(Number.isFinite(capRaw) ? capRaw : 3)));
+  if (idx < 0 || idx >= cap) return null;
 
   if (side === "back" && g.backSlotDisabled?.[idx]) return null;
   return { side, idx };

@@ -444,6 +444,12 @@ export type RunState = {
 
   timeMove: number;
 
+  // 슬롯 확장(보스 보상)
+  slotCapFront?: number; // 기본 3, 최대 4
+  slotCapBack?: number;  // 기본 3, 최대 4
+  bossKillCount?: number;
+  bossSlotFirstPick?: "front" | "back" | null;
+
   map: DungeonMap;
 
   pursuit: PursuitState;
@@ -533,6 +539,7 @@ export type ChoiceCtx =
   | { kind: "ITEM_REWARD"; offerId: ItemId; source?: "BATTLE" | "ELITE" | "BOSS" | string }
   | { kind: "REST"; highF?: boolean }
   | { kind: "EVENT"; eventId: string }
+  | { kind: "BOSS_SLOT_UPGRADE" }
   | { kind: "RELIC_OFFER"; offerIds: string[]; source?: "BOSS" | "ELITE" | "PAID" | string }
   | { kind: "SHOP"; nodeId: string }
   | { kind: "UPGRADE_PICK"; returnTo?: { kind: "SHOP"; nodeId: string }; priceGold?: number }

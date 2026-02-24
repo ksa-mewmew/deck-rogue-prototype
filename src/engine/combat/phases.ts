@@ -19,6 +19,32 @@ import {
   wingArteryBaseSuppliesBonus,
 } from "../faith";
 
+
+// =========================
+// Slot caps (boss rewards)
+// =========================
+function clampSlotCap(v: any): number {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 3;
+  return Math.max(3, Math.min(4, Math.floor(n)));
+}
+
+function getSlotCap(g: GameState, side: "front" | "back"): number {
+  const runAny: any = g.run as any;
+  return clampSlotCap(side === "front" ? runAny.slotCapFront : runAny.slotCapBack);
+}
+
+function getSlotCols(g: GameState): number {
+  return Math.max(getSlotCap(g, "front"), getSlotCap(g, "back"));
+}
+
+function resetCombatSlots(g: GameState) {
+  const cols = getSlotCols(g);
+  g.frontSlots = Array.from({ length: cols }, () => null);
+  g.backSlots = Array.from({ length: cols }, () => null);
+  g.backSlotDisabled = Array.from({ length: cols }, () => false);
+}
+
 export function startCombat(g: GameState) {
   g.combatTurn = 1;
   g.time = (g.time ?? 0) + 1;
@@ -37,9 +63,7 @@ export function startCombat(g: GameState) {
 
   g.phase = "REVEAL";
 
-  g.frontSlots = [null, null, null];
-  g.backSlots = [null, null, null];
-  g.backSlotDisabled = [false, false, false];
+  resetCombatSlots(g);
 
   g.backUidsThisTurn = [];
 
@@ -180,6 +204,9 @@ export function placeCard(g: GameState, cardUid: string, side: Side, idx: number
   }
 
   const slots = side === "front" ? g.frontSlots : g.backSlots;
+  const cap = getSlotCap(g, side);
+  if (idx < 0 || idx >= cap) return;
+  if (idx >= slots.length) return;
   if (slots[idx]) return;
 
   g.hand = g.hand.filter((x) => x !== cardUid);
@@ -295,7 +322,7 @@ function isInstalledHere(g: GameState, cardUid: string, usedSide: "front" | "bac
 }
 
 function clearSlots(g: GameState, force = false) {
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < g.frontSlots.length; i++) {
     const f = g.frontSlots[i];
     if (f) {
       if (!force && isInstalledHere(g, f, "front")) {
@@ -325,7 +352,7 @@ function clearSlots(g: GameState, force = false) {
 function incrementInstallAges(g: GameState) {
   (g as any).installAgeByUid ??= {};
   // 설치가 유지되는 카드만 +1
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < g.frontSlots.length; i++) {
     const f = g.frontSlots[i];
     if (f && isInstalledHere(g, f, "front")) {
       g.installAgeByUid[f] = (g.installAgeByUid[f] ?? 0) + 1;
@@ -342,7 +369,7 @@ export function resolveBack(g: GameState) {
   g.phase = "BACK";
   logMsg(g, "=== 후열 단계 ===");
 
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < g.backSlots.length; i++) {
     const uid = g.backSlots[i];
     if (!uid) continue;
 
@@ -362,7 +389,7 @@ export function resolveFront(g: GameState) {
   if (g.phase !== "FRONT") return;
   logMsg(g, "=== 전열 단계 ===");
 
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < g.frontSlots.length; i++) {
     const uid = g.frontSlots[i];
     if (!uid) continue;
 
@@ -504,13 +531,16 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
     }
 
     case "statusPlayer": {
-      let n = act.n;
-      // 쥐가죽 부적: 취약을 받을 때 1 덜 받는다.
-      if (act.key === "vuln" && n > 0 && isRelicActive(g, "relic_ratskin_charm")) {
-        n = Math.max(0, n - 1);
-      }
+      const n = act.n;
+      // NOTE: 취약 감소(쥐가죽 부적 등)는 applyStatusTo 내부에서 처리한다.
       applyStatusTo(g.player, act.key, n, g, "ENEMY");
-      logMsg(g, `적 효과: 플레이어 상태 ${act.key} ${n >= 0 ? "+" : ""}${n}`);
+
+      // 로그는 실제 적용량 기준으로 표시
+      let shown = n;
+      if (act.key === "vuln" && shown > 0 && isRelicActive(g, "relic_ratskin_charm")) {
+        shown = Math.max(0, shown - 1);
+      }
+      logMsg(g, `적 효과: 플레이어 상태 ${act.key} ${shown >= 0 ? "+" : ""}${shown}`);
       return;
     }
 
@@ -834,7 +864,7 @@ function cleanupBattleTransient(g: GameState) {
 }
 
 export function _clearSlotsForVictory(g: GameState) {
-  clearSlots(g);
+  clearSlots(g, true);
 }
 
 export function _cleanupBattleTransientForVictory(g: GameState) {

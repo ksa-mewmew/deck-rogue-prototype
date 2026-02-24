@@ -221,6 +221,8 @@ function ensureRuntimeEntry(g: GameState, id: string): RelicRuntimeState {
 }
 
 export function isRelicActive(g: GameState, id: string): boolean {
+  ensureRelicSystem(g);
+  if (!hasRelic(g, id)) return false;
   return !!ensureRuntimeEntry(g, id).active;
 }
 

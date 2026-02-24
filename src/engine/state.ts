@@ -26,6 +26,12 @@ export function createInitialRunState(): RunState {
     },
 
     timeMove: 0,
+    // 슬롯 확장(보스 보상)
+    slotCapFront: 3,
+    slotCapBack: 3,
+    bossKillCount: 0,
+    bossSlotFirstPick: null,
+
     map: generateDungeonMap(),
     pursuit: { heat: 0 },
     vision: { mode: "NORMAL", blind: false, presenceR: 2, typeR: 2, detailR: 0, noise: 0 },

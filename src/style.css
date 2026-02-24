@@ -600,6 +600,22 @@ html, body, #app,
   --slotTextScale: 0.78;
 }
 
+/* 슬롯 잠금(보스 보상 슬롯 확장 전) */
+.slot.locked{
+  opacity: 0.38;
+}
+.slot .slotLock{
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(26 * var(--u));
+  pointer-events: none;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.55);
+}
+
+
 /* 슬롯 안에서 정중앙 배치 컨테이너 */
 .slotCardScaler{
   position: absolute;

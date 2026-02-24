@@ -2,7 +2,6 @@ import type { GameState } from "../types";
 import { aliveEnemies, logMsg, pickOne } from "../rules";
 import { runRelicHook } from "../relics";
 import { buildIntentPreview } from "../intentPreview";
-
 const NO_REPEAT_INTENT_INDEXES: Record<string, ReadonlySet<number>> = {
   other_adventurer: new Set([1]),
   slime: new Set([0, 1]),
@@ -119,12 +118,21 @@ export function revealIntentsAndDisrupt(g: GameState) {
   g.player.nullifyDamageThisTurn = false;
 
   g.disruptIndexThisTurn = null;
-  g.backSlotDisabled = [false, false, false];
 
-  const disrupt = g.player.status.disrupt ?? 0;
-  if (disrupt > 0) {
-    g.disruptIndexThisTurn = Math.floor(Math.random() * 3);
-    g.backSlotDisabled[g.disruptIndexThisTurn] = true;
+  // 슬롯 수(보스 보상) 반영: backSlots 길이에 맞춰 교란 무효 슬롯을 선택
+  {
+    const cols = Math.max(1, g.backSlots?.length ?? 3);
+    g.backSlotDisabled = Array.from({ length: cols }, () => false);
+
+    const runAny: any = g.run as any;
+    const backCapRaw = Number(runAny.slotCapBack ?? 3);
+    const backCap = Math.max(3, Math.min(4, Math.floor(backCapRaw)));
+
+    const disrupt = g.player.status.disrupt ?? 0;
+    if (disrupt > 0) {
+      g.disruptIndexThisTurn = Math.floor(Math.random() * backCap);
+      g.backSlotDisabled[g.disruptIndexThisTurn] = true;
+    }
   }
 
   for (const e of g.enemies) {
@@ -140,7 +148,7 @@ export function revealIntentsAndDisrupt(g: GameState) {
     if (!intents || intents.length === 0) continue;
 
     const nextIx = pickNextIntentIndex(
-      intents,
+     intents,
       e.intentIndex ?? 0,
       e.id,
       e.lastIntentKey ?? null,

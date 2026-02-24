@@ -168,7 +168,6 @@ export function applyRewardChoiceKey(g: GameState, key: string): boolean {
 
       const ok = addItemToInventory(g, id, String(ctx.source ?? "BATTLE"));
       if (!ok) return true;
-
       closeChoice(g);
       return true;
     }
@@ -191,7 +190,7 @@ export function applyRewardChoiceKey(g: GameState, key: string): boolean {
 
     logMsg(g, "보상을 생략했습니다.");
     closeChoice(g);
-    return true;
+   return true;
   }
 
   if (key.startsWith("pick:")) {
@@ -200,7 +199,6 @@ export function applyRewardChoiceKey(g: GameState, key: string): boolean {
     const upgrade = Number(parts[2] ?? 0);
 
     if (!defId) return false;
-
     const ctx: any = g.choiceCtx as any;
     const isBattleReward = ctx?.kind === "BATTLE_REWARD" || ctx?.kind === "BATTLE_CARD_REWARD";
     const itemId = String(ctx?.itemOfferId ?? "");
@@ -212,7 +210,7 @@ export function applyRewardChoiceKey(g: GameState, key: string): boolean {
       logMsg(g, "카드 획득: " + defId + (upgrade > 0 ? " +" + upgrade : ""));
       ctx.cardDecision = key;
       if (ctx.itemDecision) closeChoice(g);
-      return true;
+     return true;
     }
 
     addCardToDeck(g, defId, { upgrade: Number.isFinite(upgrade) ? upgrade : 0 });
@@ -251,24 +249,53 @@ export function applyRewardChoiceKey(g: GameState, key: string): boolean {
 
     const ok = removeCardByUid(g, uid);
     if (!ok) return false;
-
     closeChoice(g);
     return true;
   }
 
   if (key.startsWith("relic:")) {
-    const id = key.slice("relic:".length);
+   const id = key.slice("relic:".length);
     if (!id) return false;
 
     const offerIds = (g.choiceCtx as any)?.offerIds as string[] | undefined;
     if (offerIds && offerIds.length > 0 && !offerIds.includes(id)) return false;
 
     g.run.relics ??= [];
-    if (!g.run.relics.includes(id)) grantRelic(g, id);
+   if (!g.run.relics.includes(id)) grantRelic(g, id);
 
     logMsg(g, `유물 획득: ${RELICS_BY_ID[id]?.name ?? id}`);
     closeChoice(g);
     return true;
+  }
+
+
+  if (key.startsWith("slot:")) {
+    const ctx: any = g.choiceCtx as any;
+    if (ctx?.kind !== "BOSS_SLOT_UPGRADE") return false;
+    const side = key.slice("slot:".length);
+    const runAny: any = g.run as any;
+    runAny.slotCapFront = Math.max(3, Math.min(4, Math.floor(Number(runAny.slotCapFront ?? 3))));
+    runAny.slotCapBack  = Math.max(3, Math.min(4, Math.floor(Number(runAny.slotCapBack  ?? 3))));
+
+    if (side === "front") {
+      if (runAny.slotCapFront < 4) runAny.slotCapFront += 1;
+      runAny.bossSlotFirstPick = "front";
+      pushUiToast(g, "INFO", "보스 보상: 전열 슬롯 +1", 2000);
+     logMsg(g, "보스 보상: 전열 슬롯 +1");
+      closeChoice(g);
+      return true;
+    }
+
+    if (side === "back") {
+      if (runAny.slotCapBack < 4) runAny.slotCapBack += 1;
+      runAny.bossSlotFirstPick = "back";
+      pushUiToast(g, "INFO", "보스 보상: 후열 슬롯 +1", 2000);
+      logMsg(g, "보스 보상: 후열 슬롯 +1");
+      closeChoice(g);
+      return true;
+    }
+
+    return false;
   }
 
   return false;
@@ -305,7 +332,7 @@ export function openRelicOfferChoice(
     return {
       key: `relic:${r.id}`,
       label: displayName,
-      detail: `${displayName}\n\n${displayDesc}`,
+     detail: `${displayName}\n\n${displayDesc}`,
     };
   });
 
@@ -326,9 +353,40 @@ export function openRelicOfferChoice(
   }
 
   enqueueChoice(g, choice, { kind: "RELIC_OFFER", offerIds, source: opt.source });
-  return offerIds;
+ return offerIds;
 }
 
+
+export function openBossSlotUpgradeChoice(g: GameState) {
+  const runAny: any = g.run as any;
+  const frontCap = Math.max(3, Math.min(4, Math.floor(Number(runAny.slotCapFront ?? 3))));
+  const backCap  = Math.max(3, Math.min(4, Math.floor(Number(runAny.slotCapBack  ?? 3))));
+
+  // 이미 둘 다 4면 스킵
+ if (frontCap >= 4 && backCap >= 4) return;
+
+  const options: ChoiceOption[] = [
+    {
+      key: "slot:front",
+      label: "전열 슬롯 +1",
+      detail: "전열 슬롯이 1칸 증가합니다. (최대 4) 전열은 유지비(S)를 소모합니다.",
+    },
+    {
+      key: "slot:back",
+      label: "후열 슬롯 +1",
+      detail: "후열 슬롯이 1칸 증가합니다. (최대 4) 후열은 교란(disrupt)의 영향을 받습니다.",
+    },
+  ];
+
+  const choice: ChoiceState = {
+    kind: "REWARD",
+    title: "보스 보상: 진형 확장",
+    prompt: "전열 또는 후열 슬롯을 1칸 확장합니다.",
+    options,
+  };
+
+  enqueueChoice(g, choice, { kind: "BOSS_SLOT_UPGRADE" });
+}
 export function openBossRelicOfferChoice(g: GameState) {
   return openRelicOfferChoice(g, {
     count: 3,

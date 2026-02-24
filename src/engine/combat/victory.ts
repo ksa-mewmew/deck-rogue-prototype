@@ -3,7 +3,7 @@ import { aliveEnemies, logMsg, pushUiToast } from "../rules";
 import { resolvePlayerEffects } from "../resolve";
 import { getCardDefFor } from "../../content/cards";
 import { runRelicHook, checkRelicUnlocks, getUnlockProgress, grantRelic } from "../relics";
-import { openBattleCardRewardChoice, openEliteRelicOfferChoice, openBossRelicOfferChoice } from "../engineRewards";
+import { openBattleCardRewardChoice, openEliteRelicOfferChoice, openBossRelicOfferChoice, openBossSlotUpgradeChoice } from "../engineRewards";
 import { _cleanupBattleTransientForVictory } from "./phases";
 import { rollBattleItemDrop } from "../items";
 import { GOD_LINES, getPatronGodOrNull, isHostile } from "../faith";
@@ -190,6 +190,36 @@ export function checkEndConditions(g: GameState) {
       (g.run as any).ominousProphecySeen = false;
       g.player.hp = g.player.maxHp;
       logMsg(g, "보스 격파! 체력이 완전히 회복되었습니다.");
+
+      // =========================
+      // 보스 보상: 슬롯 확장
+      //  - 1번째 보스: 전열/후열 중 하나 선택(+1)
+      //  - 2번째 보스: 나머지 자동(+1)
+      // =========================
+      {
+        const runAny: any = g.run as any;
+        runAny.slotCapFront = Math.max(3, Math.min(4, Math.floor(Number(runAny.slotCapFront ?? 3))));
+        runAny.slotCapBack  = Math.max(3, Math.min(4, Math.floor(Number(runAny.slotCapBack  ?? 3))));
+
+        runAny.bossKillCount = (Number(runAny.bossKillCount ?? 0) || 0) + 1;
+        const k = Number(runAny.bossKillCount) || 0;
+
+        if (k === 1) {
+          openBossSlotUpgradeChoice(g);
+        } else if (k === 2) {
+          const first = String(runAny.bossSlotFirstPick ?? "");
+          if (first === "front") {
+            if (runAny.slotCapBack < 4) runAny.slotCapBack += 1;
+            pushUiToast(g, "INFO", "보스 보상: 후열 슬롯 +1", 2000);
+            logMsg(g, "보스 보상: 후열 슬롯 +1");
+          } else {
+            if (runAny.slotCapFront < 4) runAny.slotCapFront += 1;
+            pushUiToast(g, "INFO", "보스 보상: 전열 슬롯 +1", 2000);
+            logMsg(g, "보스 보상: 전열 슬롯 +1");
+          }
+        }
+      }
+
       openBossRelicOfferChoice(g); // 3개 중 1개
     }
 
