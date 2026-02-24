@@ -37,6 +37,9 @@ export const ENEMIES = [
     id: "watching_statue",
     name: "감시하는 석상",
     maxHp: 25,
+    passives: [
+      { id: "ramp_atk_1", icon: "👁️", name: "감시의 축적", text: "매 턴 공격력이 +1 증가합니다." },
+    ],
     intents: [
       {
         label: "감시: 4 + 이번 턴에 사용한 카드의 수만큼 피해",
@@ -48,6 +51,9 @@ export const ENEMIES = [
     id: "pebble_golem",
     name: "조약돌 골렘",
     maxHp: 30,
+    passives: [
+      { id: "ramp_atk_1", icon: "🪨", name: "돌의 경화", text: "매 턴 공격력이 +1 증가합니다." },
+    ],
     intents: [
       { label: "조약돌 던지기: 8 피해", acts: [{ op: "damagePlayer", n: 8 }] },
       { label: "모래 모으기: 자신 HP 6 회복", acts: [{ op: "enemyHealSelf", n: 6 }] },
@@ -58,6 +64,9 @@ export const ENEMIES = [
     id: "rock_golem",
     name: "바위 골렘",
     maxHp: 50,
+    passives: [
+      { id: "ramp_atk_2", icon: "⛰️", name: "거대화", text: "매 턴 공격력이 +2 증가합니다." },
+    ],
     intents: [
       { label: "바위 던지기: 10 피해", acts: [{ op: "damagePlayer", n: 10 }] },
       { label: "땅 모으기: 자신 HP 8 회복", acts: [{ op: "enemyHealSelf", n: 8 }] },
@@ -190,17 +199,17 @@ export const ENEMIES = [
       {
         id: "shadow_veil",
         icon: "👥",
-        name: "그림자 잠행",
+        name: "그림자 장막",
         text: "왼쪽에 적이 있을 때, 공격(대상 지정)으로 때릴 수 없습니다.",
       },
     ],
     intents: [
       {
-        label: "조준: 다음 암살 +50%",
+        label: "조준: 암살 수치 +1",
         acts: [{ op: "enemySetAssassinAim", n: 1 }],
       },
       {
-        label: "암살: 6 피해",
+        label: "암살: 8 + 암살 수치×2 피해",
         acts: [{ op: "damagePlayerFormula", kind: "goblin_assassin" }],
       },
       {
@@ -213,18 +222,18 @@ export const ENEMIES = [
   {
     id: "old_monster_corpse",
     name: "오래된 괴물 사체",
-    maxHp: 40,
+    maxHp: 30,
     passives: [
       {
         id: "rotten_rage",
         icon: "☠️",
         name: "썩은 분노",
-        text: "다른 적이 죽을 때마다 분노 +1 (분노당 공격 +2).",
+        text: "다른 적이 죽을 때마다 분노 +1 (분노당 공격 +4).",
       },
     ],
     intents: [
       {
-        label: "투척: 9 + 분노×2 피해",
+        label: "투척: 9 + 분노×4 피해",
         acts: [{ op: "damagePlayerFormula", kind: "old_monster_corpse" }],
       },
       {

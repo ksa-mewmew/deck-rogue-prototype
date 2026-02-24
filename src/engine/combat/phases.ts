@@ -49,6 +49,13 @@ export function startCombat(g: GameState) {
   g.pendingTargetQueue = [];
 
   g.usedThisTurn = 0;
+
+  // 패시브(공격력 상승) 초기화
+  for (const en of g.enemies) {
+    if (enemyAtkRampPerTurn(en.id) > 0) (en as any).atkRamp = 0;
+  }
+
+
   g.frontPlacedThisTurn = 0;
 
   // per-turn flags
@@ -428,11 +435,23 @@ function calcDeckSizeDamage(act: { base: number; per: number; div: number; cap?:
   return { dmg, scale };
 }
 
+
+function enemyAtkRampPerTurn(enemyId: string): number {
+  if (enemyId === "watching_statue" || enemyId === "pebble_golem") return 1;
+  if (enemyId === "rock_golem") return 2;
+  return 0;
+}
+
+function getEnemyAtkRamp(enemy: EnemyState): number {
+  const v = Number((enemy as any).atkRamp ?? 0) || 0;
+  return v > 0 ? v : 0;
+}
+
 function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
   switch (act.op) {
     case "damagePlayer": {
       const ew = enemy.status.weak ?? 0;
-      applyDamageToPlayer(g, act.n, "ENEMY_ATTACK", enemy.name, ew);
+      applyDamageToPlayer(g, act.n + getEnemyAtkRamp(enemy), "ENEMY_ATTACK", enemy.name, ew);
       return;
     }
 
@@ -441,39 +460,39 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
 
       if (act.kind === "goblin_raider") {
         const dmg = Math.max(0, 12 - g.usedThisTurn);
-        applyDamageToPlayer(g, dmg, "ENEMY_ATTACK", enemy.name, ew);
+        applyDamageToPlayer(g, dmg + getEnemyAtkRamp(enemy), "ENEMY_ATTACK", enemy.name, ew);
         return;
       }
       if (act.kind === "gloved_hunter") {
         const blk = g.player.block ?? 0;
         const dmg = blk >= 4 ? 12 : 6;
-        applyDamageToPlayer(g, dmg, "ENEMY_ATTACK", enemy.name, ew);
+        applyDamageToPlayer(g, dmg + getEnemyAtkRamp(enemy), "ENEMY_ATTACK", enemy.name, ew);
         return;
       }
       if (act.kind === "goblin_assassin") {
         const aimed = Math.max(0, Number((enemy as any).assassinAim ?? 0) || 0);
-        const dmg = aimed > 0 ? 15 : 10;
-        applyDamageToPlayer(g, dmg, "ENEMY_ATTACK", enemy.name, ew);
+        const dmg = 8 + 4 * aimed;
+        applyDamageToPlayer(g, dmg + getEnemyAtkRamp(enemy), "ENEMY_ATTACK", enemy.name, ew);
         (enemy as any).assassinAim = 0;
         return;
       }
       if (act.kind === "old_monster_corpse") {
         const rage = Math.max(0, Number((enemy as any).corpseRage ?? 0) || 0);
-        const dmg = 9 + 2 * rage;
-        applyDamageToPlayer(g, dmg, "ENEMY_ATTACK", enemy.name, ew);
+        const dmg = 9 + 4 * rage;
+        applyDamageToPlayer(g, dmg + getEnemyAtkRamp(enemy), "ENEMY_ATTACK", enemy.name, ew);
         return;
       }
       if (act.kind === "punishing_one") {
         const hand = Math.max(0, Number(g.hand?.length ?? 0) || 0);
         const dmg = Math.min(30, 6 + 2 * hand);
-        applyDamageToPlayer(g, dmg, "ENEMY_ATTACK", enemy.name, ew);
+        applyDamageToPlayer(g, dmg + getEnemyAtkRamp(enemy), "ENEMY_ATTACK", enemy.name, ew);
         return;
       }
 
       // default: watching_statue
       {
         const dmg = 4 + g.usedThisTurn;
-        applyDamageToPlayer(g, dmg, "ENEMY_ATTACK", enemy.name, ew);
+        applyDamageToPlayer(g, dmg + getEnemyAtkRamp(enemy), "ENEMY_ATTACK", enemy.name, ew);
         return;
       }
     }
@@ -529,7 +548,7 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
       const { dmg: rawDmg, scale } = calcDeckSizeDamage(act, deckSize);
       const ew = enemy.status.weak ?? 0;
 
-      const applied = applyDamageToPlayer(g, rawDmg, "ENEMY_ATTACK", enemy.name, ew);
+      const applied = applyDamageToPlayer(g, rawDmg + getEnemyAtkRamp(enemy), "ENEMY_ATTACK", enemy.name, ew);
       logMsg(
         g,
         `중력 피해(공식): base ${act.base} + per ${act.per} * ceil(${deckSize}/${act.div})=${scale} => raw ${rawDmg}, 적용 ${applied}`
@@ -548,7 +567,7 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
       const reason = `${enemy.name} (${hits}타)`;
 
       for (let i = 0; i < hits; i++) {
-        applyDamageToPlayer(g, act.n, "ENEMY_ATTACK", reason, ew);
+        applyDamageToPlayer(g, act.n + getEnemyAtkRamp(enemy), "ENEMY_ATTACK", reason, ew);
       }
       return;
     }
@@ -557,7 +576,7 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
       const s = g.player.supplies ?? 0;
       if (s > 0) {
         const ew = enemy.status.weak ?? 0;
-        applyDamageToPlayer(g, act.n, "ENEMY_ATTACK", enemy.name, ew);
+        applyDamageToPlayer(g, act.n + getEnemyAtkRamp(enemy), "ENEMY_ATTACK", enemy.name, ew);
       } else {
         logMsg(g, `덮치기: S = 0 → 피해 없음`);
       }
@@ -568,7 +587,7 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
       const s = g.player.supplies ?? 0;
       if (s === 0) {
         const ew = enemy.status.weak ?? 0;
-        applyDamageToPlayer(g, act.n, "ENEMY_ATTACK", enemy.name, ew); // 프로젝트에서 쓰는 실제 함수명으로
+        applyDamageToPlayer(g, act.n + getEnemyAtkRamp(enemy), "ENEMY_ATTACK", enemy.name, ew); // 프로젝트에서 쓰는 실제 함수명으로
       } else {
         logMsg(g, `압류: S = ${s} → 피해 없음`);
       }
@@ -654,6 +673,15 @@ export function upkeepEndTurn(g: GameState) {
       }
     }
   }
+
+  // 패시브: 매 턴 공격력 증가(감시하는 석상/조약돌 골렘 +1, 바위 골렘 +2)
+  for (const en of aliveEnemies(g)) {
+    const d = enemyAtkRampPerTurn(en.id);
+    if (d <= 0) continue;
+    (en as any).atkRamp = getEnemyAtkRamp(en) + d;
+    logMsg(g, `적 패시브: ${en.name} 공격력 +${d} (누적 +${(en as any).atkRamp})`);
+  }
+
 
   g.frontPlacedThisTurn = 0;
 

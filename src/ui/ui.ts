@@ -185,13 +185,17 @@ function moveItemTip(clientX: number, clientY: number) {
   tip.style.top = lenFromDev(Math.round(y));
 }
 
-function showItemTip(itemId: string, e: MouseEvent) {
+function showItemTipAt(itemId: string, clientX: number, clientY: number) {
   setItemTipContent(itemId);
   const tip = ensureItemTip();
   tip.classList.add("show");
-  moveItemTip(e.clientX, e.clientY);
+  moveItemTip(clientX, clientY);
   // 한 번 더(레이아웃 계산 후) 클램프
-  requestAnimationFrame(() => moveItemTip(e.clientX, e.clientY));
+  requestAnimationFrame(() => moveItemTip(clientX, clientY));
+}
+
+function showItemTip(itemId: string, e: MouseEvent) {
+  showItemTipAt(itemId, e.clientX, e.clientY);
 }
 
 function hideItemTip() {
@@ -200,9 +204,93 @@ function hideItemTip() {
 }
 
 function wireItemHover(el: HTMLElement, itemId: string) {
-  el.addEventListener("mouseenter", (ev) => showItemTip(itemId, ev as MouseEvent));
-  el.addEventListener("mousemove", (ev) => moveItemTip((ev as MouseEvent).clientX, (ev as MouseEvent).clientY));
-  el.addEventListener("mouseleave", () => hideItemTip());
+  // Desktop hover
+  el.addEventListener("pointerenter", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType === "touch") return;
+    showItemTipAt(itemId, pe.clientX ?? 0, pe.clientY ?? 0);
+  });
+  el.addEventListener("pointermove", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType === "touch") return;
+    moveItemTip(pe.clientX ?? 0, pe.clientY ?? 0);
+  }, { passive: true });
+  el.addEventListener("pointerleave", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType === "touch") return;
+    hideItemTip();
+  });
+
+  // Mobile: press-and-hold to "hover"
+  let holdTimer: number | null = null;
+  let holdStartX = 0;
+  let holdStartY = 0;
+  let consumeClick = false;
+
+  const clearHold = () => {
+    if (holdTimer != null) {
+      window.clearTimeout(holdTimer);
+      holdTimer = null;
+    }
+  };
+
+  el.addEventListener("pointerdown", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType !== "touch") return;
+
+    consumeClick = false;
+    holdStartX = pe.clientX;
+    holdStartY = pe.clientY;
+
+    clearHold();
+    holdTimer = window.setTimeout(() => {
+      consumeClick = true;
+      showItemTipAt(itemId, holdStartX, holdStartY);
+    }, 320);
+  }, { passive: true });
+
+  el.addEventListener("pointermove", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType !== "touch") return;
+
+    // If tooltip is already open, follow finger a bit
+    const tipOpen = (ensureItemTip().classList.contains("show"));
+    if (tipOpen) {
+      moveItemTip(pe.clientX, pe.clientY);
+      return;
+    }
+
+    // Cancel long-press if the user is scrolling/moving
+    if (holdTimer == null) return;
+    const dx = pe.clientX - holdStartX;
+    const dy = pe.clientY - holdStartY;
+    if (dx * dx + dy * dy > 12 * 12) clearHold();
+  }, { passive: true });
+
+  const endTouchHover = () => {
+    clearHold();
+    if (ensureItemTip().classList.contains("show")) hideItemTip();
+  };
+
+  el.addEventListener("pointerup", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType !== "touch") return;
+    endTouchHover();
+  }, { passive: true });
+
+  el.addEventListener("pointercancel", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType !== "touch") return;
+    endTouchHover();
+  }, { passive: true });
+
+  // If long-press opened the tip, consume the click so it doesn't activate the item.
+  el.addEventListener("click", (ev) => {
+    if (!consumeClick) return;
+    consumeClick = false;
+    ev.preventDefault();
+    ev.stopPropagation();
+  }, true);
 }
 
 // =========================
@@ -440,7 +528,6 @@ function pullUiToastsFromState(g: GameState) {
     uiToastsRt.push({ id: toastSeq++, kind, text, born: now, ms });
   }
 
-  // ✅ 저장에 섞이지 않도록 즉시 비움
   anyG.uiToasts = [];
 }
 
@@ -523,12 +610,14 @@ function detectAndEmitDeltas(g: GameState) {
 }
 
 function emitPlayerDelta(dhp: number) {
+  const u = unitLenDev();
+
   const box = document.querySelector<HTMLElement>(".playerHudBox")
     ?? document.querySelector<HTMLElement>(".playerHudLeft");
   if (!box) return;
   const r = box.getBoundingClientRect();
   const x = (r.left + r.right) / 2;
-  const y = r.top + 14;
+  const y = r.top + 14 * u;
 
   if (dhp < 0) pushFloatFx("dmg", `${dhp}`, x, y);
   else pushFloatFx("heal", `+${dhp}`, x, y);
@@ -538,12 +627,15 @@ function emitPlayerDelta(dhp: number) {
 }
 
 function emitPlayerBlockDelta(d: number) {
+
+  const u = unitLenDev();
+
   const box = document.querySelector<HTMLElement>(".playerHudBox")
     ?? document.querySelector<HTMLElement>(".playerHudLeft");
   if (!box) return;
   const r = box.getBoundingClientRect();
   const x = (r.left + r.right) / 2;
-  const y = r.top + 34;
+  const y = r.top + 34 * u;
 
   pushFloatFx("block", (d > 0 ? `+${d}` : `${d}`), x, y);
 }
@@ -1049,6 +1141,10 @@ type RenderCardOpt = {
   };
 };
 
+export function isDraggingNow(): boolean {
+  return !!(drag && drag.dragging);
+}
+
 function renderCard(
   g: GameState,
   cardUid: string,
@@ -1173,6 +1269,141 @@ function plainTextFromRich(node: any): string {
     if (node.children) return plainTextFromRich(node.children);
   }
   return "";
+}
+
+
+// =========================
+// Choice: hover/long-press to preview the upgraded version (+1)
+// =========================
+
+function hasNextUpgradeForDef(g: GameState, defId: string, upgrade: number) {
+  const base: any = (g.content as any)?.cardsById?.[defId];
+  const ups: any[] | undefined = base?.upgrades;
+  const u = Number(upgrade ?? 0) || 0;
+  return !!ups && ups.length > u;
+}
+
+function buildUpgradePreviewDetailByDef(g: GameState, defId: string, upgrade: number) {
+  const u = Number(upgrade ?? 0) || 0;
+  const cur: any = getCardDefByIdWithUpgrade(g.content, defId, u);
+  const nxt: any = getCardDefByIdWithUpgrade(g.content, defId, u + 1);
+
+  const cf = plainTextFromRich(cur?.frontText);
+  const cb = plainTextFromRich(cur?.backText);
+  const nf = plainTextFromRich(nxt?.frontText);
+  const nb = plainTextFromRich(nxt?.backText);
+
+  return (
+    `현재: 전열 ${cf || "없음"} / 후열 ${cb || "없음"}
+` +
+    `강화: 전열 ${nf || "없음"} / 후열 ${nb || "없음"}`
+  );
+}
+
+function showUpgradeHoverPreviewByDef(g: GameState, defId: string, upgrade: number) {
+  if (!hasNextUpgradeForDef(g, defId, upgrade)) return;
+
+  cardHoverApi.ensure(document.body);
+
+  const baseName = (g.content as any)?.cardsById?.[defId]?.name ?? defId;
+  const u = Number(upgrade ?? 0) || 0;
+  const nextUp = u + 1;
+
+  const title = `${formatName(baseName, nextUp)} (강화 미리보기)`;
+  const detail = buildUpgradePreviewDetailByDef(g, defId, u);
+
+  const big = renderCardPreviewByDef(g, defId, nextUp);
+  big.classList.add("isPreviewCard");
+
+  cardHoverApi.show({ title, detail, cardEl: big });
+}
+
+function wireUpgradeHoverPreviewForChoice(el: HTMLElement, g: GameState, defId: string, upgrade: number) {
+  // Only for non-upgraded cards
+  const u = Number(upgrade ?? 0) || 0;
+  if (u !== 0) return;
+  if (!hasNextUpgradeForDef(g, defId, 0)) return;
+
+  // Mouse hover
+  el.addEventListener("pointerenter", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType !== "mouse") return;
+    if (performance.now() < suppressHoverUntil) return;
+    if (drag?.dragging) return;
+    showUpgradeHoverPreviewByDef(g, defId, 0);
+  });
+  el.addEventListener("pointerleave", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType !== "mouse") return;
+    cardHoverApi.hide();
+  });
+
+  // Touch: long press
+  let holdTimer: number | null = null;
+  let holdStartX = 0;
+  let holdStartY = 0;
+  let consumeClick = false;
+
+  const clearHold = () => {
+    if (holdTimer != null) {
+      window.clearTimeout(holdTimer);
+      holdTimer = null;
+    }
+  };
+
+  el.addEventListener("pointerdown", (ev) => {
+    const pe = ev as PointerEvent;
+    // always close any open preview (prevents sticky state)
+    suppressHover(250);
+    clearCardHoverPreview();
+    cardHoverApi.hide();
+
+    if (pe.pointerType !== "touch") return;
+
+    consumeClick = false;
+    holdStartX = pe.clientX;
+    holdStartY = pe.clientY;
+
+    clearHold();
+    holdTimer = window.setTimeout(() => {
+      consumeClick = true;
+      showUpgradeHoverPreviewByDef(g, defId, 0);
+    }, 320);
+  }, { capture: true, passive: true });
+
+  el.addEventListener("pointermove", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType !== "touch") return;
+    if (holdTimer == null) return;
+    const dx = pe.clientX - holdStartX;
+    const dy = pe.clientY - holdStartY;
+    if (dx * dx + dy * dy > 12 * 12) clearHold();
+  }, { passive: true });
+
+  const endTouch = () => {
+    clearHold();
+    cardHoverApi.hide();
+  };
+
+  el.addEventListener("pointerup", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType !== "touch") return;
+    endTouch();
+  }, { passive: true });
+
+  el.addEventListener("pointercancel", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType !== "touch") return;
+    endTouch();
+  }, { passive: true });
+
+  // Avoid picking the card when the user long-pressed for the preview
+  el.addEventListener("click", (ev) => {
+    if (!consumeClick) return;
+    consumeClick = false;
+    ev.preventDefault();
+    ev.stopPropagation();
+  }, true);
 }
 
 
@@ -2888,7 +3119,7 @@ function renderMapNodeSelect(root: HTMLElement, g: GameState, actions: UIActions
       `overflow-y:auto; overflow-x:hidden; ` +
       `z-index:70001; ` +
       `border:calc(1 * var(--u)) solid rgba(255,255,255,.14); border-radius:calc(${14} * var(--u)); ` +
-      `background:rgba(0,0,0,1); ` +                 // ✅ 완전 불투명
+      `background:rgba(0,0,0,1); ` +
       `backdrop-filter:none; ` +
       `padding:calc(${12} * var(--u));`;
 
@@ -2899,12 +3130,9 @@ function renderMapNodeSelect(root: HTMLElement, g: GameState, actions: UIActions
       const el = ev.target as HTMLElement | null;
       if (el && panel.contains(el)) return; // 패널 내부 클릭은 무시
 
-      // 상단 크롬(새 런/룰북/로그/설정) 포함: 패널은 닫되, click 이벤트는 먹지 않게(렌더 호출 없음) 처리
       mapDetailOverlayOpen = false;
       detachMapDetailOutsideDown();
 
-      // ✅ 즉시 DOM만 닫고(렌더는 나중에 다른 액션이 알아서 하게)
-      // 클릭 타겟을 DOM에서 뽑아버려서 click 이벤트가 사라지는 현상을 막는다.
       try { panel.remove(); } catch {}
       const tb = document.querySelector<HTMLButtonElement>(".mapDetailToggleBtn");
       if (tb) tb.textContent = "상세";
@@ -3531,7 +3759,6 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
           }
         }
 
-        // ✅ 같은 이벤트가 2연속으로 나오지 않게(가능한 경우)
         {
           const lastEventId: string | null | undefined = (runAny2.lastEventId as any) ?? null;
           if (lastEventId && (ev as any)?.id === lastEventId) {
@@ -3557,7 +3784,6 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
           return;
         }
 
-        // ✅ 런 1회 이벤트 처리를 위해, 이벤트 선택 시점에 기록
         {
           const runAnyEv = g.run as any;
           runAnyEv.eventsSeen ??= {};
@@ -4229,8 +4455,10 @@ function updateFloatingFaithScore(g: GameState) {
   const b = f.points[f.offered[1]] ?? 0;
   const c = f.points[f.offered[2]] ?? 0;
 
+  const u = unitLenDev()
+
   const r = btn.getBoundingClientRect();
-  badge.style.left = `${Math.round(r.right + 8)}px`;
+  badge.style.left = `${Math.round(r.right + 8 * u)}px`;
   badge.style.top = `${Math.round(r.top)}px`;
   badge.style.right = "auto";
   badge.textContent = `신앙 ${a}·${b}·${c}`;
@@ -4246,6 +4474,7 @@ export function render(g: GameState, actions: UIActions) {
     (render as any)._uiScaleInitDone = true;
     uiSettings = loadUiSettings();
     applyUiScaleVars();
+    window.dispatchEvent(new CustomEvent("deckrogue:uiFit"));
   }
   currentG = g;
   clearAllHover();
@@ -4657,6 +4886,7 @@ function setUiScaleNow(v: number) {
 
   saveUiSettings();
   applyUiScaleVars();
+  window.dispatchEvent(new CustomEvent("deckrogue:uiFit"));
 }
 
 function renderLogOverlay(g: GameState, actions: UIActions) {
@@ -4788,7 +5018,7 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
   // =========================
   // 애니메이션 속도
   // =========================
-  const animRow = div("settingsRow");
+  /*const animRow = div("settingsRow");
   animRow.style.cssText = "display:flex; align-items:center; gap:calc(12 * var(--u)); flex-wrap:wrap;";
 
   const animLabel = divText("", "애니메이션 속도");
@@ -4858,7 +5088,7 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
     "padding:calc(8 * var(--u)) calc(12 * var(--u)); border-radius:calc(12 * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.16);" +
     "background:rgba(255,255,255,.06); color:#fff; cursor:pointer;";
   animResetRow.appendChild(animReset);
-  wrap.appendChild(animResetRow);
+  wrap.appendChild(animResetRow);*/
 
   // =========================
   // 슬롯 카드 표시
@@ -4899,12 +5129,9 @@ function renderSettingsPanel(onChange: () => void, actions: UIActions) {
 function applyUiScaleVars() {
   const root = document.documentElement;
 
-  // ✅ Final scale = (user multiplier) x (screen-fit ratio)
-  const scale = getUiScaleNow();
-
-  root.style.setProperty("--uiScale", String(scale));
   root.style.setProperty("--uiScaleDesktop", String(uiSettings.uiScaleDesktop));
   root.style.setProperty("--uiScaleMobile", String(uiSettings.uiScaleMobile));
+
   root.style.setProperty("--animMul", String(animMulNow()));
 }
 
@@ -5710,6 +5937,14 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
         fixPreviewSize(cardEl, 1);
         tile.appendChild(cardEl);
 
+        // 카드가 강화(업그레이드) 0일 때, +1 강화 버전 프리뷰를 호버/롱프레스에서 보여줌
+        wireUpgradeHoverPreviewForChoice(
+          tile,
+          g,
+          String(offer.defId),
+          Number(offer.upgrade ?? 0) || 0
+        );
+
         const price = divText(
           "shopTilePrice",
           offer.sold ? "품절" : `🪙${Number(offer.priceGold ?? 0) || 0}`
@@ -5853,7 +6088,6 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
       contentRow.appendChild(illuCol);
       panel.appendChild(contentRow);
 
-      // ✅ 여기서 끝 (아래 기존 리스트 렌더는 타지 않게)
       padWrap.appendChild(panel);
       overlayEl.appendChild(backdrop);
       overlayEl.appendChild(padWrap);
@@ -5991,6 +6225,7 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
           if (!canPick) return;
           actions.onChooseChoice(opt.key);
         });
+        wireUpgradeHoverPreviewForChoice(el, g, defId, upgrade);
         if (!canPick) {
           el.style.opacity = ".55";
           el.style.cursor = "default";
@@ -6084,6 +6319,7 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
         const el = renderCardPreviewByDef(g, defId, upgrade) as HTMLElement;
         fixPreviewSize(el);
         left.appendChild(el);
+        wireUpgradeHoverPreviewForChoice(left, g, defId, upgrade);
       } else if (isShopChoice && typeof opt.key === "string" && opt.key.startsWith("shop:card:")) {
         const nodeId = String((g.choiceCtx as any)?.nodeId ?? "");
         const shop = (g.run as any)?.shops?.[nodeId];
@@ -6424,13 +6660,15 @@ function renderTopHud(g: GameState, actions: UIActions) {
   return top;
 }
 
-// ✅ Portal: keep 룰북/로그/설정 buttons above choice overlays (same layer as '새로운 런')
 function renderTopRightChrome(g: GameState, actions: UIActions) {
   // Remove old (in case of hot reload / re-render)
   document.querySelector('.topHudRightChrome')?.remove();
 
   const right = div('topHudRight');
   right.classList.add('topHudRightChrome');
+  // Ensure these chrome buttons sit above choice overlays (faith/god selection etc.)
+  // Use --zDevConsole which is above most overlays as a safe high layer
+  (right.style as any).zIndex = 'var(--zDevConsole)';
 
   right.appendChild(mkButton('룰북', () => actions.onViewRulebook()));
   right.appendChild(mkButton('로그', () => actions.onToggleLogOverlay()));
@@ -6441,7 +6679,7 @@ function renderTopRightChrome(g: GameState, actions: UIActions) {
 
 function buildResourceTopText(g: GameState): string {
   const bonusS = Number((g.run as any).nextBattleSuppliesBonus ?? 0) || 0;
-  const gold = Number((g.run as any).gold ?? 0) || 0; // ✅ g.run.gold 제거
+  const gold = Number((g.run as any).gold ?? 0) || 0;
 
   const parts: string[] = [];
   parts.push(`🪙 G ${gold}`);

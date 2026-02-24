@@ -174,11 +174,11 @@
 
   /* ---------- PLAYER HUD POSITION ---------- */
   --playerHudLeftX: calc(var(--safeL) + var(--edgePad));
-  --playerHudTop:   calc(var(--safeT) + calc(480 * var(--u)));
 
   /* 트레이 이동량과 연동되는 드롭(최종 규칙: trayRaise의 역값) */
   --trayRaise: calc(-1 * var(--u));
-  --playerHudDropY: calc(9rem);
+  --playerHudTop:   calc(var(--safeT) + calc(620 * var(--u)));
+  --playerHudDropY: 0px;
   --stageCornerLiftY: calc(-1 * var(--trayRaise));
 
   --statusBarGap: calc(30 * var(--u));
@@ -281,7 +281,7 @@
   --iconGlow:   rgba(210,240,255,.18);
 
   /* ---------- S만 보이는 HUD ---------- */
-  --sHudLeft: 21rem;
+  --sHudLeft: calc(300 * var(--u));
   --sHudTop:  calc(var(--safeT) + var(--hudH) + calc(330 * var(--u)));
   --sHudOffX: calc(0 * var(--u));
   --sHudOffY: calc(140 * var(--u));
@@ -1368,11 +1368,11 @@ html, body, #app,
 
 /* 전투 컨트롤(다음 턴 버튼) */
 .combatControls{
-  position: absolute;
+  position: fixed;
   justify-content: center;
-  left: 100rem;
-  top: 40rem;
-  transform: translate(450%, calc(90% - var(--combatCtrlLift)));
+  left: 50%;
+  bottom: calc(var(--safeB) + calc(22 * var(--u)));
+  transform: translateX(-50%);
   z-index: 1000;
   pointer-events: auto;
 
@@ -1461,13 +1461,13 @@ html, body, #app,
   z-index: var(--zChrome);
 
   padding: var(--sHudPadY) var(--sHudPadX);
-  background: rgb(255, 255, 255);
+  background: rgb(0, 0, 0);
   border: calc(1 * var(--u)) solid rgba(255,255,255,0);
   border-radius: var(--sHudR);
 
   font-weight: 900;
   font-size: var(--sHudFont);
-  color: rgb(0, 0, 0);
+  color: rgb(254, 254, 254);
   line-height: 1;
   white-space: nowrap;
 

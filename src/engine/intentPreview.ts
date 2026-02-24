@@ -63,12 +63,12 @@ function previewFormula(kind: FormulaKind, g: GameState, e: any): { raw: number;
   }
   if (kind === "goblin_assassin") {
     const aimed = Math.max(0, Number((e as any).assassinAim ?? 0) || 0);
-    const raw = aimed > 0 ? 15 : 10;
+    const raw = 8 + 4 * aimed;
     return { raw, hits: 1 };
   }
   if (kind === "old_monster_corpse") {
     const rage = Math.max(0, Number((e as any).corpseRage ?? 0) || 0);
-    const raw = 7 + 2 * rage;
+    const raw = 9 + 4 * rage;
     return { raw, hits: 1 };
   }
   if (kind === "punishing_one") {
@@ -115,6 +115,7 @@ export function buildIntentPreview(
   const applies: IntentApply[] = [];
   const notes: string[] = [];
   const hitRaws: number[] = [];
+  const atkRamp = Math.max(0, Number((e as any).atkRamp ?? 0) || 0);
 
   if (intent.meta?.applies) {
     for (const a of intent.meta.applies) pushApply(applies, a);
@@ -123,14 +124,14 @@ export function buildIntentPreview(
   for (const act of intent.acts) {
     switch (act.op) {
       case "damagePlayer": {
-        hitRaws.push(Math.max(0, Number(act.n) || 0));
+        hitRaws.push(Math.max(0, (Number(act.n) || 0) + atkRamp));
         break;
       }
 
       case "damagePlayerFormula": {
         const { raw, hits } = previewFormula(act.kind as any, g, e);
         const hh = Math.max(1, Number(hits ?? 1) || 1);
-        const r = Math.max(0, Number(raw) || 0);
+        const r = Math.max(0, (Number(raw) || 0) + atkRamp);
         for (let i = 0; i < hh; i++) hitRaws.push(r);
         break;
       }
@@ -168,14 +169,14 @@ export function buildIntentPreview(
         let hits = baseHits + Math.floor((turn - 1) / every);
         if (act.capHits != null) hits = Math.min(hits, Math.max(1, Number(act.capHits)));
 
-        const per = Math.max(0, Number(act.n) || 0);
+        const per = Math.max(0, (Number(act.n) || 0) + atkRamp);
         for (let i = 0; i < hits; i++) hitRaws.push(per);
         break;
       }
 
       case "damagePlayerIfSuppliesPositive": {
         if (g.player.supplies > 0) {
-          hitRaws.push(Math.max(0, Number(act.n) || 0));
+          hitRaws.push(Math.max(0, (Number(act.n) || 0) + atkRamp));
         } else {
         }
         break;
@@ -183,14 +184,14 @@ export function buildIntentPreview(
 
       case "damagePlayerIfSuppliesZero": {
         if (g.player.supplies == 0) {
-          hitRaws.push(Math.max(0, Number(act.n) || 0));
+          hitRaws.push(Math.max(0, (Number(act.n) || 0) + atkRamp));
         } else {
         }
         break;
       }
 
       case "damagePlayerByDeckSize": {
-        hitRaws.push(previewDeckSizeDamage(g, act));
+        hitRaws.push(Math.max(0, previewDeckSizeDamage(g, act) + atkRamp));
         break;
       }
 

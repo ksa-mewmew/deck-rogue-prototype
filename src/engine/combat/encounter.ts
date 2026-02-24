@@ -109,59 +109,73 @@ export function spawnEncounter(
 
   const patternsByTier: string[][][] = [
     [
-      ["goblin_raider"],
-      ["watching_statue"],
-      ["pebble_golem"],
-      ["slime"],
-      ["rat_swarm"],
-      ["supply_hound"],
-      ["goblin_assassin"],
+      ["goblin_raider"],       // 카드 사용 유도(많이 쓰면 덜 맞음)
+      ["watching_statue"],     // 카드 사용 억제 + 램프(시간 제한)
+      ["pebble_golem"],        // 단순 공격 + 회복 + 램프(빨리 잡아라)
+      ["slime"],               // bleed/weak 입문
+      ["rat_swarm"],           // 다타/램프히트 입문
+      ["supply_hound"],        // 보급 축 입문
+      ["goblin_assassin"],     // 조준→암살 입문(단독이라 장막이 없음)
+
     ],
     [
-      ["goblin_raider", "slime"],
-      ["pebble_golem", "pebble_golem"],
-      ["rock_golem"],
-      ["poison_spider"],
-      ["rat_swarm", "rat_swarm"],
-      ["goblin_archer", "goblin_raider"],
-      ["supply_hound", "goblin_raider"],
-      ["archive_censor"],
-      ["old_monster_corpse", "punishing_one"],
+      ["goblin_commander", "goblin_archer"], // 취약+연타(턴1 확정)  ← 대표 시너지
+      ["supply_hound", "rat_swarm"],         // 취약(턴1) → 쥐떼 연타(턴1)
+      ["goblin_commander", "goblin_assassin"], // 지휘관이 왼쪽이면 암살자 장막이 켜져 “바디가드 전투”
+      ["goblin_raider", "watching_statue"],  // 많이 써도/적게 써도 한쪽이 아픈 딜레마 + 램프
+      ["archive_censor"],                   // 교란/보급/약화로 행동 방해 단독
+      ["poison_spider"],                    // 출혈 압박 단독
+      ["goblin_archer", "goblin_raider"],   // 연타 + 보급/출혈로 잔딜 누적
+      ["pebble_golem", "slime"],            // 회복+램프 + 디버프(길어지면 위험)
+      
     ],
     [
-      ["goblin_raider", "goblin_raider", "goblin_raider"],
-      ["rock_golem", "pebble_golem"],
-      ["slime", "slime"],
-      ["poison_spider", "slime"],
-      ["gravity_echo"],
-      ["gloved_hunter"],
-      ["debt_collector"],
-      ["archive_censor", "slime"],
+      ["rock_golem"],                        // 램프+2 + 회복8 = 순수 DPS 체크(솔로가 깔끔)
+      ["gravity_echo"],                      // 덱사이즈 압박(정리/경량화 유도)
+      ["gloved_hunter"],                     // 취약+조건부 고딜(방어 계산 퍼즐)
+      ["debt_collector"],                    // 보급락 퍼즐(전열 유지비와 직접 충돌)
+
+      ["archive_censor", "debt_collector"],  // (핵심) 교란/보급-2 + 보급락 조건딜 → 전열 많이 깔면 터짐
+      ["archive_censor", "slime"],           // 교란+약화 + 출혈/약화 = 운영 붕괴형
+      ["poison_spider", "slime"],            // 출혈+약화 누적
+      ["old_monster_corpse", "rat_swarm"],   // 킬 순서 퍼즐: 쥐부터 죽이면 사체 분노↑
+      ["punishing_one"],                     // 손패 크기 자체가 위험(드로우/토큰 덱 견제)
     ],
   ];
 
   const postTreasurePatterns: string[][] = [
     ["gravity_echo", "poison_spider"],
-    ["poison_spider", "slime"],
-    ["watching_statue", "slime"],
+    ["poison_spider", "poison_spider", "slime"],      // (교체) 디버프 폭주
+    ["goblin_raider", "watching_statue"],             // (교체) 딜레마+램프
     ["watching_statue", "watching_statue"],
     ["poison_spider", "poison_spider"],
     ["rock_golem", "gravity_echo"],
     ["goblin_raider", "goblin_raider", "watching_statue"],
     ["rat_swarm", "rat_swarm", "rat_swarm"],
-    ["archive_censor", "slime"],
+    ["archive_censor", "debt_collector"],             // (교체) 보급락 퍼즐
   ];
 
   const elitePatternsByTier: string[][][] = [
-    [["goblin_raider", "watching_statue"], ["rat_swarm", "goblin_archer"]],
-    [["goblin_commander", "goblin_archer", "goblin_archer"], ["watching_statue", "watching_statue"], ["gloved_hunter", "rat_swarm"]],
-    [["rock_golem", "gravity_echo"], ["poison_spider", "poison_spider", "poison_spider"],["old_monster_corpse", "old_monster_corpse", "old_monster_corpse"]], 
-  ];
+    [
+      ["goblin_raider", "watching_statue"],   // 카드 사용 딜레마 + 램프(초반 정예답게)
+      ["supply_hound", "rat_swarm"],          // 취약 → 연타 (턴1부터 체감)
+      ["pebble_golem", "goblin_archer"],      // 램프(+1) + 연타 = ‘빨리 죽이기’ 강제
+    ],
+    [
+        ["goblin_commander", "goblin_archer", "goblin_archer"], // 취약 + 6연타(턴1부터)
+        ["archive_censor", "goblin_archer", "goblin_raider"],   // 교란/보급 + 연타 + 카드사용딜레마
+        ["poison_spider", "poison_spider", "slime"],            // 출혈 스택 + 약화 = 회복/방어 시험
+    ],
+    [
+      ["rock_golem", "gravity_echo"],                          // 램프+2 + 덱사이즈 고딜
+      ["archive_censor", "debt_collector", "supply_hound"],    // 교란 + 보급락 + 취약 (3축)
+      ["punishing_one", "gloved_hunter"],                      // 손패 벌점 + 취약+조건부 고딜
+    ]
+ ];
 
   const elitePostTreasurePatterns: string[][] = [
     ["gravity_echo", "gravity_echo"],
-    ["rock_golem", "poison_spider"],
-    ["watching_statue", "gravity_echo"],
+    ["watching_statue", "gravity_echo", "rock_golem"],
     ["debt_collector", "supply_hound", "supply_hound"],
   ];
 

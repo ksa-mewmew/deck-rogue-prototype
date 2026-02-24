@@ -279,6 +279,7 @@ export type EnemyState = {
   // custom enemy vars
   assassinAim?: number;
   corpseRage?: number;
+  atkRamp?: number;
 };
 
 export type PlayerEffect =

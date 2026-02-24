@@ -86,11 +86,11 @@ const MAD_REWARD_POOL: RewardEntry[] = [
 ];
 
 export const REWARD_POOL: RewardEntry[] = [
-  { id: "berserk", weight: 20 },
+  { id: "berserk", weight: 0 },
   { id: "bandage", weight: 12 },
-  { id: "arrow_rain", weight: 20 },
+  { id: "arrow_rain", weight: 0 },
   { id: "smoke", weight: 0 },
-  { id: "redeploy", weight: 12 },
+  { id: "redeploy", weight: 20 },
  
   { id: "secret_strike", weight: 3 },
   { id: "fire_scroll", weight: 3 },
