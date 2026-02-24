@@ -56,6 +56,36 @@ function injectFontFaces() {
   style.textContent = css;
 }
 
+function installHandDockVarSync() {
+  let raf = 0;
+
+  const sync = () => {
+    raf = 0;
+    const dock = document.querySelector(".handDock") as HTMLElement | null;
+    if (!dock) return;
+
+    const r = document.documentElement;
+    const rect = dock.getBoundingClientRect();
+
+    r.style.setProperty("--handDockTopPx", `${rect.top}px`);
+    r.style.setProperty("--handDockRightPx", `${rect.right}px`);
+    r.style.setProperty("--handDockBottomPx", `${rect.bottom}px`);
+    r.style.setProperty("--handDockLeftPx", `${rect.left}px`);
+  };
+
+  const request = () => {
+    if (raf) return;
+    raf = requestAnimationFrame(sync);
+  };
+
+  window.addEventListener("deckrogue:layout", request as any, { passive: true } as any);
+  window.addEventListener("resize", request, { passive: true });
+  window.visualViewport?.addEventListener("resize", request as any, { passive: true } as any);
+  window.visualViewport?.addEventListener("scroll", request as any, { passive: true } as any);
+
+  request();
+}
+
 function installRerenderOnLayoutChange() {
   let raf = 0;
   let pending = false;
@@ -80,35 +110,42 @@ function installRerenderOnLayoutChange() {
     raf = requestAnimationFrame(() => requestAnimationFrame(doRender));
   };
 
+  const requestFit = () => {
+    window.dispatchEvent(new CustomEvent("deckrogue:uiFit"));
+  };
+
   window.addEventListener("deckrogue:layout", request as any, { passive: true } as any);
   window.addEventListener("resize", request, { passive: true });
+  window.visualViewport?.addEventListener("resize", request as any, { passive: true } as any);
+  window.visualViewport?.addEventListener("scroll", request as any, { passive: true } as any);
+
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) request();
   });
 
-  window.addEventListener("focus", () => {
-    window.dispatchEvent(new CustomEvent("deckrogue:uiFit"));
-    request();
-  }, { passive: true } as any);
+  window.addEventListener(
+    "focus",
+    () => {
+      requestFit();
+      request();
+    },
+    { passive: true } as any
+  );
 
-  window.visualViewport?.addEventListener("resize", request as any, { passive: true } as any);
-  window.visualViewport?.addEventListener("scroll", request as any, { passive: true } as any);
-
-  // 진짜 최후의 보루: 레이아웃 박스 크기 변하면 리렌더
-  const ro = new ResizeObserver(() => request()); 
+  const ro = new ResizeObserver(() => request());
   ro.observe(document.documentElement);
 
-  // 옵션: 초기 1회도 “안전빵”으로 맞춰주고 싶으면
-  // request();
+  requestFit();
+  request();
 }
 
-// ---- 실행 순서(이제부터는 전부 import 아래) ----
 setAssetCssVars();
 injectFontFaces();
 
 installUiFit();
 installLayoutMode();
 
+installHandDockVarSync();
 installRerenderOnLayoutChange();
 
 render(g, actions);

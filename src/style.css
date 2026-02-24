@@ -1369,16 +1369,18 @@ html, body, #app,
 /* 전투 컨트롤(다음 턴 버튼) */
 .combatControls{
   position: fixed;
+  display: flex;
   justify-content: center;
-  left: 50%;
-  bottom: calc(var(--safeB) + calc(22 * var(--u)));
-  transform: translateX(-50%);
-  z-index: 1000;
-  pointer-events: auto;
 
-  /* 기존 위치 강제 무효화 */
-  bottom: auto !important;
-  right: auto !important;
+
+  bottom: calc(100vh - var(--handDockTopPx) + calc(10 * var(--u)) + var(--safeB));
+
+  right: calc(var(--edgePad) + var(--safeR));
+  left: auto;
+  transform: none;
+
+  z-index: var(--zHandDock, 2000); /* handDock보다 위 */
+  pointer-events: auto;
 }
 .combatControls *{ pointer-events: auto !important; }
 
