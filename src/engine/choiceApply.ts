@@ -1,4 +1,4 @@
-import type { ChoiceOption, ChoiceState, GameState } from "./types";
+import type { ChoiceOption, ChoiceState, GameState, GodId, TemptGodId } from "./types";
 import { applyRewardChoiceKey, openShopChoice } from "./engineRewards";
 import { clearAllChoices, setChoice } from "./choice";
 import { logMsg, pushUiToast } from "./rules";
@@ -529,7 +529,8 @@ export function applyChoiceKey(g: GameState, key: string): boolean {
     }
 
     if (key === "tempt:accept") {
-      // 첫 번째 인간: 카드 '선택' 복제 (후속 PICK_CARD)
+      const tempter = (ctx as any).tempter as TemptGodId;
+      acceptTemptation(g, tempter);
       if (tempter === ("first_human" as any)) {
         // 비용/신앙 이동은 수락 시점에 확정
         g.player.fatigue = (g.player.fatigue ?? 0) + 3;

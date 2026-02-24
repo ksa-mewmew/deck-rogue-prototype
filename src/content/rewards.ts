@@ -107,12 +107,21 @@ export const REWARD_POOL: RewardEntry[] = [
   { id: "cloth_scrap_armor", weight: 12 },
   { id: "prey_mark", weight: 12 },
   { id: "brawl_cleaver", weight: 20 },
+  { id: "hand_blade", weight: 12 },
+  { id: "gambler_glove", weight: 20 },
+  { id: "lone_blow", weight: 12 },
+  { id: "install_makeshift_wall", weight: 3 },
 
   { id: "install_ballista", weight: 20 },
   { id: "install_iron_bulwark", weight: 20 },
   { id: "install_cursed_banner", weight: 12 },
+  { id: "install_lead_observation", weight: 12 },
+  { id: "install_castle_ballista", weight: 20 },
   { id: "scribe_hand", weight: 12 },
   { id: "install_scriptorium", weight: 3 },
+
+  { id: "innate_march_shield", weight: 12 },
+  { id: "rare_cut_second", weight: 3 },
 
 ];
 

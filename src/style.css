@@ -254,7 +254,7 @@
   --traySlot: calc(72 * var(--u));
   --trayGap:  calc(10 * var(--u));
   --trayPad:  calc(10 * var(--u));
-  
+
   /* 화면 가장자리 기본 여백 + 추가 안쪽 이동(양쪽 대칭) */
   --traySidePad: calc(22 * var(--u));
   --trayInwardX: calc(14 * var(--u)); /* (+) => 아이템은 더 오른쪽, 렐릭은 더 왼쪽으로(중앙 쪽) */
@@ -359,6 +359,7 @@ body{
   flex-direction:column;
   position: relative;
   z-index: var(--zMain);
+  pointer-events: none;
 }
 
 /* 배경이 흰색으로 튀지 않도록 안전장치 */
@@ -412,10 +413,10 @@ html, body, #app,
   overflow: visible;
   position: relative;
   z-index: var(--zChrome);
-  pointer-events: auto;
+  pointer-events: none !important; /* 기본적으로 상단 HUD는 클릭 불가, 내부에서 클릭 가능한 부분만 따로 지정 */
 }
 
-.topHudLeftSpacer{ pointer-events: none; }
+.topHudLeftSpacer{ pointer-events: none !important; }
 .playerHudLeft, .topHudRight{ pointer-events: auto; }
 
 /* 오른쪽 상단 버튼(항상 클릭 가능) */
@@ -423,7 +424,7 @@ html, body, #app,
   position: fixed;
   top:   calc(var(--safeT) + calc(8 * var(--u)));
   right: calc(var(--safeR) + calc(10 * var(--u)));
-  z-index: calc(var(--zChrome)+10000);
+  z-index: calc(var(--zChrome)+20000);
   pointer-events: auto;
 }
 .topHudRight *{ pointer-events:auto; }
@@ -486,6 +487,7 @@ html, body, #app,
   box-sizing: border-box;
   overflow: hidden;
   padding-bottom: calc(var(--dockH) + calc(6 * var(--u)));
+  pointer-events: auto;
 }
 
 .stage{
@@ -685,6 +687,54 @@ html, body, #app,
   --slotTextScale: calc(var(--slotCardScale, 1) * 1.25);
 }
 
+/* 교란(비활성) 슬롯 표시 */
+.slot.disabled{
+  cursor: not-allowed;
+}
+
+/* 기본 오목 레이어 색감만 살짝 바꿔서 "이상 상태" 느낌 */
+.slot.disabled::before{
+  background: rgba(40, 0, 60, .55);
+  box-shadow:
+    inset 0 calc(12 * var(--u)) calc(18 * var(--u)) rgba(0,0,0,.70),
+    inset 0 calc(-10 * var(--u)) calc(16 * var(--u)) rgba(255,255,255,.05),
+    inset 0 0 0 calc(1 * var(--u)) rgba(200,140,255,.14);
+  opacity: .95;
+}
+
+/* 사선 마스크 + 🌀 뱃지(우상단) */
+.slot.disabled::after{
+  content: "🌀";
+  position: absolute;
+  inset: var(--slotPad);
+  pointer-events: none;
+
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  padding: calc(6 * var(--u));
+
+  font-size: calc(20 * var(--u));
+  line-height: 1;
+
+  color: rgba(235, 230, 255, .90);
+  text-shadow: 0 0 calc(10 * var(--u)) rgba(170, 90, 255, .35);
+
+  /* 은은한 사선 */
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(255,255,255,.08) 0,
+    rgba(255,255,255,.08) calc(6 * var(--u)),
+    rgba(0,0,0,0) calc(6 * var(--u)),
+    rgba(0,0,0,0) calc(12 * var(--u))
+  );
+  opacity: .85;
+}
+
+/* 슬롯 안 카드가 있으면 살짝 흐리게(필터 대신 opacity만) */
+.slot.disabled .slotCardInner{
+  opacity: .82;
+}
 
 /* =========================
    9) CARDS (parchment-only)
@@ -2207,6 +2257,30 @@ pre.choice-detail,
   padding: calc(1 * var(--u) * var(--enemyUi)) calc(3 * var(--u) * var(--enemyUi));
   border-radius: calc(7 * var(--u) * var(--enemyUi));
 }
+
+
+
+/* 패시브 아이콘 라인 */
+.enemyPassiveRow{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap: calc(6 * var(--u) * var(--enemyUi));
+  min-height: calc(14 * var(--u) * var(--enemyUi));
+}
+.enemyPassiveIcon{
+  font-size: calc(13 * var(--u) * var(--enemyUi));
+  line-height: 1;
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.05);
+  padding: calc(1 * var(--u) * var(--enemyUi)) calc(4 * var(--u) * var(--enemyUi));
+  border-radius: calc(8 * var(--u) * var(--enemyUi));
+}
+
+/* 대상 선택 시 */
+.enemyBanner.targetable{ cursor:pointer; }
+.enemyBanner.untargetable{ cursor:not-allowed; opacity:.65; filter: grayscale(.20); }
+.enemyBanner.untargetable .enemyMiniHud{ opacity: .85; }
 
 /* 호버 상세 */
 .enemyHoverDetail{

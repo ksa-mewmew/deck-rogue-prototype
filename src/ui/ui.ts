@@ -374,7 +374,7 @@ function tickMsForPhase(phase: GameState["phase"]) {
     case "ENEMY": return 100;
     case "UPKEEP": return 100;
     case "DRAW":  return 100;
-    case "PLACE": return 0;   
+    case "PLACE": return 0;
     default: return 220;
   }
 }
@@ -483,7 +483,7 @@ function pushFloatFx(kind: FloatFx["kind"], text: string, x: number, y: number) 
 
 function cleanupFloatFx() {
   const now = performance.now();
-  
+
   floatFx = floatFx.filter((f) => now - f.born < animMs(700));
 }
 
@@ -500,7 +500,7 @@ function detectAndEmitDeltas(g: GameState) {
     return;
   }
 
-  
+
   if (prevPlayerHp != null) {
     const d = g.player.hp - prevPlayerHp;
     if (d !== 0) emitPlayerDelta(d);
@@ -510,7 +510,7 @@ function detectAndEmitDeltas(g: GameState) {
     if (d !== 0) emitPlayerBlockDelta(d);
   }
 
-  
+
   for (let i = 0; i < g.enemies.length; i++) {
     const cur = g.enemies[i].hp;
     const prev = prevEnemyHp[i];
@@ -523,7 +523,7 @@ function detectAndEmitDeltas(g: GameState) {
 }
 
 function emitPlayerDelta(dhp: number) {
-  const box = document.querySelector<HTMLElement>(".playerHudBox") 
+  const box = document.querySelector<HTMLElement>(".playerHudBox")
     ?? document.querySelector<HTMLElement>(".playerHudLeft");
   if (!box) return;
   const r = box.getBoundingClientRect();
@@ -538,7 +538,7 @@ function emitPlayerDelta(dhp: number) {
 }
 
 function emitPlayerBlockDelta(d: number) {
-  const box = document.querySelector<HTMLElement>(".playerHudBox") 
+  const box = document.querySelector<HTMLElement>(".playerHudBox")
     ?? document.querySelector<HTMLElement>(".playerHudLeft");
   if (!box) return;
   const r = box.getBoundingClientRect();
@@ -736,7 +736,7 @@ async function runAutoAdvanceRAF(g: GameState, actions: UIActions) {
       const step = computeNextStep(g, actions,  false);
       if (!step.fn || step.disabled) break;
 
-      
+
       const beforePhase = g.phase;
 
       step.fn();
@@ -755,7 +755,7 @@ async function runAutoAdvanceRAF(g: GameState, actions: UIActions) {
 function ensureBossSchedule(g: GameState) {
   const runAny = g.run as any;
   if (runAny.timeMove == null) runAny.timeMove = g.run.nodePickCount ?? 0;
-  if (runAny.nextBossTime == null) runAny.nextBossTime = 40; 
+  if (runAny.nextBossTime == null) runAny.nextBossTime = 40;
   if (runAny.forcedNext == null) runAny.forcedNext = null as ForcedNext;
 }
 
@@ -1043,8 +1043,8 @@ type RenderCardOpt = {
   draggable?: boolean;
   mode?: CardRenderMode;
   hoverPreview?: {
-    root: HTMLElement;            
-    api: CardHoverPreviewApi;       
+    root: HTMLElement;
+    api: CardHoverPreviewApi;
     buildDetail?: (g: GameState, cardUid: string) => string;
   };
 };
@@ -1077,7 +1077,7 @@ function renderCard(
 
   if (mode === "SLOT_NAME_ONLY") d.classList.add("slotNameOnly");
 
-  
+
   const header = div("cardHeader");
   const title = displayNameForUid(g, cardUid);
   header.appendChild(divText("cardTitle", title));
@@ -1091,7 +1091,7 @@ function renderCard(
 
   d.appendChild(header);
 
-  
+
   if (mode === "FULL") {
     const body = div("cardBody");
 
@@ -1107,13 +1107,13 @@ function renderCard(
 
     d.appendChild(body);
   } else {
-    
+
   }
 
-  
+
   if (clickable && onClick) d.onclick = () => onClick(cardUid);
 
-  
+
   if (clickable) {
     d.onpointerdown = (ev) => {
       if ((ev as any).button !== 0 && (ev as any).pointerType === "mouse") return;
@@ -1459,6 +1459,14 @@ let hoverSlot: SlotDrop | null = null;
 let showLogOverlay = false;
 let mapDetailOverlayOpen = false;
 
+let mapDetailOutsideDown: ((ev: PointerEvent) => void) | null = null;
+function detachMapDetailOutsideDown() {
+  if (!mapDetailOutsideDown) return;
+  document.removeEventListener("pointerdown", mapDetailOutsideDown, true);
+  mapDetailOutsideDown = null;
+}
+
+
 let relicHoverId: string | null = null;
 let relicHoverAt: Pt | null = null;
 
@@ -1494,7 +1502,7 @@ function renderRealCardForOverlay(
   uid: string,
   onPick?: (uid: string) => void
 ): HTMLElement {
-  const clickable = !!onPick; 
+  const clickable = !!onPick;
   const el = renderCard(g, uid, clickable, onPick, { draggable: false });
   el.classList.add("overlayCard");
   return el;
@@ -1534,7 +1542,7 @@ function renderCardPreviewByDef(g: GameState, defId: string, upgrade: number): H
 
 type NodeType = "BATTLE" | "ELITE" | "REST" | "TREASURE" | "EVENT" | "SHOP";
 
-const VS15 = "\uFE0E"; 
+const VS15 = "\uFE0E";
 
 function sepSpan(cls: string, txt: string) {
   const s = document.createElement("span");
@@ -1581,8 +1589,8 @@ export function renderLabelList(
   el.replaceChildren();
 
   if (isBoss) {
-    
-    
+
+
     appendNodeLabel(el, "BATTLE", true);
     return;
   }
@@ -1606,13 +1614,13 @@ type VisionMode = "NORMAL" | "FOCUS" | "WIDE";
 
 type VisionParams = {
   mode: VisionMode;
-  
+
   presenceR: number;
-  
+
   typeR: number;
-  
+
   detailR: number;
-  
+
   noise: number;
 };
 
@@ -1634,7 +1642,7 @@ type GraphMapLite = {
   edges: Record<string, string[]>;
   visionNonce?: number;
   treasureId?: string | null;
-  
+
   seen?: Record<string, 0 | 1 | 2 | 3>;
 };
 
@@ -1692,7 +1700,7 @@ function dungeonToGraphLite(dm: DungeonMap, opts?: { verticalLinks?: boolean }):
 
 
 function hash32(s: string) {
-  
+
   let h = 2166136261 >>> 0;
   for (let i = 0; i < s.length; i++) {
     h ^= s.charCodeAt(i);
@@ -1702,7 +1710,7 @@ function hash32(s: string) {
 }
 
 function seeded01(seed: number) {
-  
+
   let x = seed >>> 0;
   x ^= x << 13;
   x ^= x >>> 17;
@@ -1725,14 +1733,14 @@ function ensureGraphRuntime(g: GameState) {
     detailR: 0,
     noise: 0,
   };
-  
+
   runAny.pursuit ??= { heat: 0 };
 
-  
+
   if (!runAny.map) {
     runAny.map = makeDebugGraphMap();
   } else {
-    
+
     const m = runAny.map as any;
     if (Array.isArray(m.nodes)) {
       const rec: Record<string, MapNodeLite> = {};
@@ -1958,7 +1966,7 @@ type RevealLevel = 0 | 1 | 2 | 3;
 function ensureSeenMap(map: GraphMapLite): Record<string, RevealLevel> {
   const m: any = map as any;
   if (!m.seen) m.seen = {};
-  
+
   m.seen[map.pos] = 3;
   return m.seen as Record<string, RevealLevel>;
 }
@@ -1976,7 +1984,7 @@ function updateSeenFromVision(map: GraphMapLite, vp: VisionParams) {
     if (r > prev) seen[id] = r;
   }
 
-  
+
   seen[map.pos] = 3;
 }
 
@@ -2109,7 +2117,7 @@ function makeDebugGraphMap(): GraphMapLite {
 
   const ids = Array.from({ length: N }, (_, i) => `n${i}`);
 
-  
+
   edges[ids[0]] = [];
   nodes[ids[0]] = { id: ids[0], kind: "START", visited: true, cleared: true, depth: 0 };
 
@@ -2123,7 +2131,7 @@ function makeDebugGraphMap(): GraphMapLite {
     nodes[id] = { id, kind: "BATTLE", visited: false, cleared: false };
   }
 
-  
+
   const extra = 10;
   for (let k = 0; k < extra; k++) {
     const a = ids[Math.floor(Math.random() * ids.length)];
@@ -2136,7 +2144,7 @@ function makeDebugGraphMap(): GraphMapLite {
     edges[b].push(a);
   }
 
-  
+
   const tmpMap: GraphMapLite = {
     pos: ids[0],
     startId: ids[0],
@@ -2160,13 +2168,13 @@ function makeDebugGraphMap(): GraphMapLite {
     }
   }
 
-  
+
   for (const id of ids) {
     if (id === ids[0]) continue;
     nodes[id].kind = "BATTLE";
   }
 
-  
+
   const pickKinds: NodeType[] = ["BATTLE", "BATTLE", "BATTLE", "EVENT", "REST", "ELITE"];
   for (const id of ids) {
     if (id === ids[0] || id === deepest) continue;
@@ -2193,7 +2201,7 @@ function visionParamsFromState(g: GameState): VisionParams {
   const tm = Number(runAny.timeMove ?? 0) || 0;
   const vAny = vision as any;
 
-  
+
   if (vAny.forceModeUntilMove != null && tm >= Number(vAny.forceModeUntilMove)) {
     vAny.forceModeUntilMove = null;
     vAny.forceMode = null;
@@ -2209,7 +2217,7 @@ function visionParamsFromState(g: GameState): VisionParams {
   let detailR = Number(vision.detailR ?? 0) || 0;
   let noise = clamp01(Number(vision.noise ?? 0.08) || 0);
 
-  
+
   if (mode === "FOCUS") {
     presenceR -= 1;
     typeR -= 1;
@@ -2222,7 +2230,7 @@ function visionParamsFromState(g: GameState): VisionParams {
     noise = clamp01(noise * 1.35);
   }
 
-  
+
   if (g.run.treasureObtained) {
     const tier = pursuitTier(pursuit.heat ?? 0);
     presenceR += tier >= 2 ? 1 : 0;
@@ -2240,10 +2248,10 @@ function visionParamsFromState(g: GameState): VisionParams {
     }
   }
 
-  
+
   /*const f = Math.max(0, Number(g.player.fatigue ?? 0) || 0);
   if (f > 0) {
-    
+
     const losePresence = Math.floor(f / 14);
     const loseType = Math.floor(f / 6);
     const loseDetail = Math.floor(f / 10);
@@ -2857,8 +2865,10 @@ function renderMapNodeSelect(root: HTMLElement, g: GameState, actions: UIActions
 
   const btnDetail = mkButton(mapDetailOverlayOpen ? "상세 닫기" : "상세", () => {
     mapDetailOverlayOpen = !mapDetailOverlayOpen;
+    if (!mapDetailOverlayOpen) detachMapDetailOutsideDown();
     render(g, actions);
   });
+  btnDetail.classList.add("mapDetailToggleBtn");
   btnDetail.style.cssText = `margin-left:calc(${-30} * var(--u)); padding:calc(${2} * var(--u)) calc(${5} * var(--u)); opacity:.9;`;
   right.appendChild(btnDetail);
 
@@ -2886,13 +2896,20 @@ function renderMapNodeSelect(root: HTMLElement, g: GameState, actions: UIActions
     panel.addEventListener("wheel", (ev) => ev.stopPropagation(), { passive: true });
 
     const onDocPointerDown = (ev: PointerEvent) => {
-      const t = ev.target as Node | null;
-      if (t && panel.contains(t)) return;      // 패널 내부 클릭은 무시
+      const el = ev.target as HTMLElement | null;
+      if (el && panel.contains(el)) return; // 패널 내부 클릭은 무시
+
+      // 상단 크롬(새 런/룰북/로그/설정) 포함: 패널은 닫되, click 이벤트는 먹지 않게(렌더 호출 없음) 처리
       mapDetailOverlayOpen = false;
-      document.removeEventListener("pointerdown", onDocPointerDown, true);
-      render(g, actions);
+      detachMapDetailOutsideDown();
+
+      // ✅ 즉시 DOM만 닫고(렌더는 나중에 다른 액션이 알아서 하게)
+      // 클릭 타겟을 DOM에서 뽑아버려서 click 이벤트가 사라지는 현상을 막는다.
+      try { panel.remove(); } catch {}
+      const tb = document.querySelector<HTMLButtonElement>(".mapDetailToggleBtn");
+      if (tb) tb.textContent = "상세";
     };
- 
+
     const head = div("");
     head.style.cssText = `display:flex; align-items:center; justify-content:space-between; gap:calc(${10} * var(--u));`;
 
@@ -2902,6 +2919,7 @@ function renderMapNodeSelect(root: HTMLElement, g: GameState, actions: UIActions
 
     const btnClose = mkButton("닫기", () => {
       mapDetailOverlayOpen = false;
+      detachMapDetailOutsideDown();
       render(g, actions);
     });
     btnClose.style.cssText = `padding:calc(${6} * var(--u)) calc(${10} * var(--u)); opacity:.9;`;
@@ -3003,7 +3021,9 @@ function renderMapNodeSelect(root: HTMLElement, g: GameState, actions: UIActions
         panel.appendChild(scout);
       }
     }
-    document.addEventListener("pointerdown", onDocPointerDown, true);
+    detachMapDetailOutsideDown();
+    mapDetailOutsideDown = onDocPointerDown;
+    document.addEventListener("pointerdown", mapDetailOutsideDown, true);
     root.appendChild(panel);
   }
 
@@ -3133,7 +3153,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         return;
       }
 
-      
+
 
       slots[idx] = null;
 
@@ -3189,7 +3209,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
 
     onCloseOverlay: () => {
       const g = getG();
-      overlay = null;        
+      overlay = null;
       render(g, actions);
     },
 
@@ -3198,7 +3218,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       hoverSlot = null;
       overlay = null;
       drag = null;
-      closeChoiceOrPop(g);           
+      closeChoiceOrPop(g);
       clearSave();
       setGame(createInitialState(g.content));
     },
@@ -3276,8 +3296,8 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       render(g, actions);
     },
 
-    
-    
+
+
     onMoveToNode: (toId: string) => {
       const g = getG();
       if (g.run.finished) return;
@@ -3295,14 +3315,14 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       const neigh = map.edges[from] ?? [];
       if (!neigh.includes(toId)) return;
 
-      
+
       runAny.timeMove = Number(runAny.timeMove ?? 0) + wingArteryMoveDelta(g);
       map.visionNonce = Number(map.visionNonce ?? 0) + 1;
 
-      
+
       map.pos = toId;
 
-      
+
       const node = map.nodes[toId] ?? (map.nodes[toId] = { id: toId, kind: "BATTLE" });
       const firstVisit = !node.visited;
       if (firstVisit) {
@@ -3310,7 +3330,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         g.run.nodePickCount = (g.run.nodePickCount ?? 0) + 1;
       }
 
-      
+
       if (g.run.treasureObtained) {
         pursuit.heat = Number(pursuit.heat ?? 0) + 1;
         const tier = pursuitTier(pursuit.heat);
@@ -3329,7 +3349,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         }
       }
 
-      
+
       ensureBossSchedule(g);
       const T = totalTimeOnMap(g);
       if (Number(runAny.nextBossTime ?? 0) > 0 && T >= Number(runAny.nextBossTime ?? 0)) {
@@ -3350,7 +3370,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         return;
       }
 
-      
+
 
       const tmNow = Number(runAny.timeMove ?? 0) || 0;
 
@@ -3462,7 +3482,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         return;
       }
 
-      
+
 
       if (actualKind === "SHOP") {
         // 상점은 EMPTY로 바뀌지 않습니다. (노드에 계속 상점으로 남음)
@@ -3548,7 +3568,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
 
         let opts = ev.options(g);
 
-        
+
         /*const { tier } = madnessP(g);
         if (tier >= 2 && !opts.some((o) => o.key === "mad:whisper")) {
           opts = [
@@ -3587,7 +3607,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
           const picked = opts.find((o) => o.key === key);
           if (!picked) return;
 
-          
+
           const up = getUnlockProgress(g);
           up.eventPicks += 1;
           checkRelicUnlocks(g);
@@ -3677,7 +3697,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
             (g.run as any).onWinGrantRelicId = outcome.onWinGrantRelicId ?? null;
 
             logMsg(g, outcome.title ? `이벤트 전투: ${outcome.title}` : "이벤트 전투 발생!");
-          
+
             const runAny = g.run as any;
             runAny.pendingEventWinRelicId = outcome.onWinGrantRelicId ?? null;
             runAny.pendingEventWinGold = Number(outcome.onWinGrantGold ?? 0) || 0;
@@ -3716,7 +3736,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         return;
       }
 
-      
+
       if (actualKind === "BATTLE" || actualKind === "ELITE") {
         // 광기(수락) 3: 50% 확률로 전투 노드에서도 전투가 발생하지 않음 (보스 제외)
         {
@@ -3885,7 +3905,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
     },
   };
 
-  
+
   function openRewardPick(g: GameState, actions: any, title: string, prompt: string) {
 
 
@@ -3898,7 +3918,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         detail: `전열: ${d.frontText} / 후열: ${d.backText}`,
       };
     });
- 
+
 
     g.choice = {
       kind: "REWARD",
@@ -3997,7 +4017,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
     };
 
     choiceHandler = (k: string) => {
-      
+
       if (k === "skip") {
         logMsg(g, "강화 취소");
         closeChoiceOrPop(g);
@@ -4007,7 +4027,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         return;
       }
 
-      
+
       if (k.startsWith("up:")) {
         const uid = k.slice("up:".length);
         const ok = upgradeCardByUid(g, uid);
@@ -4020,7 +4040,7 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
         return;
       }
 
-      
+
       closeChoiceOrPop(g);
       render(g, actions);
     };
@@ -4049,7 +4069,7 @@ function normalizePlacementCounters(g: GameState) {
 }
 
 export function mountRoot(): HTMLDivElement {
-  applyAssetVarsOnce(); 
+  applyAssetVarsOnce();
   const app = document.querySelector<HTMLDivElement>("#app")!;
   app.innerHTML = "";
   return app;
@@ -4060,7 +4080,11 @@ function mkButton(label: string, onClick: () => void, className = "") {
   if (className) b.className = className;
   b.type = "button";
   b.textContent = label;
-  b.onclick = onClick;
+  b.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClick();
+  });
   return b;
 }
 
@@ -4139,7 +4163,7 @@ function renderFloatFxLayer() {
 }
 
 export function ensureFloatingNewRunButton() {
-  
+
   if (document.querySelector(".floatingNewRun")) return;
 
   const btn = document.createElement("button");
@@ -4226,6 +4250,12 @@ export function render(g: GameState, actions: UIActions) {
   currentG = g;
   clearAllHover();
 
+  if (g.phase !== "NODE") {
+    // 지도 상세 패널이 열려있던 상태에서 빠져나오면, 남아있는 document 리스너가 클릭을 먹을 수 있음
+    mapDetailOverlayOpen = false;
+    detachMapDetailOutsideDown();
+  }
+
   setDevConsoleCtx({
     getG: () => currentG ?? g,
     actions: { onNewRun: () => actions.onNewRun() },
@@ -4233,7 +4263,7 @@ export function render(g: GameState, actions: UIActions) {
     log: (msg) => logMsg((currentG ?? g), msg),
   });
 
-  
+
   renderDevConsole();
 
   floatingNewRunHandler = () => actions.onNewRun();
@@ -4319,7 +4349,7 @@ export function render(g: GameState, actions: UIActions) {
 
 
   normalizeEnemyNameWidth();
-  renderStageCornerResourceHud(g); 
+  renderStageCornerResourceHud(g);
   renderHandDock(g, actions, isTargeting(g));
   alignHandToBoardAnchor(g);
   alignEnemyHudToViewportCenter();
@@ -4374,7 +4404,7 @@ function getRelicView(g: GameState, id: string) {
     id,
     name: disp.name,
     desc: disp.text,
-    state: disp.state, 
+    state: disp.state,
     icon,
     art,
   };
@@ -4631,7 +4661,7 @@ function setUiScaleNow(v: number) {
 
 function renderLogOverlay(g: GameState, actions: UIActions) {
 
-  
+
   document.querySelector(".logOverlay")?.remove();
 
   if (!showLogOverlay) return;
@@ -4896,7 +4926,7 @@ function renderOverlayLayer(
   const layer = div("overlay-layer");
   layer.style.cssText = isFull
     ? "position:fixed; inset:0;" +
-      "background:rgba(0,0,0,1);" +          
+      "background:rgba(0,0,0,1);" +
       "display:flex; justify-content:center; align-items:flex-start;" +
       "padding:calc(24 * var(--u)); box-sizing:border-box;"
     : "position:fixed; inset:0;" +
@@ -5004,7 +5034,7 @@ function renderOverlayLayer(
       "gap:calc(10 * var(--u));" +
       "align-content:start;" +
       "min-width:0;"+
-      "max-height: 62vh;" + 
+      "max-height: 62vh;" +
       "overflow-y: auto;" +
       "overflow-x: hidden;";
 
@@ -5040,7 +5070,7 @@ function renderOverlayLayer(
       "line-height:1.45;";
     side.appendChild(sidePre);
 
-    
+
     let selectedUid: string | null = sortedUids[0] ?? null;
 
     const renderSide = () => {
@@ -5079,7 +5109,7 @@ function renderOverlayLayer(
 
         const setSelected = () => {
           selectedUid = uid;
-          
+
           grid.querySelectorAll(".pileSelected").forEach((el) => el.classList.remove("pileSelected"));
           thumb.classList.add("pileSelected");
           renderSide();
@@ -5331,7 +5361,7 @@ function renderRelicTray(g: GameState, actions: UIActions) {
 
 
 function renderChoiceLayer(g: GameState, actions: UIActions) {
-  
+
   document.querySelector(".choice-overlay")?.remove();
 
   const c = g.choice;
@@ -5426,7 +5456,7 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
   // =========================
   // Faith start: BIG selection UI
   // =========================
-  
+
   if (c.kind === "FAITH" && (g.choiceCtx as any)?.kind === "FAITH_START") {
     panel.style.cssText +=
       `width:min(100vw, calc(${1800} * var(--u))); height:90vh;` +
@@ -6282,13 +6312,26 @@ function renderTopHud(g: GameState, actions: UIActions) {
       const e = g.enemies[i];
       const banner = div("enemyBanner enemyCardWrap");
 
-      if (targeting && e.hp > 0) banner.classList.add("targetable");
+      // targeting highlight + 패시브 기반 대상 불가 표시
+      let untargetable = false;
+      if (targeting && e.hp > 0) {
+        const req: any = (g as any).pendingTarget ?? null;
+        const isDmgSelect = req?.kind === "damageSelect";
+        if (isDmgSelect && e.id === "goblin_assassin") {
+          const alive = g.enemies.filter((x) => (x as any).hp > 0);
+          const rank = alive.indexOf(e) + 1; // ①=1
+          if (rank === 2 || rank === 3) untargetable = true;
+        }
+      }
+
+      if (targeting && e.hp > 0 && !untargetable) banner.classList.add("targetable");
+      if (untargetable) banner.classList.add("untargetable");
       banner.onclick = () => actions.onSelectEnemy(i);
 
       const artWrap = div("enemyArtWrap");
       const artCard = div("enemyArtCard");
 
-      
+
       artWrap.style.setProperty("--frameImg", `url("${assetUrl("assets/enemies/enemies_frame.png")}")`);
       artWrap.style.setProperty("--artImg", `url("${enemyArtUrl(e.id)}")`);
       artWrap.appendChild(artCard);
@@ -6321,6 +6364,18 @@ function renderTopHud(g: GameState, actions: UIActions) {
 
       mini.appendChild(topRow);
 
+      // 패시브 HUD(아이콘)
+      const passivesMini = (def as any).passives as any[] | undefined;
+      if (passivesMini && passivesMini.length) {
+        const prow = div("enemyPassiveRow");
+        for (const p of passivesMini.slice(0, 4)) {
+          const ic = divText("enemyPassiveIcon", String(p.icon ?? "Ⓟ"));
+          prow.appendChild(ic);
+        }
+        mini.appendChild(prow);
+      }
+
+
       const hpLine = div("enemyHpLine");
       hpLine.appendChild(divText("enemyHpText", `HP ${e.hp}/${e.maxHp}`));
 
@@ -6342,9 +6397,18 @@ function renderTopHud(g: GameState, actions: UIActions) {
       if ((st.disrupt ?? 0) > 0) lines.push(`교란 ${st.disrupt}`);
       if (e.immuneThisTurn) lines.push("면역");
 
+      const passiveLines: string[] = [];
+      const passives = (def as any).passives as any[] | undefined;
+      if (passives && passives.length) {
+        for (const p of passives) {
+          passiveLines.push(`${String(p.icon ?? "Ⓟ")} ${String(p.name ?? "패시브")}: ${String(p.text ?? "")}`);
+        }
+      }
+
       hover.textContent =
-        (g.enemies[i].name) + `\n \n` +
-        (g.intentsRevealedThisTurn ? `${label}\n \n` : "") +
+        (g.enemies[i].name) + "\n\n" +
+        (passiveLines.length ? `패시브:\n${passiveLines.join("\n")}\n\n` : "") +
+        (g.intentsRevealedThisTurn ? `${label}\n\n` : "") +
         (lines.length ? `상태: ${lines.join(", ")}` : "상태: 없음");
 
       banner.appendChild(artWrap);
@@ -6370,10 +6434,7 @@ function renderTopRightChrome(g: GameState, actions: UIActions) {
 
   right.appendChild(mkButton('룰북', () => actions.onViewRulebook()));
   right.appendChild(mkButton('로그', () => actions.onToggleLogOverlay()));
-  right.appendChild(mkButton('설정', () => {
-    overlay = { kind: 'SETTINGS' };
-    render(g, actions);
-  }));
+  right.appendChild(mkButton('설정', () => actions.onViewSettings()));
 
   document.body.appendChild(right);
 }
@@ -6527,7 +6588,7 @@ function getTargetHintText(g: GameState): string | null {
     : reason === "RELIC" ? "유물"
     : null;
 
-  const tail = reasonLabel ? ` — ${reasonLabel}` : "";
+  const tail = reasonLabel ? ` - ${reasonLabel}` : "";
 
   const qn = g.pendingTargetQueue?.length ?? 0;
   const remaining = (g.pendingTarget ? 1 : 0) + qn;
@@ -6658,7 +6719,7 @@ function enableHorizontalWheelScroll(el: HTMLElement) {
   (el as any).dataset.wheelX = "1";
   el.addEventListener(
     "wheel", (e) => {
-      
+
       if (e.shiftKey) return;
       const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
       el.scrollLeft += dx;
@@ -6762,7 +6823,7 @@ function alignHandToBoardAnchor(_g: GameState) {
   if (next > maxScroll) next = maxScroll;
 
   hand.scrollLeft = Math.round(next);
-  row.style.transform = ""; 
+  row.style.transform = "";
 }
 
 function applySlotCardScale(slotEl: HTMLElement, scalerEl: HTMLElement) {
@@ -6987,18 +7048,18 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
       return;
     }
 
-    
+
     if (ev.code === "KeyP") {
       ev.preventDefault();
       actions.onNewRun();
       return;
     }
 
-    
+
     if (ev.code === "Digit4") {
       ev.preventDefault();
 
-      
+
       if (isTargeting(g)) {
         g.pendingTarget = null;
         g.pendingTargetQueue = [];
@@ -7008,12 +7069,12 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
         return;
       }
 
-      
+
       actions.onClearSelected();
       return;
     }
-  
-    
+
+
     if (ev.key === "Tab") {
       ev.preventDefault();
       if (g.hand.length === 0) return;
@@ -7027,7 +7088,7 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
       return;
     }
 
-    
+
     if (ev.code === "Space") {
       ev.preventDefault();
       const g = getG();
@@ -7039,14 +7100,14 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
       return;
     }
 
-    
+
     if (ev.code === "Digit1" || ev.code === "Digit2" || ev.code === "Digit3") {
       ev.preventDefault();
       const idx = ev.code === "Digit1" ? 0 : ev.code === "Digit2" ? 1 : 2;
 
-      
+
       if (isTargeting(g)) {
-        
+
         const e = g.enemies[idx];
         if (!e || e.hp <= 0) {
           logMsg(g, `대상 선택 실패: ${idx + 1}번 적이 없습니다.`);
@@ -7058,12 +7119,12 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
         return;
       }
 
-      
+
       actions.onHotkeySlot("front", idx);
       return;
     }
 
-    
+
     if (ev.code === "KeyQ" || ev.code === "KeyW" || ev.code === "KeyE") {
       ev.preventDefault();
       const idx = ev.code === "KeyQ" ? 0 : ev.code === "KeyW" ? 1 : 2;
@@ -7100,7 +7161,7 @@ function beginDrag(
   const grabDX = r ? (ev.clientX - r.left) : 20;
   const grabDY = r ? (ev.clientY - r.top) : 20;
 
-  
+
   const css = getComputedStyle(document.documentElement);
   const handW = parseFloat(css.getPropertyValue("--handCardW")) || undefined;
   const handH = parseFloat(css.getPropertyValue("--handCardH")) || undefined;
@@ -7217,7 +7278,7 @@ function renderDragOverlay(_app: HTMLElement, g: GameState) {
 
   const wrap = document.createElement("div");
 
-  
+
   wrap.className = "dragCardPreview";
   wrap.style.position = "fixed";
   const leftVw = ((drag.x - (drag.grabDX ?? 20)) / window.innerWidth) * 100;

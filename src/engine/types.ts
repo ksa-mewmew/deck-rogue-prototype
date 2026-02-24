@@ -4,7 +4,7 @@ export type Zone = "deck" | "hand" | "discard" | "front" | "back" | "exhausted" 
 export type Side = "front" | "back";
 
 export type StatusKey = "vuln" | "weak" | "bleed" | "disrupt";
-export type CardTag = "EXHAUST" | "VANISH" | "INSTALL" | "TOKEN";
+export type CardTag = "EXHAUST" | "VANISH" | "INSTALL" | "TOKEN" | "INNATE";
 export type CardRarity = "BASIC" | "COMMON" | "SPECIAL" | "RARE" | "MADNESS";
 export type RelicId = string;
 export type ItemId = string;
@@ -31,7 +31,7 @@ export type GodId =
   | "card_dealer"
   | "rabbit_hunt"
   | "madness";
-
+export type TemptGodId = Exclude<GodId, "madness">;
 export type FaithState = {
   offered: [GodId, GodId, GodId];
   points: Record<GodId, number>;
@@ -202,7 +202,7 @@ export type IntentPreview = {
   baseDmg?: number;
   dmgTotal?: number;
   hits?: number;
-  perHit?: number; 
+  perHit?: number;
   notes?: string[];
 
   applies?: IntentApply[];
@@ -224,12 +224,21 @@ export type IntentMeta = {
 
 
 
+export type EnemyPassive = {
+  id: string;
+  icon: string; // HUD 아이콘(짧게)
+  name: string;
+  text: string;
+};
+
+
 export type EnemyData = {
   id: string;
   name: string;
   omen?: string;
   maxHp: number;
   intents: EnemyIntentData[];
+  passives?: EnemyPassive[];
   rule?: string;
 };
 
@@ -266,6 +275,10 @@ export type EnemyState = {
 
   lastIntentKey?: string | null;
   lastIntentStreak?: number;
+
+  // custom enemy vars
+  assassinAim?: number;
+  corpseRage?: number;
 };
 
 export type PlayerEffect =
@@ -290,7 +303,11 @@ export type PlayerEffect =
   | { op: "clearStatusSelf"; key: StatusKey }
   | { op: "damageEnemyFormula"; target: "select" | "random" | "all"; kind: string }
   | { op: "damageEnemyFormula"; target: "select" | "random" | "all"; kind: string }
-  | { op: "addCardToHand"; defId: string; n?: number; upgrade?: number };
+  | { op: "addCardToHand"; defId: string; n?: number; upgrade?: number }
+  | { op: "blockFormula"; kind: string }
+  | { op: "discardHandAllDraw"; extraDraw?: number }
+  | { op: "discardHandRandom"; n: number }
+  | { op: "halveEnemyHpAtIndex"; index: number };
 
 export type ItemData = {
   id: ItemId;
@@ -344,10 +361,11 @@ export type DamageContext = {
 
 export type EnemyEffect =
   | { op: "damagePlayer"; n: number }
-  | { op: "damagePlayerFormula"; kind: "goblin_raider" | "watching_statue" | "gloved_hunter" }
+  | { op: "damagePlayerFormula"; kind: "goblin_raider" | "watching_statue" | "gloved_hunter" | "goblin_assassin" | "old_monster_corpse" | "punishing_one" }
   | { op: "supplies"; n: number }
   | { op: "statusPlayer"; key: StatusKey; n: number }
   | { op: "enemyHealSelf"; n: number }
+  | { op: "enemySetAssassinAim"; n: number }
   | { op: "enemyImmuneThisTurn" }
   | { op: "enemyImmuneNextTurn" }
   | { op: "fatiguePlayer"; n: number }
@@ -521,13 +539,13 @@ export type ChoiceCtx =
   | { kind: "FAITH_START"; offered: [GodId, GodId, GodId] }
   | { kind: "GOD_TEMPT"; tempter: GodId }
   | { kind: "MADNESS_TEMPT"; offerBoon: 1 | 2 | 3; offerBane: 1 | 2 | 3 };
-  
+
 export type ChoiceFrame = { choice: ChoiceState; ctx: ChoiceCtx };
 
 export type GameState = {
 
   combatTurn: number;
-    
+
   uidSeq: number;
 
   intentsRevealedThisTurn: boolean;
@@ -572,6 +590,10 @@ export type GameState = {
 
   backUidsThisTurn: string[];
   placedUidsThisTurn: string[];
+
+  // 설치(장비) 카드가 슬롯에 남아있는 턴 수(연속)
+  // key = cardUid
+  installAgeByUid: Record<string, number>;
 
   time: number;
 

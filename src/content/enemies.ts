@@ -16,7 +16,7 @@ export const ENEMIES = [
         ],
       },
     ],
-  }, 
+  },
 
   {
     id: "goblin_raider",
@@ -180,6 +180,84 @@ export const ENEMIES = [
     ],
   },
 
+
+
+  {
+    id: "goblin_assassin",
+    name: "고블린 암살자",
+    maxHp: 22,
+    passives: [
+      {
+        id: "shadow_veil",
+        icon: "👥",
+        name: "그림자 잠행",
+        text: "왼쪽에 적이 있을 때, 공격(대상 지정)으로 때릴 수 없습니다.",
+      },
+    ],
+    intents: [
+      {
+        label: "조준: 다음 암살 +50%",
+        acts: [{ op: "enemySetAssassinAim", n: 1 }],
+      },
+      {
+        label: "암살: 6 피해",
+        acts: [{ op: "damagePlayerFormula", kind: "goblin_assassin" }],
+      },
+      {
+        label: "재정비: 자신 HP 5 회복",
+        acts: [{ op: "enemyHealSelf", n: 5 }],
+      },
+    ],
+  },
+
+  {
+    id: "old_monster_corpse",
+    name: "오래된 괴물 사체",
+    maxHp: 40,
+    passives: [
+      {
+        id: "rotten_rage",
+        icon: "☠️",
+        name: "썩은 분노",
+        text: "다른 적이 죽을 때마다 분노 +1 (분노당 공격 +2).",
+      },
+    ],
+    intents: [
+      {
+        label: "투척: 9 + 분노×2 피해",
+        acts: [{ op: "damagePlayerFormula", kind: "old_monster_corpse" }],
+      },
+      {
+        label: "질척임: 자신 HP 6 회복",
+        acts: [{ op: "enemyHealSelf", n: 6 }],
+      },
+    ],
+  },
+
+  {
+    id: "punishing_one",
+    name: "징벌하는 자",
+    maxHp: 60,
+    passives: [
+      {
+        id: "punish_hand",
+        icon: "⚖️",
+        name: "징벌",
+        text: "플레이어 손패 1장당 공격 피해 +2.",
+      },
+    ],
+    intents: [
+      {
+        label: "심판: 6 + 손패×2 피해",
+        acts: [{ op: "damagePlayerFormula", kind: "punishing_one" }],
+      },
+      {
+        label: "추궁: 약화 +2 부여",
+        acts: [{ op: "statusPlayer", key: "weak", n: 2 }],
+      },
+    ],
+  },
+
   {
     id: "gloved_hunter",
     name: "장갑 낀 사냥꾼",
@@ -256,7 +334,7 @@ export const ENEMIES = [
     ],
   },
 
-  
+
   {
     id: "boss_cursed_wall",
     name: "저주받은 벽",

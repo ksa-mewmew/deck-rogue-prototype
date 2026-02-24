@@ -1,5 +1,5 @@
 import type { GameState } from "../types";
-import { aliveEnemies, applyStatusTo } from "../rules";
+import { aliveEnemies, applyStatusTo, pushUiToast, logMsg } from "../rules";
 import { applyDamageToEnemy, cleanupPendingTargetsIfNoEnemies } from "../effects";
 import { checkEndConditions } from "./victory";
 import { checkRelicUnlocks, getUnlockProgress } from "../relics";
@@ -54,6 +54,19 @@ export function resolveTargetSelection(g: GameState, enemyIndex: number): boolea
   if (!target || target.hp <= 0) return false;
 
   const req = g.pendingTarget as any;
+
+
+  // 대상 지정 공격 제한: 고블린 암살자(②/③일 때)
+  // - 패시브는 "공격(대상 지정)"만 막는다. (설치/무작위/전체 피해 등은 허용)
+  if (req.kind === "damageSelect" && target.id === "goblin_assassin") {
+    const alive = aliveEnemies(g);
+    const rank = alive.indexOf(target) + 1; // ①=1
+    if (rank === 2 || rank === 3) {
+      pushUiToast(g, "WARN", "공격 대상으로 지정할 수 없습니다.");
+      logMsg(g, "고블린 암살자: 잠행 → 대상 지정 공격 무효");
+      return false;
+    }
+  }
 
   if (req.kind === "damageSelect") {
     const amount = calcDamageForTargetSelection(g, req, target);

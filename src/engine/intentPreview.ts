@@ -43,7 +43,7 @@ function catFromPreview(p: IntentPreview): IntentCategory {
   return "OTHER";
 }
 
-type FormulaKind = "goblin_raider" | "watching_statue" | "gloved_hunter";
+type FormulaKind = "goblin_raider" | "watching_statue" | "gloved_hunter" | "goblin_assassin" | "old_monster_corpse" | "punishing_one";
 
 function previewFormula(kind: FormulaKind, g: GameState, e: any): { raw: number; hits?: number } {
   const used = g.usedThisTurn ?? 0;
@@ -61,6 +61,22 @@ function previewFormula(kind: FormulaKind, g: GameState, e: any): { raw: number;
     const raw = blk >= 4 ? 12 : 6;
     return { raw, hits: 1 };
   }
+  if (kind === "goblin_assassin") {
+    const aimed = Math.max(0, Number((e as any).assassinAim ?? 0) || 0);
+    const raw = aimed > 0 ? 15 : 10;
+    return { raw, hits: 1 };
+  }
+  if (kind === "old_monster_corpse") {
+    const rage = Math.max(0, Number((e as any).corpseRage ?? 0) || 0);
+    const raw = 7 + 2 * rage;
+    return { raw, hits: 1 };
+  }
+  if (kind === "punishing_one") {
+    const hand = Math.max(0, Number(g.hand?.length ?? 0) || 0);
+    const raw = Math.min(30, 6 + 2 * hand);
+    return { raw, hits: 1 };
+  }
+
   return { raw: 0, hits: 1 };
 }
 
@@ -177,7 +193,7 @@ export function buildIntentPreview(
         hitRaws.push(previewDeckSizeDamage(g, act));
         break;
       }
-      
+
       default:
         break;
     }

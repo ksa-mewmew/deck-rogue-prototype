@@ -65,6 +65,7 @@ export function spawnEncounter(
     g.run.battleCount = battleNo;
     for (const id of chosen) g.run.enemyLastSeenBattle[id] = battleNo;
     g.enemies = chosen.map((id) => enemyStateFromId(g, id));
+    runAny.lastBattleEnemyCount = g.enemies.length;
     g.run.lastBattleWasElite = false;
     (g.run as any).lastBattleWasBoss = false;
     logMsg(g, `전투 시작! (노드 ${nodeNo}, 전투 ${battleNo}회차) 적: ${g.enemies.map((e) => e.name).join(", ")}`);
@@ -96,6 +97,7 @@ export function spawnEncounter(
       }
 
       g.enemies = [enemyStateFromId(g, bossId)];
+      runAny.lastBattleEnemyCount = g.enemies.length;
       g.run.ominousProphecySeen = false;
 
       logMsg(g, `보스 등장! (노드 ${nodeNo}) 적: ${g.enemies[0].name}`);
@@ -113,6 +115,7 @@ export function spawnEncounter(
       ["slime"],
       ["rat_swarm"],
       ["supply_hound"],
+      ["goblin_assassin"],
     ],
     [
       ["goblin_raider", "slime"],
@@ -123,6 +126,7 @@ export function spawnEncounter(
       ["goblin_archer", "goblin_raider"],
       ["supply_hound", "goblin_raider"],
       ["archive_censor"],
+      ["old_monster_corpse", "punishing_one"],
     ],
     [
       ["goblin_raider", "goblin_raider", "goblin_raider"],
@@ -151,7 +155,7 @@ export function spawnEncounter(
   const elitePatternsByTier: string[][][] = [
     [["goblin_raider", "watching_statue"], ["rat_swarm", "goblin_archer"]],
     [["goblin_commander", "goblin_archer", "goblin_archer"], ["watching_statue", "watching_statue"], ["gloved_hunter", "rat_swarm"]],
-    [["rock_golem", "gravity_echo"], ["poison_spider", "poison_spider", "poison_spider"],], 
+    [["rock_golem", "gravity_echo"], ["poison_spider", "poison_spider", "poison_spider"],["old_monster_corpse", "old_monster_corpse", "old_monster_corpse"]], 
   ];
 
   const elitePostTreasurePatterns: string[][] = [
@@ -179,6 +183,7 @@ export function spawnEncounter(
   for (const id of chosen) g.run.enemyLastSeenBattle[id] = battleNo;
 
   g.enemies = chosen.map((id) => enemyStateFromId(g, id));
+  runAny.lastBattleEnemyCount = g.enemies.length;
 
   g.run.lastBattleWasElite = forceElite;
   (g.run as any).lastBattleWasBoss = false;

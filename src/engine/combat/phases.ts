@@ -1,6 +1,6 @@
 import type { EnemyEffect, EnemyState, GameState, Side } from "../types";
 import { aliveEnemies, clampMin, logMsg, shuffle, applyStatusTo, pushUiToast } from "../rules";
-import { applyDamageToPlayer, cleanupPendingTargetsIfNoEnemies } from "../effects";
+import { applyDamageToPlayer, cleanupPendingTargetsIfNoEnemies, addBlock } from "../effects";
 import { resolvePlayerEffects } from "../resolve";
 import { getCardDefFor, cardNameWithUpgrade } from "../../content/cards";
 import { runRelicHook, checkRelicUnlocks, getUnlockProgress, isRelicActive } from "../relics";
@@ -23,6 +23,10 @@ export function startCombat(g: GameState) {
   g.combatTurn = 1;
   g.time = (g.time ?? 0) + 1;
   logMsg(g, "전투: 시간 +1");
+  // 설치물 age 리셋(전투 단위)
+  g.installAgeByUid = {};
+
+  (g as any)._gamblerGloveGainedThisTurn = {};
 
   g.player.block = 0;
   g.player.status.vuln = 0;
@@ -41,7 +45,6 @@ export function startCombat(g: GameState) {
 
   g.hand = [];
   g.selectedHandCardUid = null;
-
   g.pendingTarget = null;
   g.pendingTargetQueue = [];
 
@@ -117,9 +120,37 @@ export function startCombat(g: GameState) {
     }
 
     n = Math.max(0, n);
+
+    // 선천성(INNATE): 전투 시작 시 손으로 가져오기(덱/버림 모두에서 수집)
+    // - 기본 드로우 n을 우선 채우되, INNATE는 반드시 손으로.
+    // - INNATE가 n보다 많으면 손패가 n을 초과할 수 있음(의도된 과부하).
+    const innate: string[] = [];
+    const takeInnateFrom = (zone: "deck" | "discard") => {
+      const arr = zone === "deck" ? g.deck : g.discard;
+      for (const uid of arr) {
+        const def = getCardDefFor(g, uid);
+        if (def.tags?.includes("INNATE")) innate.push(uid);
+      }
+    };
+    takeInnateFrom("deck");
+    takeInnateFrom("discard");
+
+    if (innate.length) {
+      // 중복 제거(덱/버림 양쪽에서 찾은 경우)
+      const unique = Array.from(new Set(innate));
+      g.deck = g.deck.filter((uid) => !unique.includes(uid));
+      g.discard = g.discard.filter((uid) => !unique.includes(uid));
+      for (const uid of unique) {
+        g.hand.push(uid);
+        g.cards[uid].zone = "hand";
+      }
+      logMsg(g, `선천성: ${unique.length}장 시작 손패에 배치`);
+      n = Math.max(0, n - unique.length);
+    }
+
     drawCards(g, n);
   }
-  
+
   revealIntentsAndDisrupt(g);
   g.phase = "PLACE";
 
@@ -148,6 +179,13 @@ export function placeCard(g: GameState, cardUid: string, side: Side, idx: number
   slots[idx] = cardUid;
   g.cards[cardUid].zone = side;
 
+  // 설치물 age 초기화(처음 설치되는 순간부터 카운트)
+  if (isInstalledHere(g, cardUid, side)) {
+    // 구버전 세이브 호환
+    (g as any).installAgeByUid ??= {};
+    g.installAgeByUid[cardUid] ??= 0;
+  }
+
   g.usedThisTurn += 1;
   if (side === "front") g.frontPlacedThisTurn += 1;
   (g.placedUidsThisTurn ??= []);
@@ -155,6 +193,17 @@ export function placeCard(g: GameState, cardUid: string, side: Side, idx: number
 
   // 신앙: 카드 사용 훅(임계치)
   applyFaithOnCardUsedHooks(g);
+
+
+  // 유물 언락 카운트: 달빛 두루마리 사용
+  try {
+    const defUsed: any = getCardDefFor(g, cardUid);
+    if (defUsed?.id === "token_moon_scroll") {
+      const up: any = getUnlockProgress(g) as any;
+      up.moonScrollUses = (Number(up.moonScrollUses ?? 0) || 0) + 1;
+      checkRelicUnlocks(g);
+    }
+  } catch {}
 
   logMsg(g, `[${cardNameWithUpgrade(g, cardUid)}]를 ${side === "front" ? "전열" : "후열"} ${idx}번에 배치`);
   runRelicHook(g, "onPlaceCard", { side, idx, cardUid });
@@ -168,6 +217,10 @@ function isTag(g: GameState, cardUid: string, tag: "EXHAUST" | "VANISH" | "INSTA
 function removeFromSlots(g: GameState, cardUid: string) {
   g.frontSlots = g.frontSlots.map((x) => (x === cardUid ? null : x));
   g.backSlots = g.backSlots.map((x) => (x === cardUid ? null : x));
+
+  // 설치물 age 제거(슬롯에서 빠지면 연속 카운트 리셋)
+  const ages = (g as any).installAgeByUid as Record<string, number> | undefined;
+  if (ages && (cardUid in ages)) delete ages[cardUid];
 }
 
 function moveCardAfterUse(g: GameState, cardUid: string, usedSide: "front" | "back") {
@@ -262,6 +315,21 @@ function clearSlots(g: GameState, force = false) {
   }
 }
 
+function incrementInstallAges(g: GameState) {
+  (g as any).installAgeByUid ??= {};
+  // 설치가 유지되는 카드만 +1
+  for (let i = 0; i < 3; i++) {
+    const f = g.frontSlots[i];
+    if (f && isInstalledHere(g, f, "front")) {
+      g.installAgeByUid[f] = (g.installAgeByUid[f] ?? 0) + 1;
+    }
+    const b = g.backSlots[i];
+    if (b && isInstalledHere(g, b, "back")) {
+      g.installAgeByUid[b] = (g.installAgeByUid[b] ?? 0) + 1;
+    }
+  }
+}
+
 export function resolveBack(g: GameState) {
   if (g.phase !== "PLACE" && g.phase !== "BACK") return;
   g.phase = "BACK";
@@ -280,7 +348,6 @@ export function resolveBack(g: GameState) {
 
     resolvePlayerEffects({ game: g, side: "back", cardUid: uid }, def.back);
   }
-
   g.phase = "FRONT";
 }
 
@@ -309,7 +376,7 @@ export function resolveEnemy(g: GameState) {
     const def = g.content.enemiesById[e.id];
     const intent = def.intents[e.intentIndex % def.intents.length];
 
-    if (e.id === "boss_soul_stealer") {
+   if (e.id === "boss_soul_stealer") {
       if (e.soulWillNukeThisTurn) {
         const ew = e.status.weak ?? 0;
         applyDamageToPlayer(g, 50, "ENEMY_ATTACK", "영혼 강탈자", ew);
@@ -323,15 +390,15 @@ export function resolveEnemy(g: GameState) {
       for (const act of intent.acts) resolveEnemyEffect(g, e, act);
 
       if (e.intentIndex === __SOUL_WARN_INTENT_INDEX) {
-        e.soulWarnCount = (e.soulWarnCount ?? 0) + 1;
+       e.soulWarnCount = (e.soulWarnCount ?? 0) + 1;
         logMsg(g, `영혼 강탈자: 경고 +1 (${e.soulWarnCount}/3)`);
         if ((e.soulWarnCount ?? 0) >= 3) {
-          e.soulArmed = true;
-          logMsg(g, "영혼 강탈자: 경고 3회 완료 → 폭발 가능 상태!");
-          if (Math.random() < SOUL_NUKE_CHANCE) {
-            e.soulWillNukeThisTurn = true;
-          }
+        e.soulArmed = true;
+        logMsg(g, "영혼 강탈자: 경고 3회 완료 → 폭발 가능 상태!");
+        if (Math.random() < SOUL_NUKE_CHANCE) {
+          e.soulWillNukeThisTurn = true;
         }
+      }
       }
 
       continue;
@@ -370,21 +437,45 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
     }
 
     case "damagePlayerFormula": {
+      const ew = enemy.status.weak ?? 0;
+
       if (act.kind === "goblin_raider") {
         const dmg = Math.max(0, 12 - g.usedThisTurn);
-        const ew = enemy.status.weak ?? 0;
         applyDamageToPlayer(g, dmg, "ENEMY_ATTACK", enemy.name, ew);
-      } else if (act.kind === "gloved_hunter") {
+        return;
+      }
+      if (act.kind === "gloved_hunter") {
         const blk = g.player.block ?? 0;
         const dmg = blk >= 4 ? 12 : 6;
-        const ew = enemy.status.weak ?? 0;
         applyDamageToPlayer(g, dmg, "ENEMY_ATTACK", enemy.name, ew);
-      } else {
-        const dmg = 4 + g.usedThisTurn;
-        const ew = enemy.status.weak ?? 0;
-        applyDamageToPlayer(g, dmg, "ENEMY_ATTACK", enemy.name, ew);
+        return;
       }
-      return;
+      if (act.kind === "goblin_assassin") {
+        const aimed = Math.max(0, Number((enemy as any).assassinAim ?? 0) || 0);
+        const dmg = aimed > 0 ? 15 : 10;
+        applyDamageToPlayer(g, dmg, "ENEMY_ATTACK", enemy.name, ew);
+        (enemy as any).assassinAim = 0;
+        return;
+      }
+      if (act.kind === "old_monster_corpse") {
+        const rage = Math.max(0, Number((enemy as any).corpseRage ?? 0) || 0);
+        const dmg = 9 + 2 * rage;
+        applyDamageToPlayer(g, dmg, "ENEMY_ATTACK", enemy.name, ew);
+        return;
+      }
+      if (act.kind === "punishing_one") {
+        const hand = Math.max(0, Number(g.hand?.length ?? 0) || 0);
+        const dmg = Math.min(30, 6 + 2 * hand);
+        applyDamageToPlayer(g, dmg, "ENEMY_ATTACK", enemy.name, ew);
+        return;
+      }
+
+      // default: watching_statue
+      {
+        const dmg = 4 + g.usedThisTurn;
+        applyDamageToPlayer(g, dmg, "ENEMY_ATTACK", enemy.name, ew);
+        return;
+      }
     }
 
     case "supplies": {
@@ -410,12 +501,18 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
       return;
     }
 
+    case "enemySetAssassinAim": {
+      (enemy as any).assassinAim = Math.max(0, Number((enemy as any).assassinAim ?? 0) || 0) + (Number(act.n ?? 0) || 0);
+      logMsg(g, `적(${enemy.name})이(가) 조준 상태가 됨`);
+      return;
+    }
+
+
     case "enemyImmuneThisTurn": {
       enemy.immuneThisTurn = true;
       logMsg(g, `적(${enemy.name})이(가) 피해 면역 상태가 됨`);
       return;
-    }
-
+   }
     case "enemyImmuneNextTurn": {
       enemy.immuneNextTurn = true;
       logMsg(g, `적(${enemy.name})이(가) 다음 턴 피해 면역 상태가 됨`);
@@ -427,7 +524,6 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
       logMsg(g, `적 효과: 피로 F ${act.n >= 0 ? "+" : ""}${act.n} (현재 ${g.player.fatigue})`);
       return;
     }
-
     case "damagePlayerByDeckSize": {
       const deckSize = getCombatDeckSize(g);
       const { dmg: rawDmg, scale } = calcDeckSizeDamage(act, deckSize);
@@ -445,7 +541,6 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
       const turn = Math.max(1, Number(g.combatTurn ?? 1));
       const baseHits = Math.max(1, Number(act.baseHits ?? 1));
       const every = Math.max(1, Number(act.everyTurns ?? 1));
-
       let hits = baseHits + Math.floor((turn - 1) / every);
       if (act.capHits != null) hits = Math.min(hits, Math.max(1, Number(act.capHits)));
 
@@ -480,7 +575,7 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
       break;
     }
     default: {
-      const _exhaustive: never = act;
+     const _exhaustive: never = act;
       return _exhaustive;
     }
   }
@@ -499,7 +594,7 @@ export function upkeepEndTurn(g: GameState) {
     let changed = false;
 
     if ((g.player.status.weak ?? 0) > 0) {
-      up.endedTurnWeak += 1;
+      up.endedTurnWeak = (up.endedTurnWeak ?? 0) + 1;
       changed = true;
     }
 
@@ -524,7 +619,6 @@ export function upkeepEndTurn(g: GameState) {
     const hadS = g.player.supplies ?? 0;
     const pay = Math.min(hadS, frontCount); // 실제 낸 S
     g.player.supplies = hadS - pay;
-
     const shortfall = frontCount - pay; // 부족분 = 전열 수 - 낸 S
     if (shortfall > 0) {
       g.player.fatigue += shortfall;
@@ -538,7 +632,7 @@ export function upkeepEndTurn(g: GameState) {
     // Unlock progress for relic activation: ended turn with S=0
     {
       const up = getUnlockProgress(g);
-      up.endedTurnSupplyZero += 1;
+      up.endedTurnSupplyZero = (up.endedTurnSupplyZero ?? 0) + 1;
       checkRelicUnlocks(g);
     }
 
@@ -565,10 +659,20 @@ export function upkeepEndTurn(g: GameState) {
 
   decayStatuses(g);
   clearSlots(g);
+  incrementInstallAges(g);
   cleanupPendingTargetsIfNoEnemies(g);
 
   checkEndConditions(g);
 
+  // 유물 해금 진행도: 설치물이 3개 이상인 채로 턴 종료
+  {
+    const installs = (g.frontSlots.filter(Boolean).length + g.backSlots.filter(Boolean).length) | 0;
+    if (installs >= 3) {
+      const up: any = getUnlockProgress(g) as any;
+      up.endedTurnWith3Installs = (Number(up.endedTurnWith3Installs ?? 0) || 0) + 1;
+      checkRelicUnlocks(g);
+    }
+  }
   runRelicHook(g, "onUpkeepEnd");
 
   g.phase = "DRAW";
@@ -601,10 +705,17 @@ export function drawStepStartNextTurn(g: GameState) {
   const extra = Number((g as any)._extraDrawNextTurn ?? 0);
   (g as any)._extraDrawNextTurn = 0;
 
+  // per-turn cap reset (도박사의 장갑 등)
+  (g as any)._gamblerGloveGainedThisTurn = {};
+
+  const blockBefore = g.player.block ?? 0;
   drawCards(g, n + (extra > 0 ? extra : 0));
 
-  if (g.player.block > 0) {
-    g.player.block = 0;
+  // 간이 방벽(전열 설치): 턴 종료 시 방어도 유지
+  const retain = hasMakeshiftWallFront(g);
+  if (!retain && blockBefore > 0) {
+    // 기존 턴의 방어만 소실 (드로우로 새로 얻은 방어는 남김)
+    g.player.block = Math.max(0, (g.player.block ?? 0) - blockBefore);
     logMsg(g, "방어(블록) 소실");
   }
 
@@ -624,6 +735,37 @@ export function drawStepStartNextTurn(g: GameState) {
   applyWingArteryEvery5Turns(g);
 }
 
+
+function hasMakeshiftWallFront(g: GameState): boolean {
+  for (const uid of g.frontSlots) {
+    if (!uid) continue;
+    const inst = g.cards[uid];
+    if (inst?.defId === "install_makeshift_wall") return true;
+  }
+  return false;
+}
+
+function applyGamblerGloveOnDraw(g: GameState) {
+  // 전열에 설치된 도박사의 장갑: 드로우마다 방어 +2, 턴당 캡
+  const gainedMap: Record<string, number> = ((g as any)._gamblerGloveGainedThisTurn ??= {});
+
+  for (const uid of g.frontSlots) {
+    if (!uid) continue;
+    const inst = g.cards[uid];
+    if (!inst || inst.defId !== "gambler_glove") continue;
+
+    const cap = (inst.upgrade ?? 0) > 0 ? 10 : 6;
+    const gained = Number(gainedMap[uid] ?? 0) || 0;
+    if (gained >= cap) continue;
+
+    const add = Math.min(2, cap - gained);
+    if (add > 0) {
+      addBlock(g, add);
+      gainedMap[uid] = gained + add;
+    }
+  }
+}
+
 export function drawCards(g: GameState, n: number): number {
   let drawn = 0;
 
@@ -636,6 +778,8 @@ export function drawCards(g: GameState, n: number): number {
 
     g.hand.push(card);
     drawn++;
+
+    applyGamblerGloveOnDraw(g);
   }
 
   logMsg(g, `드로우 ${drawn}/${n} (손패 ${g.hand.length})`);

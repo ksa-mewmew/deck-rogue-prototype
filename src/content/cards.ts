@@ -154,7 +154,7 @@ export const CARDS: CardData[] = [
   {
     id: "goal_treasure",
     name: "저주받은 보물",
-    rarity: "BASIC",
+    rarity: "MADNESS",
     exhaustWhen: "BOTH",
     frontText: "F +1, 소모",
     backText: "S -1, F +1, 소모",
@@ -218,18 +218,18 @@ export const CARDS: CardData[] = [
     name: "화살의 비",
     rarity: "COMMON",
     exhaustWhen: "BOTH",
-    frontText: "전체 피해 10, S -2 소모",
+    frontText: "전체 피해 9, S -2 소모",
     backText: "드로우 2, S +2, F +1, 소모",
     front: [
-      { op: "damageEnemy", target: "all", n: 10 },
+      { op: "damageEnemy", target: "all", n: 9 },
       { op: "supplies", n: -2 },
     ],
     back: [{ op: "draw", n: 2 }, { op: "supplies", n: 2 }, { op: "fatigue", n: 1 }],
 
     upgrades: [
       {
-        frontText: "전체 피해 13, S -2, 소모",
-        front: [{ op: "damageEnemy", target: "all", n: 13 },
+        frontText: "전체 피해 11, S -2, 소모",
+        front: [{ op: "damageEnemy", target: "all", n: 11 },
         { op: "supplies", n: -2 },],
 
         backText: "드로우 3, S +3, F +2, 소모",
@@ -285,22 +285,22 @@ export const CARDS: CardData[] = [
     rarity: "RARE",
     exhaustWhen: "BOTH",
     frontText: "무작위 피해 (F의 2배), 소모",
-    backText: "전체 취약 +3 및 약화 +3, 소모",
+    backText: "전체 취약 +3 및 약화 +2, 소모",
     front: [{ op: "damageEnemyByPlayerFatigue", target: "random", mult: 2 }],
     back: [
       { op: "statusEnemy", target: "all", key: "vuln", n: 3 },
-      { op: "statusEnemy", target: "all", key: "weak", n: 3 },
+      { op: "statusEnemy", target: "all", key: "weak", n: 2 },
     ],
 
     upgrades: [
       {
-        exhaustWhen: "FRONT",
+        exhaustWhen: "BOTH",
         frontText: "지정 피해 (F의 2배), 소모",
         front: [{ op: "damageEnemyByPlayerFatigue", target: "select", mult: 2 }],
 
-        backText: "전체 취약 +4 및 약화 +4",
+        backText: "전체 취약 +4 및 약화 +3, 소모",
         back: [{ op: "statusEnemy", target: "all", key: "vuln", n: 4 },
-        { op: "statusEnemy", target: "all", key: "weak", n: 4 },],
+        { op: "statusEnemy", target: "all", key: "weak", n: 3 },],
       },
     ]
 
@@ -313,18 +313,18 @@ export const CARDS: CardData[] = [
     rarity: "RARE",
     exhaustWhen: "FRONT",
     vanishWhen: "BACK",
-    frontText: "전체 피해 6, 소모",
-    backText: "전체 피해 12, 소실",
-    front: [{ op: "damageEnemy", target: "all", n: 6 }],
-    back: [{ op: "damageEnemy", target: "all", n: 12 }],
+    frontText: "전체 피해 8, 소모",
+    backText: "전체 피해 14, 소실",
+    front: [{ op: "damageEnemy", target: "all", n: 8 }],
+    back: [{ op: "damageEnemy", target: "all", n: 14 }],
 
     upgrades: [
       {
-        frontText: "전체 피해 8, 소모",
-        front: [{ op: "damageEnemy", target: "all", n: 8 }],
+        frontText: "전체 피해 11, 소모",
+        front: [{ op: "damageEnemy", target: "all", n: 11 }],
 
-        backText: "전체 피해 15, 소실",
-        back: [{ op: "damageEnemy", target: "all", n: 15 }],
+        backText: "전체 피해 18, 소실",
+        back: [{ op: "damageEnemy", target: "all", n: 18 }],
       },
     ]
   },
@@ -387,9 +387,9 @@ export const CARDS: CardData[] = [
     upgrades: [
       {
         frontText: "HP -6, F -3, 소모",
-        backText: "HP +10, F +1, 소실",
+        backText: "HP +11, F +1, 소실",
         front: [{ op: "hp", n: -6 }, { op: "fatigue", n: -3 }],
-        back: [{ op: "hp", n: 10 }, { op: "fatigue", n: 1 }],
+        back: [{ op: "hp", n: 11 }, { op: "fatigue", n: 1 }],
       },
     ]
 
@@ -431,9 +431,9 @@ export const CARDS: CardData[] = [
     upgrades: [
       {
         frontText: "방어 +5, S +2",
-        backText: "S +5",
+        backText: "S +4",
         front: [{ op: "block", n: 5 }, { op: "supplies", n: 2 }],
-        back: [{ op: "supplies", n: 5 }],
+        back: [{ op: "supplies", n: 4 }],
       },
     ]
 
@@ -530,17 +530,17 @@ export const CARDS: CardData[] = [
     id: "blood_contract",
     name: "피의 계약",
     rarity: "COMMON",
-    frontText: "지정 피해 13, HP -3",
+    frontText: "지정 피해 15, HP -3",
     backText: "S +4, F +1",
-    front: [{ op: "damageEnemy", target: "select", n: 12 }, { op: "hp", n: -3 }],
-    back: [{ op: "supplies", n: 3 }, { op: "fatigue", n: 1 }],
+    front: [{ op: "damageEnemy", target: "select", n: 15 }, { op: "hp", n: -3 }],
+    back: [{ op: "supplies", n: 4 }, { op: "fatigue", n: 1 }],
 
     upgrades: [
       {
-        frontText: "지정 피해 16, HP -3",
+        frontText: "지정 피해 18, HP -3",
         backText: "S +5, F +1",
-        front: [{ op: "damageEnemy", target: "select", n: 15 }, { op: "hp", n: -3 }],
-        back: [{ op: "supplies", n: 4 }, { op: "fatigue", n: 1 }],
+        front: [{ op: "damageEnemy", target: "select", n: 18 }, { op: "hp", n: -3 }],
+        back: [{ op: "supplies", n: 5 }, { op: "fatigue", n: 1 }],
       },
     ]
   },
@@ -569,13 +569,13 @@ export const CARDS: CardData[] = [
     id: "prey_mark",
     name: "사냥감 표시",
     rarity: "SPECIAL",
-    frontText: "지정 피해 7, 대상의 HP가 플레이어보다 높으면 대신 피해 12",
+    frontText: "지정 피해 10, HP가 플레이어보다 높으면 피해 15",
     backText: "지정 취약 +2",
     front: [{ op: "damageEnemyFormula", target: "select", kind: "prey_mark" }],
     back: [{ op: "statusEnemy", target: "select", key: "vuln", n: 2 }],
     upgrades: [
       {
-        frontText: "지정 피해 9, 대상의 HP가 플레이어보다 높으면 대신 피해 15",
+        frontText: "지정 피해 12, HP가 플레이어보다 높으면 피해 18",
         front: [{ op: "damageEnemyFormula", target: "select", kind: "prey_mark_u1" }],
         backText: "지정 취약 +3",
         back: [{ op: "statusEnemy", target: "select", key: "vuln", n: 3 }],
@@ -589,20 +589,100 @@ export const CARDS: CardData[] = [
     id: "brawl_cleaver",
     name: "난전 정리",
     rarity: "COMMON",
-    frontText: "지정 피해 8, 남은 적이 3명이면 대신 피해 16",
-    backText: "방어 +6",
+    frontText: "지정 피해 10, 적이 3명이면 대신 피해 16",
+    backText: "방어 +5",
     front: [{ op: "damageEnemyFormula", target: "select", kind: "triple_bounty" }],
-    back: [{ op: "block", n: 6 }],
+    back: [{ op: "block", n: 5 }],
     upgrades: [
       {
-        frontText: "지정 피해 10, 남은 적이 3명이면 대신 20",
+        frontText: "지정 피해 10, 적이 3명이면 대신 20",
         front: [{ op: "damageEnemyFormula", target: "select", kind: "triple_bounty_u1" }],
-        backText: "방어 +7",
-        back: [{ op: "block", n: 7 }],
+        backText: "방어 +6",
+        back: [{ op: "block", n: 6 }],
       },
     ],
   },
 
+// 15) 손 안의 칼날
+  {
+    id: "hand_blade",
+    name: "손 안의 칼날",
+    rarity: "RARE",
+    frontText: "지정 피해 4, 이 카드 제외 손패 1장당 피해 +2",
+    backText: "손패 1장당 방어 +1 (최대 6)",
+    front: [{ op: "damageEnemyFormula", target: "select", kind: "hand_blade" }],
+    back: [{ op: "blockFormula", kind: "hand_blade_back" }],
+    upgrades: [
+      {
+        frontText: "지정 피해 6, 이 카드 제외 손패 1장당 피해 +2",
+        backText: "손패 1장당 방어 +2",
+        front: [{ op: "damageEnemyFormula", target: "select", kind: "hand_blade_u1" }],
+        back: [{ op: "blockFormula", kind: "hand_blade_back_u1" }],
+      },
+    ],
+  },
+
+
+  // 16) 도박사의 장갑
+  {
+    id: "gambler_glove",
+    name: "도박사의 장갑",
+    rarity: "COMMON",
+    tags: ["INSTALL"],
+    installWhen: "FRONT",
+    frontText: "카드를 뽑을 때마다 방어 +2 (최대 6) (설치)",
+    backText: "손패를 모두 버린다. 버린 만큼 뽑는다.",
+    front: [],
+    back: [{ op: "discardHandAllDraw" }],
+    upgrades: [
+      {
+        frontText: "카드를 뽑을 때마다 방어 +2 (최대 10) (설치)",
+        backText: "손패를 모두 버린다. 버린 만큼 뽑는다. 드로우 1",
+        front: [],
+        back: [{ op: "discardHandAllDraw", extraDraw: 1 }],
+      },
+    ],
+  },
+
+  // 17) 고독한 일격
+  {
+    id: "lone_blow",
+    name: "고독한 일격",
+    rarity: "SPECIAL",
+    frontText: "이번 턴에 이 카드만 사용했으면, 지정 피해 20",
+    backText: "이번 턴에 이 카드만 사용했으면, 방어 +10",
+    front: [{ op: "damageEnemyFormula", target: "select", kind: "lone_blow_20" }],
+    back: [{ op: "blockFormula", kind: "lone_blow_block_10" }],
+    upgrades: [
+      {
+        frontText: "이번 턴에 이 카드만 사용했으면, 지정 피해 26",
+        backText: "이번 턴에 이 카드만 사용했으면, 방어 +14",
+        front: [{ op: "damageEnemyFormula", target: "select", kind: "lone_blow_26" }],
+        back: [{ op: "blockFormula", kind: "lone_blow_block_14" }],
+      },
+    ],
+  },
+
+  // 18) 간이 방벽
+  {
+    id: "install_makeshift_wall",
+    name: "간이 방벽",
+    rarity: "RARE",
+    tags: ["INSTALL"],
+    installWhen: "BOTH",
+    frontText: "턴이 끝날 때 방어도가 사라지지 않음 (설치)",
+    backText: "보급 +1 (설치)",
+    front: [],
+    back: [{ op: "supplies", n: 1 }],
+    upgrades: [
+      {
+        frontText: "턴이 끝날 때 방어도가 사라지지 않음, 방어 +2 (설치)",
+        backText: "보급 +1, 방어 +2 (설치)",
+        front: [{ op: "block", n: 2 }],
+        back: [{ op: "supplies", n: 1 }, { op: "block", n: 2 }],
+      },
+    ],
+  },
 
   // =========================
   // 설치(장비) / 토큰(두루마리)
@@ -634,16 +714,16 @@ export const CARDS: CardData[] = [
     rarity: "COMMON",
     tags: ["INSTALL"],
     installWhen: "BOTH",
-    frontText: "방어 +3 (설치)",
-    backText: "방어 +1 (설치)",
-    front: [{ op: "block", n: 3 }],
-    back: [{ op: "block", n: 1 }],
+    frontText: "방어 +4 (설치)",
+    backText: "방어 +2 (설치)",
+    front: [{ op: "block", n: 4 }],
+    back: [{ op: "block", n: 2 }],
     upgrades: [
       {
-        frontText: "방어 +4 (설치)",
-        backText: "방어 +2 (설치)",
-        front: [{ op: "block", n: 4 }],
-        back: [{ op: "block", n: 2 }],
+        frontText: "방어 +5 (설치)",
+        backText: "방어 +3 (설치)",
+        front: [{ op: "block", n: 5 }],
+        back: [{ op: "block", n: 3 }],
       },
     ],
   },
@@ -655,15 +735,99 @@ export const CARDS: CardData[] = [
     tags: ["INSTALL"],
     installWhen: "BOTH",
     frontText: "무작위 적에게 취약 +1 (설치)",
-    backText: "방어 +1 (설치)",
+    backText: "방어 +2 (설치)",
     front: [{ op: "statusEnemy", target: "random", key: "vuln", n: 1 }],
-    back: [{ op: "block", n: 1 }],
+    back: [{ op: "block", n: 2 }],
     upgrades: [
       {
         frontText: "무작위 적에게 취약 +2 (설치)",
-        backText: "방어 +2 (설치)",
+        backText: "방어 +3 (설치)",
         front: [{ op: "statusEnemy", target: "random", key: "vuln", n: 2 }],
+        back: [{ op: "block", n: 3 }],
+      },
+    ],
+  },
+
+  // (신규) 선두 관측 — 설치형 피해 가이드
+  // 전열 설치: (1)에게 주는 피해 +2
+  // 후열 설치: (3)에게 주는 피해 +2
+  {
+    id: "install_lead_observation",
+    name: "선두 관측",
+    rarity: "COMMON",
+    tags: ["INSTALL"],
+    installWhen: "BOTH",
+    frontText: "(1)번 적에게 주는 피해 +2 (설치)",
+    backText: "(3)번 적에게 주는 피해 +2 (설치)",
+    front: [],
+    back: [],
+    upgrades: [
+      {
+        frontText: "(1)번 적에게 주는 피해 +2, 방어 +2 (설치)",
+        backText: "(3)번 적에게 주는 피해 +2, 방어 +2 (설치)",
+        front: [{ op: "block", n: 2 }],
         back: [{ op: "block", n: 2 }],
+      },
+    ],
+  },
+
+  // (신규) 기동 방패 — 선천성
+  {
+    id: "innate_march_shield",
+    name: "기동 방패",
+    rarity: "COMMON",
+    tags: ["INNATE"],
+    frontText: "방어 +7 (선천성)",
+    backText: "방어 +4 (선천성)",
+    front: [{ op: "block", n: 7 }],
+    back: [{ op: "block", n: 4 }],
+    upgrades: [
+      {
+        frontText: "방어 +9 (선천성)",
+        backText: "방어 +6 (선천성)",
+        front: [{ op: "block", n: 9 }],
+        back: [{ op: "block", n: 6 }],
+      },
+    ],
+  },
+
+  // (신규) 중열 절단 — (2)번 적의 HP를 절반으로
+  {
+    id: "rare_cut_second",
+    name: "중열 절단",
+    rarity: "RARE",
+    exhaustWhen: "BOTH",
+    frontText: "(2)번 적의 현재 HP를 절반으로, 소모",
+    backText: "(2)번 적의 현재 HP를 절반으로, F +1, 소모",
+    front: [{ op: "halveEnemyHpAtIndex", index: 1 }],
+    back: [{ op: "fatigue", n: 1 }, { op: "halveEnemyHpAtIndex", index: 1 }],
+    upgrades: [
+      {
+        frontText: "(2)번 적의 현재 HP를 절반으로, S +2, 소모",
+        backText: "(2)번 적의 현재 HP를 절반으로, 소모",
+        front: [{ op: "halveEnemyHpAtIndex", index: 1 }, { op: "supplies", n: 2 }],
+        back: [{ op: "halveEnemyHpAtIndex", index: 1 }],
+      },
+    ],
+  },
+
+  // (신규) 성곽 쇠뇌 — 오래 둘수록 강해지는 설치
+  {
+    id: "install_castle_ballista",
+    name: "성곽 쇠뇌",
+    rarity: "COMMON",
+    tags: ["INSTALL"],
+    installWhen: "BOTH",
+    frontText: "무작위 피해 1 + 설치한 턴 수 (설치)",
+    backText: "방어 +2 (설치)",
+    front: [{ op: "damageEnemyFormula", target: "random", kind: "castle_ballista_age" }],
+    back: [{ op: "block", n: 2 }],
+    upgrades: [
+      {
+        frontText: "무작위 피해 2 + 설치한 턴 수 (설치)",
+        backText: "방어 +3 (설치)",
+        front: [{ op: "damageEnemyFormula", target: "random", kind: "castle_ballista_age_u1" }],
+        back: [{ op: "block", n: 3 }],
       },
     ],
   },

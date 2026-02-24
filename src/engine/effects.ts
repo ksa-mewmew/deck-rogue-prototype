@@ -72,6 +72,9 @@ export function cleanupPendingTargetsIfNoEnemies(g: GameState) {
 export function applyDamageToEnemy(g: GameState, enemy: EnemyState, raw: number) {
   if (raw <= 0) return;
 
+  // resolve.ts에서 설치물 기원 피해를 메타로 표시합니다.
+  const fromInstall = !!(g as any)._playerDamageFromInstall;
+
   const idx = g.enemies.indexOf(enemy);
   if (idx < 0) {
     logMsg(g, `WARN: applyDamageToEnemy target not in g.enemies (${enemy?.id ?? "?"})`);
@@ -88,11 +91,34 @@ export function applyDamageToEnemy(g: GameState, enemy: EnemyState, raw: number)
     return;
   }
 
+  // 설치물 기반 피해 보정
+  // - 선두 관측(전열 설치): (1)에게 주는 피해 +2
+  // - 선두 관측(후열 설치): (3)에게 주는 피해 +2
+  // NOTE: 의도/행동 변경 없이, 순수한 피해 수치만 보정합니다.
+  {
+    const OBS_ID = "install_lead_observation";
+    const countIn = (slots: (string | null)[], defId: string) => {
+      let c = 0;
+      for (const uid of slots) {
+        if (!uid) continue;
+        const inst = g.cards[uid];
+        if (inst && inst.defId === defId) c += 1;
+      }
+      return c;
+    };
+
+    let bonus = 0;
+    if (idx === 0) bonus += 2 * countIn(g.frontSlots, OBS_ID);
+    if (idx === 2) bonus += 2 * countIn(g.backSlots, OBS_ID);
+    if (bonus > 0) raw += bonus;
+  }
+
   // PRE_STATUS
   let ctxBase = {
     target: "ENEMY" as const,
     source: "PLAYER_ATTACK" as const,
     raw,
+    reason: fromInstall ? ("INSTALL" as const) : undefined,
     enemyIndex: idx,
     enemyId: enemy.id,
   };
@@ -141,12 +167,31 @@ export function applyDamageToEnemy(g: GameState, enemy: EnemyState, raw: number)
   enemy.hp = Math.max(0, enemy.hp - dmg);
   logMsg(g, `적(${enemy.name})에게 ${dmg} 피해. (HP ${enemy.hp}/${enemy.maxHp})`);
 
+  // 유물 해금 진행도: 설치물 피해 누적
+  if (fromInstall && dmg > 0) {
+    const up: any = getUnlockProgress(g) as any;
+    up.installDamageDealt = (Number(up.installDamageDealt ?? 0) || 0) + dmg;
+    checkRelicUnlocks(g);
+  }
+
   // 유물 해금 진행도: 적 처치 카운트
   if (beforeHp > 0 && enemy.hp === 0) {
     const up = getUnlockProgress(g);
     up.kills += 1;
     checkRelicUnlocks(g);
   }
+
+  // 적 패시브: 오래된 괴물 사체(썩은 분노)
+  // - 다른 적이 죽을 때마다(처치 발생 시) 분노 +1 → 공격 +2
+  if (beforeHp > 0 && enemy.hp === 0) {
+    for (const other of aliveEnemies(g) as any) {
+      if (!other || other.hp <= 0) continue;
+      if (other.id !== "old_monster_corpse") continue;
+      (other as any).corpseRage = Math.max(0, Number((other as any).corpseRage ?? 0) || 0) + 1;
+      logMsg(g, `적(${other.name}) 패시브: 썩은 분노 +1 (현재 ${(other as any).corpseRage})`);
+    }
+  }
+
 
   notifyDamageAppliedByRelics(g, {
     ...ctxBase,

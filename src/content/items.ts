@@ -32,6 +32,25 @@ export const ITEMS: ItemData[] = [
     priceGold: 22,
     consumable: true,
   },
+
+  {
+    id: "item_moon_scroll",
+    name: "달빛 두루마리",
+    text: "달빛 두루마리 1장을 손패에 추가합니다. (소모)",
+    art: "assets/items/item_moon_scroll.png",
+    effects: [{ op: "addCardToHand", defId: "token_moon_scroll", n: 1 }],
+    priceGold: 18,
+    consumable: true,
+  },
+  {
+    id: "item_triple_swap",
+    name: "교환권",
+    text: "손패에서 무작위 3장을 버리고, 3장을 뽑습니다. (소모)",
+    art: "assets/items/item_triple_swap.png",
+    effects: [{ op: "discardHandRandom", n: 3 }, { op: "draw", n: 3 }],
+    priceGold: 20,
+    consumable: true,
+  },
 ];
 
 export const ITEMS_BY_ID: Record<string, ItemData> = Object.fromEntries(ITEMS.map((x) => [x.id, x]));

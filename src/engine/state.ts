@@ -130,6 +130,8 @@ export function createInitialState(content: Content): GameState {
     backUidsThisTurn: [],
     placedUidsThisTurn: [],
 
+    installAgeByUid: {},
+
     victoryResolvedThisCombat: false,
 
     time: 0,

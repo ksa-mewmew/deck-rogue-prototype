@@ -111,6 +111,17 @@ export function checkEndConditions(g: GameState) {
       checkRelicUnlocks(g);
     }
 
+    // 유물 해금 진행도: 적이 3명인 전투 승리
+    {
+      const runAny: any = g.run as any;
+      const enemyCount = Number(runAny.lastBattleEnemyCount ?? 0) || 0;
+      if (!wasBoss && enemyCount === 3) {
+        const up = getUnlockProgress(g) as any;
+        up.threeEnemyWins = (Number(up.threeEnemyWins ?? 0) || 0) + 1;
+        checkRelicUnlocks(g);
+      }
+    }
+
     // =========================
     // Victory rewards (gold, etc.)
     // =========================

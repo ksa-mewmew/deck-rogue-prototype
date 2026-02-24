@@ -129,6 +129,12 @@ type UnlockProgress = {
   skippedTurn: number;
   bleedApplied: number;
   endedTurnSupplyZero: number;
+  moonScrollUses: number;
+
+  // --- custom unlock counters (new relics) ---
+  threeEnemyWins: number;
+  endedTurnWith3Installs: number;
+  installDamageDealt: number;
 };
 
 export type RelicUnlockBaseline = {
@@ -150,6 +156,11 @@ const DEFAULT_UNLOCK: UnlockProgress = {
   skippedTurn: 0,
   bleedApplied: 0,
   endedTurnSupplyZero: 0,
+  moonScrollUses: 0,
+
+  threeEnemyWins: 0,
+  endedTurnWith3Installs: 0,
+  installDamageDealt: 0,
 };
 
 function ensureRelicSystem(g: GameState) {

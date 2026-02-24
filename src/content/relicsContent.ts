@@ -1,6 +1,6 @@
 import type { RelicDef } from "../engine/relics";
-import { healPlayer } from "../engine/effects";
-import { logMsg, aliveEnemies, applyStatusTo } from "../engine/rules";
+import { healPlayer, applyDamageToEnemy, addBlock, addSupplies } from "../engine/effects";
+import { logMsg, aliveEnemies, applyStatusTo, pickOne } from "../engine/rules";
 
 
 export function listAllRelicIds(): string[] {
@@ -356,6 +356,124 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
       g.hand.push(uid);
 
       logMsg(g, "유물[검은 잉크병]: 달빛 두루마리 +1");
+    },
+
+  },
+
+  relic_moon_scroll_chisel: {
+    id: "relic_moon_scroll_chisel",
+    dormantName: "달빛 부스러기",
+    dormantText: "차가운 빛이 손끝에 묻어 있다.",
+    unlockHint: "조건: 달빛 두루마리 3회 사용",
+
+    art: "assets/relics/relic_moon_scroll_chisel.png",
+
+    unlock: (g, base) => {
+      const cur = (g.run as any).unlock?.moonScrollUses ?? 0;
+      const prev = base.unlock.moonScrollUses ?? 0;
+      return cur >= (prev + 3);
+    },
+
+    name: "달빛 깎개",
+    text: "달빛 두루마리를 사용하면 무작위 🗡️ 피해 3",
+    unlockFlavor: "문장 사이로 빛이 새어 나온다.",
+
+    onPlaceCard(g, ctx) {
+      const uid = ctx.cardUid;
+      const inst = g.cards[uid];
+      if (!inst) return;
+      if (inst.defId !== "token_moon_scroll") return;
+      const alive = aliveEnemies(g);
+      if (alive.length === 0) return;
+      applyDamageToEnemy(g, pickOne(alive), 3);
+      logMsg(g, "유물[달빛 깎개]: 무작위 적에게 3 피해");
+    },
+  },
+
+  // =========================
+  // (법령 유물) 순서/설치 테마
+  // =========================
+
+  relic_order_whistle: {
+    id: "relic_order_whistle",
+    dormantName: "닳아빠진 호루라기",
+    dormantText: "불면 소리가 나지 않는다. 그래도 목에 건다.",
+    unlockHint: "조건: 적이 3명인 전투 승리",
+
+    art: "assets/relics/relic_order_whistle.png",
+
+    unlock: (g, base) => ((g.run as any).unlock?.threeEnemyWins ?? 0) >= (base.unlock.threeEnemyWins + 1),
+
+    name: "대열 정리의 호루라기",
+    text: "적이 죽을 때마다 🛡️ 방어 +6",
+    unlockFlavor: "호루라기 소리는 대열을 다시 세운다.",
+
+    onCombatStart(g) {
+      // per-combat kill guard (중복 발동 방지)
+      (g as any)._orderWhistleKillSet = new Set<string>();
+    },
+
+    onDamageApplied(g, ctx) {
+      if (ctx.target !== "ENEMY") return;
+      const idx = ctx.enemyIndex;
+      if (idx == null || idx < 0) return;
+      const en = g.enemies[idx];
+      if (!en) return;
+      if (en.hp !== 0) return;
+
+      const key = `${idx}:${ctx.enemyId ?? "?"}`;
+      const maybe = (g as any)._orderWhistleKillSet;
+      const set: Set<string> = maybe instanceof Set ? maybe : new Set<string>();
+      if (set.has(key)) return;
+      set.add(key);
+      (g as any)._orderWhistleKillSet = set;
+
+      addBlock(g, 6);
+      logMsg(g, "유물[대열 정리의 호루라기]: 적 처치 → 방어 +6");
+    },
+  },
+
+  relic_field_mechanic_glove: {
+    id: "relic_field_mechanic_glove",
+    dormantName: "기름 냄새 나는 장갑",
+    dormantText: "손바닥에 낡은 가죽이 들러붙는다.",
+    unlockHint: "조건: 설치물이 3개 이상인 채로 턴 종료",
+
+    art: "assets/relics/relic_field_mechanic_glove.png",
+
+    unlock: (g, base) => ((g.run as any).unlock?.endedTurnWith3Installs ?? 0) >= (base.unlock.endedTurnWith3Installs + 1),
+
+    name: "현장 정비공의 장갑",
+    text: "턴 종료 시 설치물이 있으면 🍞 S +1",
+    unlockFlavor: "정비는 곧 보급이다.",
+
+    onUpkeepEnd(g) {
+      const installs = (g.frontSlots.filter(Boolean).length + g.backSlots.filter(Boolean).length) | 0;
+      if (installs <= 0) return;
+      addSupplies(g, 1);
+      logMsg(g, "유물[현장 정비공의 장갑]: 턴 종료 설치물 보유 → S +1");
+    },
+  },
+
+  relic_castle_sight: {
+    id: "relic_castle_sight",
+    dormantName: "흐린 조준기",
+    dormantText: "벽 너머를 보려면, 먼저 초점을 맞춰야 한다.",
+    unlockHint: "조건: 설치물로 준 피해 도합 15",
+
+    art: "assets/relics/relic_castle_sight.png",
+
+    unlock: (g, base) => ((g.run as any).unlock?.installDamageDealt ?? 0) >= (base.unlock.installDamageDealt + 15),
+
+    name: "성곽 조준기",
+    text: "설치물이 주는 🗡️ 피해 +1",
+    unlockFlavor: "가까운 적부터 정확히.",
+
+    modifyDamage(g, ctx) {
+      if (ctx.phase !== "PRE_STATUS") return ctx.current;
+      if (ctx.target !== "ENEMY") return ctx.current;
+      if (ctx.reason !== "INSTALL") return ctx.current;
+      return ctx.current + 1;
     },
   },
 

@@ -60,15 +60,84 @@ function enemyWillAttackThisTurn(g: GameState, en: EnemyState): boolean {
   );
 }
 
+function onlyThisCardUsedThisTurn(ctx: ResolveCtx): boolean {
+  const g = ctx.game;
+  const used = Number(g.usedThisTurn ?? 0) || 0;
+  if (used !== 1) return false;
+  const placed = (g.placedUidsThisTurn ?? []).filter(Boolean);
+  if (placed.length !== 1) return false;
+  return placed[0] === ctx.cardUid;
+}
+
 function calcDamageEnemyFormulaBase(ctx: ResolveCtx, kind: string): number {
   switch (kind) {
 
-    case "prey_mark": return 7;
-    case "prey_mark_u1": return 9;
-    case "triple_bounty": return 8;
+    case "prey_mark": return 10;
+    case "prey_mark_u1": return 12;
+    case "triple_bounty": return 10;
     case "triple_bounty_u1": return 10;
+    case "hand_blade": {
+      const g = ctx.game;
+      const handOthers = Object.values(g.cards).filter((c) => c.zone === "hand" && c.uid !== ctx.cardUid).length;
+      return 4 + 2 * handOthers;
+    }
+    case "hand_blade_u1": {
+      const g = ctx.game;
+      const handOthers = Object.values(g.cards).filter((c) => c.zone === "hand" && c.uid !== ctx.cardUid).length;
+      return 6 + 2 * handOthers;
+    }
+    case "lone_blow_20": {
+      return onlyThisCardUsedThisTurn(ctx) ? 20 : 0;
+    }
+    case "lone_blow_26": {
+      return onlyThisCardUsedThisTurn(ctx) ? 26 : 0;
+    }
+
+    // 설치물: 성곽 쇠뇌
+    case "castle_ballista_age": {
+      const uid = ctx.cardUid ?? "";
+      const age = (ctx.game.installAgeByUid?.[uid] ?? 0) | 0;
+      return 1 + Math.max(0, age);
+    }
+    case "castle_ballista_age_u1": {
+      const uid = ctx.cardUid ?? "";
+      const age = (ctx.game.installAgeByUid?.[uid] ?? 0) | 0;
+      return 2 + Math.max(0, age);
+    }
+
+
+
 
     default: return 0;
+  }
+}
+
+function calcBlockFormula(ctx: ResolveCtx, kind: string): number {
+  const g = ctx.game;
+  const handCount = Object.values(g.cards).filter((c) => c.zone === "hand" && c.uid !== ctx.cardUid).length;
+
+  switch (kind) {
+    // 손 안의 칼날(후열): 손패 1장당 방어 2, 최대 6
+    case "hand_blade_back": {
+      const amount = 1 * handCount;
+      return Math.min(6, amount);
+    }
+
+    // 강화: 캡 없음
+    case "hand_blade_back_u1": {
+      return 1 * handCount;
+    }
+    // 고독한 일격(후열): 이번 턴 이 카드만 사용했으면 방어
+    case "lone_blow_block_10": {
+      return onlyThisCardUsedThisTurn(ctx) ? 10 : 0;
+    }
+    case "lone_blow_block_14": {
+      return onlyThisCardUsedThisTurn(ctx) ? 14 : 0;
+    }
+
+
+    default:
+      return 0;
   }
 }
 
@@ -85,7 +154,7 @@ function calcDamageEnemyFormulaForTarget(g: GameState, kind: string, target: Ene
     }
 
     case "triple_bounty": {
-      const bonus = 8;
+      const bonus = 6;
       const alive = (aliveCountSnapshot ?? aliveEnemies(g).length);
       return alive >= 3 ? base + bonus : base;
     }
@@ -103,11 +172,44 @@ function calcDamageEnemyFormulaForTarget(g: GameState, kind: string, target: Ene
 export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
   const g = ctx.game;
 
+  // 설치물에서 발생한 피해인지 여부를 메타로 전달합니다.
+  // (설치물 피해 누적/유물 보정/언락 카운트 등에 사용)
+  const fromInstall = (() => {
+    try {
+      const def: any = getCardDefFor(g, ctx.cardUid);
+      if (!(def?.tags?.includes("INSTALL"))) return false;
+      const w = def.installWhen as ("FRONT" | "BACK" | "BOTH" | "NONE" | undefined);
+      if (!w || w === "BOTH") return true;
+      if (w === "FRONT") return ctx.side === "front";
+      if (w === "BACK") return ctx.side === "back";
+      return false;
+    } catch {
+      return false;
+    }
+  })();
+
+  const damageEnemyWithMeta = (en: EnemyState, amount: number) => {
+    const key = "_playerDamageFromInstall";
+    const prev = (g as any)[key];
+    (g as any)[key] = fromInstall;
+    try {
+      applyDamageToEnemy(g, en, amount);
+    } finally {
+      (g as any)[key] = prev;
+    }
+  };
+
   for (const e of effects) {
     switch (e.op) {
       case "block":
         addBlock(g, e.n);
         break;
+
+      case "blockFormula": {
+        const amount = calcBlockFormula(ctx, e.kind);
+        if (amount > 0) addBlock(g, amount);
+        break;
+      }
 
       case "supplies":
         addSupplies(g, e.n);
@@ -143,6 +245,55 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
         break;
       }
 
+      case "discardHandAllDraw": {
+        const extra = Number((e as any).extraDraw ?? 0) || 0;
+        const toDiscard = g.hand.slice();
+        if (toDiscard.length > 0) {
+          g.hand = [];
+          for (const uid of toDiscard) {
+            g.discard.push(uid);
+            g.cards[uid].zone = "discard";
+          }
+          logMsg(g, `손패 ${toDiscard.length}장 버림`);
+        } else {
+          logMsg(g, `손패 버림: 0장`);
+        }
+
+        const want = toDiscard.length + extra;
+        if (want > 0) {
+          const drawn = drawCards(g, want);
+          g.drawCountThisTurn += drawn;
+        }
+        break;
+      }
+
+      case "discardHandRandom": {
+        let n = Number((e as any).n ?? 0) || 0;
+        n = Math.max(0, Math.min(n, g.hand.length));
+        if (n <= 0) {
+          logMsg(g, `손패 무작위 버림: 0장`);
+          break;
+        }
+
+        const pool = g.hand.slice();
+        const picked: string[] = [];
+        for (let i = 0; i < n; i++) {
+          const uid = pickOne(pool);
+          const ix = pool.indexOf(uid);
+          if (ix >= 0) pool.splice(ix, 1);
+          picked.push(uid);
+        }
+
+        g.hand = g.hand.filter((u) => !picked.includes(u));
+        for (const uid of picked) {
+          g.discard.push(uid);
+          g.cards[uid].zone = "discard";
+        }
+
+        logMsg(g, `손패 무작위 버림: ${picked.length}장`);
+        break;
+      }
+
       case "ifDrewThisTurn": {
         if (g.drawCountThisTurn > 0) {
           resolvePlayerEffects(ctx, e.then);
@@ -154,13 +305,27 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
         if (e.target === "random") {
           const alive = aliveEnemies(g);
           if (alive.length === 0) break;
-          applyDamageToEnemy(g, pickOne(alive), e.n);
+          damageEnemyWithMeta(pickOne(alive), e.n);
         } else if (e.target === "all") {
-          for (const en of aliveEnemies(g)) applyDamageToEnemy(g, en, e.n);
+          for (const en of aliveEnemies(g)) damageEnemyWithMeta(en, e.n);
         } else {
           enqueueTargetSelectDamage(ctx, e.n);
         }
         break;
+
+      case "halveEnemyHpAtIndex": {
+        const idx = (e.index ?? -1) | 0;
+        const en = g.enemies[idx];
+        if (!en || en.hp <= 0) break;
+
+        const before = en.hp;
+        // 절반으로(내림). 1 미만으로는 내려가지 않게(즉사 방지)
+        const after = Math.max(1, Math.floor(before / 2));
+        if (after >= before) break;
+        en.hp = after;
+        logMsg(g, `적(${en.name})의 HP를 절반으로: ${before} → ${after}`);
+        break;
+      }
 
       case "clearStatusSelf": {
         const k = e.key;
@@ -179,7 +344,7 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
           const frontCount = g.frontSlots.filter(Boolean).length;
           amount = frontCount * e.nPer;
         }
-        applyDamageToEnemy(g, pickOne(alive), amount);
+        damageEnemyWithMeta(pickOne(alive), amount);
         break;
       }
 
@@ -189,7 +354,7 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
         if (e.target === "random") {
           const alive = aliveEnemies(g);
           if (alive.length === 0) break;
-          applyDamageToEnemy(g, pickOne(alive), amount);
+          damageEnemyWithMeta(pickOne(alive), amount);
           break;
         }
 
@@ -216,7 +381,7 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
           if (alive.length === 0) break;
           const en = pickOne(alive);
           const amount = calcDamageEnemyFormulaForTarget(g, e.kind, en, base, alive.length);
-          applyDamageToEnemy(g, en, amount);
+          damageEnemyWithMeta(en, amount);
           break;
         }
 
@@ -225,7 +390,7 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
           const aliveCountSnap = targets.length;
           for (const en of targets) {
             const amount = calcDamageEnemyFormulaForTarget(g, e.kind, en, base, aliveCountSnap);
-            applyDamageToEnemy(g, en, amount);
+            damageEnemyWithMeta(en, amount);
           }
           break;
         }
