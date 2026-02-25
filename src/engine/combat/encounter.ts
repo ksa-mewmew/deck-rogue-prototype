@@ -17,7 +17,7 @@ export function enemyStateFromId(g: GameState, enemyId: string): EnemyState {
     hp: def.maxHp,
     maxHp: def.maxHp,
     intentIndex: 0,
-    status: { vuln: 0, weak: 0, bleed: 0, disrupt: 0 },
+    status: { vuln: 0, weak: 0, bleed: 0, disrupt: 0, slash:0 },
     immuneThisTurn: false,
     immuneNextTurn: false,
     lastIntentKey: null,

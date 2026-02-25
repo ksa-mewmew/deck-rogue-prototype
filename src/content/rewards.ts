@@ -82,46 +82,54 @@ const JUNK_REWARD_POOL: string[] = [
 const MAD_REWARD_POOL: RewardEntry[] = [
   { id: "mad_echo", weight: 12 },
   { id: "mad_insight", weight: 12 },
-  { id: "mad_bargain", weight: 3 },
+  { id: "mad_bargain", weight: 12 },
+  { id: "mad_no_impossible", weight: 3 },
+  { id: "mad_bed_of_thorns", weight: 3 },
 ];
 
 export const REWARD_POOL: RewardEntry[] = [
   { id: "berserk", weight: 0 },
-  { id: "bandage", weight: 12 },
   { id: "arrow_rain", weight: 0 },
   { id: "smoke", weight: 0 },
-  { id: "redeploy", weight: 20 },
- 
+
+  { id: "redeploy", weight: 3 },
   { id: "secret_strike", weight: 3 },
   { id: "fire_scroll", weight: 3 },
-  { id: "caltrops", weight: 12 },
   { id: "emergency_rations", weight: 3 },
-  { id: "painkiller", weight: 12 },
   { id: "field_experience", weight: 3 },
+  { id: "install_makeshift_wall", weight: 3 },
+  { id: "install_scriptorium", weight: 3 },
+  { id: "cut_second", weight: 3 },
+  { id: "coin_toss", weight: 3 },
+  { id: "unforgettable_memory", weight: 3 },
 
-  { id: "camp_prep", weight: 20 },
+  { id: "bandage", weight: 12 },
+  { id: "caltrops", weight: 12 },
+  { id: "painkiller", weight: 12 },
   { id: "vital_shot", weight: 12 },
   { id: "taunt", weight: 12 },
-  { id: "rapid_fire", weight: 20 },
-  { id: "blood_contract", weight: 20 },
   { id: "cloth_scrap_armor", weight: 12 },
   { id: "prey_mark", weight: 12 },
-  { id: "brawl_cleaver", weight: 20 },
   { id: "hand_blade", weight: 12 },
-  { id: "gambler_glove", weight: 20 },
   { id: "lone_blow", weight: 12 },
-  { id: "install_makeshift_wall", weight: 3 },
-
-  { id: "install_ballista", weight: 20 },
-  { id: "install_iron_bulwark", weight: 20 },
   { id: "install_cursed_banner", weight: 12 },
   { id: "install_lead_observation", weight: 12 },
-  { id: "install_castle_ballista", weight: 20 },
   { id: "scribe_hand", weight: 12 },
-  { id: "install_scriptorium", weight: 3 },
-
   { id: "innate_march_shield", weight: 12 },
-  { id: "rare_cut_second", weight: 3 },
+  { id: "fuel_kindling", weight: 12 },
+  { id: "impossible_plan", weight: 12 },
+  { id: "slash_frenzy", weight: 12 },
+  { id: "doppelganger", weight: 12 },
+
+  { id: "camp_prep", weight: 20 },
+  { id: "rapid_fire", weight: 20 },
+  { id: "blood_contract", weight: 20 },
+  { id: "brawl_cleaver", weight: 20 },
+  { id: "gambler_glove", weight: 20 },
+  { id: "install_ballista", weight: 20 },
+  { id: "install_iron_bulwark", weight: 20 },
+  { id: "install_castle_ballista", weight: 20 },
+  { id: "install_wedge_spike", weight: 20 },
 
 ];
 

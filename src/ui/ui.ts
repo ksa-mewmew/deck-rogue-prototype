@@ -1,7 +1,3 @@
-
-
-
-
 import { setDevConsoleCtx, renderDevConsole, toggleDevConsole, isDevConsoleOpen } from "./dev_console";
 import { drawNineSlice } from "./nineslice";
 import type { GameState, PileKind, Side, IntentCategory, IntentPreview, DungeonMap, MapNode } from "../engine/types";
@@ -63,23 +59,22 @@ const RULEBOOK_TEXT = `# Deck Rogue Prototype — 룰북 (플레이어용)
 이 문서는 스포일러를 최소화합니다.
 
 [1] 개요
-노드를 선택하며 진행하고, 전투에서 살아남아 성장합니다. 목표는 무엇일까요?
-→ 던전 깊숙한 곳의 [저주받은 보물]을 얻고, 입구(START)로 되돌아오면 승리합니다.
+노드를 선택하며 진행하고, 전투에서 살아남아 성장합니다.
+던전 깊숙한 곳의 [저주받은 보물]을 얻고, 입구로 되돌아오면 승리합니다.
 모든 카드는 전열과 후열이 있습니다. 배치에 따라 역할이 달라집니다.
 
 [2] 보급과 피로도
 
-보급(S): 전열 카드 및 일부 효과의 발동에 사용됩니다. 보통 7로 시작합니다.
-보급이 부족한 상태로 턴 종료 시 피로도만큼 피해를 받습니다.
+보급(S): 전열 카드 및 일부 효과의 발동에 사용됩니다. 전열 카드는 사용만으로 1의 보급을 소비합니다. 대부분 7로 시작합니다.
+보급이 0인 상태로 턴 종료 시 피로도만큼 피해를 받습니다.
 
-피로도(F): 덱을 섞거나 전열 카드의 보급이 부족한 채로 턴을 마칠 때 피로도가 1 올라가며, 일부 카드의 효과로도 변합니다.
-피로도는 전투가 끝나도 유지됩니다. 너무 쌓인 피로는 때때로 당신을 변하게 합니다.
+피로도(F): 덱을 섞을 때 1 올라갑니다. 전열 카드를 위한 보급이 없는 채로 턴이 종료되면 부족분만큼 피로도를 얻습니다. 일부 카드의 효과로도 늘어나거나 줄어듭니다. 피로도는 전투가 끝나도 유지됩니다. 너무 쌓인 피로는 때때로 당신을 변하게 합니다.
 
 [3] 전투 흐름
 배치 → 후열 발동 → 전열 발동 → 적 행동 → 정리 → 드로우
 ※ “대상 선택 필요”가 뜨면 살아있는 적을 클릭해 대상을 정하세요.
-※ 후열 발동을 누르면 턴이 진행되어, 카드의 배치를 변경할 수 없습니다.
-보급 및 그에 따른 변화는 정리 단계에서 처리합니다.
+※ "다음 턴"을 누르면 턴이 진행되어, 카드의 배치를 변경할 수 없습니다.
+보급 비용 및 그에 따른 피로도 등의 변화는 정리 단계에서 처리합니다.
 
 손패는 턴이 종료되어도 유지됩니다.
 카드는 매 턴마다 사용한 만큼 뽑습니다. 즉, 카드로 인한 드로우는 패의 매수 자체를 늘리는 효과가 있습니다.
@@ -90,7 +85,10 @@ const RULEBOOK_TEXT = `# Deck Rogue Prototype — 룰북 (플레이어용)
 - 취약: 받는 피해가 (취약)만큼 증가합니다.
 - 약화: 주는 피해가 (약화)만큼 감소합니다.
 - 출혈: 턴 종료 시 (출혈)만큼 피해를 입습니다.
-- 교란: 당신을 방해합니다. 무엇일까요?
+- 교란: 0보다 높으면, 무작위 후열 슬롯 하나가 비활성화됩니다.
+- 설치: 턴이 끝날 때 회수하지 않는 카드입니다. 전열의 경우 S는 그대로 소모합니다.
+- 선천성: 첫 턴에 확정적으로 뽑습니다. 기존의 시작 손패보다 많은 선천성 카드를 지닌 경우, 그 수와 무관하게 모든 선천성 카드를 뽑습니다.
+- 부동: 이동하거나 회수할 수 없습니다.
 
 [5] 조작
 
@@ -102,19 +100,9 @@ const RULEBOOK_TEXT = `# Deck Rogue Prototype — 룰북 (플레이어용)
 - Space: 다음 턴
 - P: 새로운 런
 
-(모바일)
-- 손패: 클릭 시 선택, 길게 누를 시 확대
-- 카드 선택 상태에서 슬롯을 눌러 배치
-- 슬롯: 클릭 시 확대, 길게 누를 시 회수
-- 슬롯에 넣은 카드는 이름만 보입니다.
+[6]
 
-[6] 당신을 위한 조언
-
-덱은 당신의 비품입니다. 비품이 적으면, 늘 새로 꾸리느라 힘들 겁니다. 비품이 많으면, 들고 다니기 힘들겠지요. 균형을 찾으세요.
-
-[7] 시간
-
-시간은 금입니다. 모든 행동은 시간을 소모합니다. 싸움은 좀 더 소모할지도 모르겠군요.
+시간은 금입니다. 모든 행동은 시간을 소모합니다. 싸움은 좀 더 소모합니다.
 중요한 건 이곳이 당신에게 넉넉한 시간을 주지 않는다는 것이겠지요.
 `;
 
@@ -372,18 +360,48 @@ function showFaithTip(g: GameState, e: MouseEvent) {
   requestAnimationFrame(() => moveFaithTip(e.clientX, e.clientY));
 }
 
+function showFaithTipAt(g: GameState, clientX: number, clientY: number) {
+  setFaithTipContent(g);
+  const tip = ensureFaithTip();
+  tip.classList.add("show");
+  moveFaithTip(clientX, clientY);
+  requestAnimationFrame(() => moveFaithTip(clientX, clientY));
+}
+
 function hideFaithTip() {
   const tip = ensureFaithTip();
   tip.classList.remove("show");
 }
 
 function wireFaithBadgeHover(el: HTMLElement) {
-  el.addEventListener("mouseenter", (ev) => {
+  el.addEventListener("pointerenter", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType === "touch") return;
     if (!currentG) return;
-    showFaithTip(currentG, ev as MouseEvent);
+    showFaithTipAt(currentG, pe.clientX, pe.clientY);
   });
-  el.addEventListener("mousemove", (ev) => moveFaithTip((ev as MouseEvent).clientX, (ev as MouseEvent).clientY));
-  el.addEventListener("mouseleave", () => hideFaithTip());
+  el.addEventListener("pointermove", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType === "touch") return;
+    moveFaithTip(pe.clientX, pe.clientY);
+  }, { passive: true });
+  el.addEventListener("pointerleave", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType === "touch") return;
+    hideFaithTip();
+  });
+
+  el.addEventListener("pointerup", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType !== "touch") return;
+    if (!currentG) return;
+    const tip = ensureFaithTip();
+    if (tip.classList.contains("show")) {
+      hideFaithTip();
+      return;
+    }
+    showFaithTipAt(currentG, pe.clientX, pe.clientY);
+  }, { passive: true });
 }
 
 function getAssetBase(): string {
@@ -1023,12 +1041,14 @@ let currentG: GameState | null = null;
 
 let hoveredCardKey: string | null = null;
 let suppressHoverUntil = 0;
+let pinnedCardUid: string | null = null;
 
 function clearCardHoverPreview() {
   hoveredCardKey = null;
+  pinnedCardUid = null;
   try { cardHoverApi.hide(); } catch {}
   const pv = document.querySelector(".cardHoverPreview");
-  if (pv) pv.classList.remove("on");
+  if (pv) pv.classList.remove("on", "pinned");
 }
 
 function suppressHover(ms = 250) {
@@ -1042,6 +1062,8 @@ function createCardHoverPreviewApi(): CardHoverPreviewApi {
   let titleEl: HTMLElement | null = null;
   let cardHost: HTMLElement | null = null;
   let detailEl: HTMLElement | null = null;
+  let pinned = false;
+  let wiredOutsideClose = false;
 
   function ensure(root: HTMLElement) {
     if (panel) return;
@@ -1059,6 +1081,24 @@ function createCardHoverPreviewApi(): CardHoverPreviewApi {
     panel.appendChild(row);
 
     root.appendChild(panel);
+
+    // Mobile: allow tapping outside to close a pinned preview.
+    if (!wiredOutsideClose) {
+      wiredOutsideClose = true;
+      document.addEventListener(
+        "pointerdown",
+        (ev) => {
+          if (!pinned || !panel) return;
+          const t = ev.target as HTMLElement | null;
+          if (!t) return;
+          if (panel.contains(t)) return;
+          pinnedCardUid = null;
+          unpin();
+          hide();
+        },
+        true
+      );
+    }
   }
 
   function show(p: CardHoverPreviewPayload) {
@@ -1079,7 +1119,25 @@ function createCardHoverPreviewApi(): CardHoverPreviewApi {
     panel.classList.remove("on");
   }
 
-  return { ensure, show, hide };
+  function pin() {
+    if (!panel) return;
+    pinned = true;
+    panel.classList.add("pinned");
+    panel.style.pointerEvents = "auto";
+  }
+
+  function unpin() {
+    if (!panel) return;
+    pinned = false;
+    panel.classList.remove("pinned");
+    panel.style.pointerEvents = "none";
+  }
+
+  function isPinned() {
+    return pinned;
+  }
+
+  return { ensure, show, hide, pin, unpin, isPinned } as any;
 }
 
 
@@ -1129,6 +1187,9 @@ type CardHoverPreviewApi = {
   ensure(root: HTMLElement): void;
   show(p: CardHoverPreviewPayload): void;
   hide(): void;
+  pin?(): void;
+  unpin?(): void;
+  isPinned?(): boolean;
 };
 
 type RenderCardOpt = {
@@ -1191,14 +1252,19 @@ function renderCard(
   if (mode === "FULL") {
     const body = div("cardBody");
 
+    const inst = g.cards[cardUid];
+    const flipped = Boolean((inst as any)?.flipped);
+    const frontRich = flipped ? def.backText : def.frontText;
+    const backRich = flipped ? def.frontText : def.backText;
+
     const sec1 = div("cardSection");
     sec1.classList.add("front");
-    sec1.appendChild(renderCardRichTextNode(def.frontText));
+    sec1.appendChild(renderCardRichTextNode(frontRich));
     body.appendChild(sec1);
 
     const sec2 = div("cardSection");
     sec2.classList.add("back");
-    sec2.appendChild(renderCardRichTextNode(def.backText));
+    sec2.appendChild(renderCardRichTextNode(backRich));
     body.appendChild(sec2);
 
     d.appendChild(body);
@@ -1211,8 +1277,69 @@ function renderCard(
 
 
   if (clickable) {
+    let touchHoldTimer: number | null = null;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchDragStarted = false;
+    let touchPointerId = -1;
+    let touchPressActive = false;
+
+    const canStartTouchDrag = () => {
+      if (isTargeting(g)) return false;
+      if (g.phase !== "PLACE") return false;
+      if (!draggable) return false;
+      return true;
+    };
+
+    const showTouchHoldHover = () => {
+      if (!opt?.hoverPreview) return;
+      if (drag?.dragging) return;
+
+      const { root, api, buildDetail } = opt.hoverPreview;
+      api.ensure(root);
+
+      const detailText =
+        buildDetail?.(g, cardUid)
+        ?? (() => {
+          const f = plainTextFromRich(def.frontText);
+          const b = plainTextFromRich(def.backText);
+          return `전열: ${f || "없음"}\n후열: ${b || "없음"}`;
+        })();
+
+      const big = renderCard(g, cardUid, false, undefined, { draggable: false, mode: "FULL" });
+      big.classList.add("isPreviewCard");
+
+      pinnedCardUid = cardUid;
+      api.show({ title, detail: detailText, cardEl: big });
+      api.pin?.();
+    };
+
+    const clearTouchHold = () => {
+      if (touchHoldTimer != null) {
+        window.clearTimeout(touchHoldTimer);
+        touchHoldTimer = null;
+      }
+    };
+
     d.onpointerdown = (ev) => {
       if ((ev as any).button !== 0 && (ev as any).pointerType === "mouse") return;
+      const pe = ev as PointerEvent;
+
+      if (pe.pointerType === "touch") {
+        touchDragStarted = false;
+        touchPointerId = pe.pointerId;
+        touchPressActive = true;
+        touchStartX = pe.clientX;
+        touchStartY = pe.clientY;
+        clearTouchHold();
+
+        touchHoldTimer = window.setTimeout(() => {
+          if (!touchPressActive) return;
+          showTouchHoldHover();
+        }, 320);
+        return;
+      }
+
       if (isTargeting(g)) return;
       if (g.phase !== "PLACE") return;
       if (!draggable) return;
@@ -1220,6 +1347,53 @@ function renderCard(
       const idx = g.hand.indexOf(cardUid);
       beginDrag(ev as any, { kind: "hand", cardUid, fromHandIndex: idx });
     };
+
+    d.addEventListener("pointermove", (ev) => {
+      const pe = ev as PointerEvent;
+      if (pe.pointerType !== "touch") return;
+      const dx = pe.clientX - touchStartX;
+      const dy = pe.clientY - touchStartY;
+      const movedEnough = dx * dx + dy * dy > 12 * 12;
+      if (!movedEnough) return;
+
+      clearTouchHold();
+
+      if (drag?.dragging) return;
+      if (!touchPressActive) return;
+      if (!canStartTouchDrag()) return;
+
+      touchDragStarted = true;
+      touchPressActive = false;
+      const idx = g.hand.indexOf(cardUid);
+      const dragEv = {
+        currentTarget: d,
+        pointerId: touchPointerId,
+        clientX: pe.clientX,
+        clientY: pe.clientY,
+      } as unknown as PointerEvent;
+      beginDrag(dragEv, { kind: "hand", cardUid, fromHandIndex: idx });
+    }, { passive: true });
+
+    d.addEventListener("pointerup", (ev) => {
+      const pe = ev as PointerEvent;
+      if (pe.pointerType !== "touch") return;
+      touchPressActive = false;
+      clearTouchHold();
+    }, { passive: true });
+
+    d.addEventListener("pointercancel", (ev) => {
+      const pe = ev as PointerEvent;
+      if (pe.pointerType !== "touch") return;
+      touchPressActive = false;
+      clearTouchHold();
+    }, { passive: true });
+
+    d.addEventListener("click", (ev) => {
+      if (!touchDragStarted) return;
+      touchDragStarted = false;
+      ev.preventDefault();
+      ev.stopPropagation();
+    }, true);
   }
 
 
@@ -1241,6 +1415,9 @@ function renderCard(
       if (performance.now() < suppressHoverUntil) return;
       if (drag?.dragging) return;
 
+      // If pinned (tap), don't override while user is reading.
+      if (api.isPinned?.() && pinnedCardUid) return;
+
       const big = renderCard(g, cardUid, false, undefined, { draggable: false, mode: "FULL" });
       big.classList.add("isPreviewCard");
 
@@ -1248,13 +1425,53 @@ function renderCard(
     });
 
     d.addEventListener("pointerleave", () => {
+      // If pinned (mobile tap), keep it.
+      if (api.isPinned?.()) return;
       api.hide();
     });
 
-    d.addEventListener("pointerdown", () => {
-      suppressHover(250);
-      clearCardHoverPreview();
-    }, { capture: true });
+    // Mobile/touch: tap to pin the preview on the right so text is readable.
+    d.addEventListener(
+      "pointerup",
+      (ev) => {
+        const pe = ev as PointerEvent;
+        if (pe.pointerType === "mouse") return;
+        if (pe.pointerType === "touch") return;
+        if (!document.body.classList.contains("mobile")) return;
+        if (drag?.dragging) return;
+        if (drag && drag.pointerId === pe.pointerId) return;
+        if (performance.now() < suppressHoverUntil) return;
+
+        // toggle
+        if (pinnedCardUid === cardUid && api.isPinned?.()) {
+          pinnedCardUid = null;
+          api.unpin?.();
+          api.hide();
+          return;
+        }
+
+        pinnedCardUid = cardUid;
+
+        const big = renderCard(g, cardUid, false, undefined, { draggable: false, mode: "FULL" });
+        big.classList.add("isPreviewCard");
+        api.show({ title, detail: detailText, cardEl: big });
+        api.pin?.();
+      },
+      { passive: true }
+    );
+
+    d.addEventListener(
+      "pointerdown",
+      (ev) => {
+        const pe = ev as PointerEvent;
+        if (pe.pointerType === "touch") return;
+        suppressHover(250);
+        // Don't clear if the user is interacting with a pinned panel.
+        if (api.isPinned?.() && pinnedCardUid) return;
+        clearCardHoverPreview();
+      },
+      { capture: true }
+    );
   }
 
   return d;
@@ -1542,6 +1759,7 @@ const EFFECT_ICON: Record<string, string> = {
   immune: "✨",
   supplies: "🍞",
   fatigue: "💤",
+  slash: "🗡️",
 };
 
 type EnemyState = GameState["enemies"][number];
@@ -1628,6 +1846,7 @@ function renderStatusEmojiRow(st: any, immuneThisTurn?: boolean) {
   add("weak", st?.weak ?? 0);
   add("bleed", st?.bleed ?? 0);
   add("disrupt", st?.disrupt ?? 0);
+  add("slash", st?.slash ?? 0);
 
   if (immuneThisTurn) {
     const s = document.createElement("span");
@@ -2957,6 +3176,7 @@ function renderMapMiniGraph(
     label.setAttribute("dominant-baseline", "central");
     label.setAttribute("text-anchor", "middle");
     label.setAttribute("font-size", detailMode ? "12" : "14");
+    label.style.fontSize = "var(--mapNodeEmojiSize, calc(16 * var(--u)))";
 
     label.setAttribute("fill", ICON_FILL);
 
@@ -3478,6 +3698,15 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       const slots = fromSide === "front" ? g.frontSlots : g.backSlots;
       const uid = slots[fromIdx];
       if (!uid) return;
+
+      {
+        const inst = g.cards[uid];
+        const def = getCardDefByIdWithUpgrade(g.content, inst.defId, inst.upgrade ?? 0);
+        if (def.tags?.includes("LOCKED")) {
+          pushUiToast(g, "WARN", "이 카드는 회수할 수 없습니다.", 1600);
+          return;
+        }
+      }
 
       slots[fromIdx] = null;
 
@@ -4073,7 +4302,25 @@ export function makeUIActions(g0: GameState, setGame: (next: GameState) => void)
       const a = fromSlots[fromIdx];
       if (!a) return;
 
+      {
+        const inst = g.cards[a];
+        const def = getCardDefByIdWithUpgrade(g.content, inst.defId, inst.upgrade ?? 0);
+        if (def.tags?.includes("LOCKED")) {
+          pushUiToast(g, "WARN", "이 카드는 회수하거나 이동할 수 없습니다.", 1600);
+          return;
+        }
+      }
+
       const b = toSlots[toIdx];
+
+      if (b) {
+        const instB = g.cards[b];
+        const defB = getCardDefByIdWithUpgrade(g.content, instB.defId, instB.upgrade ?? 0);
+        if (defB.tags?.includes("LOCKED")) {
+          pushUiToast(g, "WARN", "이 카드는 회수하거나 이동할 수 없습니다.", 1600);
+          return;
+        }
+      }
 
       fromSlots[fromIdx] = b ?? null;
       toSlots[toIdx] = a;
@@ -4464,6 +4711,11 @@ function updateFloatingFaithScore(g: GameState) {
   badge.textContent = `신앙 ${a}·${b}·${c}`;
 }
 
+function isMobilePortraitUi() {
+  const b = document.body;
+  return !!b && b.classList.contains("mobile") && b.classList.contains("portrait");
+}
+
 
 
 
@@ -4546,10 +4798,10 @@ export function render(g: GameState, actions: UIActions) {
   main.scrollTop = lastMainPanelScrollTop;
   main.scrollLeft = lastMainPanelScrollLeft;
 
-  main.appendChild(renderBattleTitleRow(g));
+  if (!isMobilePortraitUi()) main.appendChild(renderBattleTitleRow(g));
 
   if (g.run.finished) main.appendChild(p("런 종료. 새로운 런을 원하시면 버튼을 누르거나 키보드 P를 입력하십시오."));
-  else if (g.phase === "NODE") renderNodeSelect(main, g, actions);
+  else if (g.phase === "NODE" && !isMobilePortraitUi()) renderNodeSelect(main, g, actions);
   else renderCombat(main, g, actions);
 
   stageInner.appendChild(main);
@@ -5381,6 +5633,7 @@ function renderItemTray(g: GameState, actions: UIActions) {
 
   const tray = document.createElement("div");
   tray.className = "itemTray";
+  tray.classList.add("noScrollbar");
 
   let itemHoverId: string | null = null;
 
@@ -5510,11 +5763,13 @@ function renderRelicTray(g: GameState, actions: UIActions) {
 
   const tray = el("div", "relicTray");
   tray.id = "relicTray";
+  tray.classList.add("noScrollbar");
 
   const tip = el("div", "relicHoverTip");
   tray.appendChild(tip);
 
   const list = el("div", "relicTrayList");
+  list.classList.add("noScrollbar");
   tray.appendChild(list);
 
   const updateTip = () => {
@@ -5680,6 +5935,28 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
     panel.appendChild(promptEl);
   }
 
+  const ctxAny: any = g.choiceCtx as any;
+  const optsAny: any[] = Array.isArray((c as any).options) ? (c as any).options : [];
+  const hasFrontBackPick =
+    optsAny.length === 2 &&
+    optsAny.some((o) => String((o?.text ?? o?.label ?? "")).includes("전열")) &&
+    optsAny.some((o) => String((o?.text ?? o?.label ?? "")).includes("후열"));
+  const artPath = typeof ctxAny?.artPath === "string" ? ctxAny.artPath : hasFrontBackPick ? "assets/ui/choice/slot_pick.png" : null;
+  if (artPath) {
+    const artWrap = div("choice-art");
+    artWrap.style.cssText =
+      `margin:0 0 calc(${12} * var(--u)) 0;` +
+      `border-radius:calc(${14} * var(--u)); overflow:hidden;` +
+      `border:calc(1 * var(--u)) solid rgba(255,255,255,.14);` +
+      `background:rgba(255,255,255,.06);`;
+    const img = document.createElement("img");
+    img.src = assetUrl(artPath);
+    img.alt = "";
+    img.style.cssText = "display:block; width:100%; height:auto; max-height:calc(240 * var(--u)); object-fit:cover;";
+    artWrap.appendChild(img);
+    panel.appendChild(artWrap);
+  }
+
   // =========================
   // Faith start: BIG selection UI
   // =========================
@@ -5700,17 +5977,100 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
 
     const sub = div("faith-sub");
     sub.style.cssText =
-      `margin:0 0 calc(${14} * var(--u)) 0;` +
-      `font-size:calc(${13} * var(--u)); opacity:.92; line-height:1.35;`;
+      `margin:0 0 calc(${16} * var(--u)) 0;` +
+      `font-size:calc(${19} * var(--u)); opacity:.92; line-height:1.35;`;
     sub.textContent = "선택한 신은 신앙 5로 시작합니다. 유혹 수락 시: 유혹한 신 +1 / 현재 포커스 -1. 포커스 점수 ≥3이면 후원 패시브가 활성화됩니다.";
     panel.appendChild(sub);
 
-    const grid = div("faith-grid");
-    grid.style.cssText =
-      `display:grid; grid-template-columns:repeat(3, minmax(0, 1fr));` +
-      `gap:calc(${14} * var(--u));`;
+    const mobilePortrait = document.body.classList.contains("mobile") && document.body.classList.contains("portrait");
+    if (mobilePortrait) {
+      const list = div("faith-list");
+      list.style.cssText = `display:flex; flex-direction:column; gap:calc(${16} * var(--u));`;
 
-    const makeGodCard = (id: "dream_shadow" | "wing_artery" | "forge_master") => {
+      const makeGodRow = (id: "dream_shadow" | "wing_artery" | "forge_master") => {
+        const row = div("faith-godRow");
+        row.style.cssText =
+          `display:flex; gap:calc(${18} * var(--u)); align-items:stretch;` +
+          `min-height:calc(${340} * var(--u));` +
+          `border-radius:calc(${16} * var(--u));` +
+          `border:calc(1 * var(--u)) solid rgba(255,255,255,.14);` +
+          `background:#101010; overflow:hidden;`;
+
+        const art = div("faith-godArt");
+        art.style.cssText =
+          `flex:0 0 clamp(calc(${160} * var(--u)), 36vw, calc(${260} * var(--u)));` +
+          `position:relative; overflow:hidden;` +
+          `border-right:calc(1 * var(--u)) solid rgba(255,255,255,.10);` +
+          `background:rgba(0,0,0,1);`;
+
+        const img = document.createElement("img");
+        img.alt = godName(id);
+        img.src = assetUrl(godArt(id));
+        (img.style as any).imageRendering = "pixelated";
+        img.style.cssText =
+          `position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:50% 35%;` +
+          `transform: scale(1.06); transform-origin: 50% 50%;` +
+          `image-rendering: pixelated; image-rendering: crisp-edges;`;
+        img.onerror = () => {
+          try { img.remove(); } catch {}
+          const ph = div("faith-imgPh");
+          ph.textContent = "(illustration)";
+          ph.style.cssText =
+            `position:absolute; inset:0; display:flex; align-items:center; justify-content:center;` +
+            `opacity:.35; font-size:calc(${18} * var(--u));`;
+          art.appendChild(ph);
+        };
+        art.appendChild(img);
+        row.appendChild(art);
+
+        const body = div("faith-godBody");
+        body.style.cssText =
+          `flex:1 1 auto; min-width:0;` +
+          `display:flex; flex-direction:column; gap:calc(${14} * var(--u));` +
+          `padding:calc(${20} * var(--u));`;
+
+        const head = div("faith-godHead");
+        head.style.cssText =
+          `display:flex; align-items:center; justify-content:space-between; gap:calc(${10} * var(--u));`;
+
+        const nameEl = div("faith-godName");
+        nameEl.textContent = godName(id);
+        nameEl.style.cssText = `font-size:calc(${34} * var(--u)); font-weight:900;`;
+        head.appendChild(nameEl);
+
+        const pickBtn = button("선택", () => actions.onChooseChoice(`faith:choose:${id}`), false);
+        pickBtn.style.cssText +=
+          `flex:0 0 auto;` +
+          `font-size:calc(${22} * var(--u));` +
+          `padding:calc(${14} * var(--u)) calc(${16} * var(--u));` +
+          `border-radius:calc(${12} * var(--u));`;
+        head.appendChild(pickBtn);
+        body.appendChild(head);
+
+        const pre = document.createElement("pre");
+        pre.textContent = godAbilityBlock(id);
+        pre.style.cssText =
+          `margin:0; padding:calc(${14} * var(--u));` +
+          `white-space:pre-wrap; line-height:1.35;` +
+          `font-size:calc(${20} * var(--u));` +
+          `border:calc(1 * var(--u)) solid rgba(255,255,255,.10);` +
+          `background:rgba(0,0,0,1);` +
+          `font-family:"Mulmaru", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;`;
+        body.appendChild(pre);
+
+        row.appendChild(body);
+        return row;
+      };
+
+      for (const id of offered) list.appendChild(makeGodRow(id));
+      panel.appendChild(list);
+    } else {
+      const grid = div("faith-grid");
+      grid.style.cssText =
+        `display:grid; grid-template-columns:repeat(3, minmax(0, 1fr));` +
+        `gap:calc(${14} * var(--u));`;
+
+      const makeGodCard = (id: "dream_shadow" | "wing_artery" | "forge_master") => {
       const card = div("faith-godCard");
       card.style.cssText =
         `display:flex; flex-direction:column;` +
@@ -5786,6 +6146,7 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
 
     for (const id of offered) grid.appendChild(makeGodCard(id));
     panel.appendChild(grid);
+    }
 
     padWrap.appendChild(panel);
     overlayEl.appendChild(backdrop);
@@ -6211,10 +6572,8 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
 
       const row = div("choice-rewardCardRow");
       row.style.cssText =
-        "display:flex;" +
-        `gap:calc(${18} * var(--u));` +
-        "justify-content:center; align-items:flex-start;" +
-        "flex-wrap:nowrap;";
+        "display:flex; justify-content:center; align-items:flex-start;" +
+        `gap:calc(${12} * var(--u)); flex-wrap:nowrap;`;
 
       for (const opt of pickOpts) {
         const payload = opt.key.slice("pick:".length);
@@ -6459,22 +6818,27 @@ function renderTopHud(g: GameState, actions: UIActions) {
   document.querySelectorAll(".topHud").forEach((el) => el.remove());
   document.querySelectorAll(".enemyHudCenter").forEach((el) => el.remove());
 
+  const isMobile = document.body.classList.contains("mobile");
+  const isPortrait = document.body.classList.contains("portrait");
+  const mobilePortrait = isMobile && isPortrait;
+
   const top = div("topHud");
   top.appendChild(div("topHudLeftSpacer"));
 
   const left = div("playerHudLeft");
 
-
   const titleRow = div("playerTitleRow");
   titleRow.appendChild(divText("playerHudTitle", "플레이어"));
 
-  const piles = div("pileButtons");
-  piles.appendChild(mkButton("덱", () => actions.onViewPile("deck")));
-  piles.appendChild(mkButton("버림", () => actions.onViewPile("discard")));
-  piles.appendChild(mkButton("손패", () => actions.onViewPile("hand")));
-  piles.appendChild(mkButton("소모", () => actions.onViewPile("exhausted")));
-  piles.appendChild(mkButton("소실", () => actions.onViewPile("vanished")));
-  titleRow.appendChild(piles);
+  if (!mobilePortrait) {
+    const piles = div("pileButtons");
+    piles.appendChild(mkButton("덱", () => actions.onViewPile("deck")));
+    piles.appendChild(mkButton("버림", () => actions.onViewPile("discard")));
+    piles.appendChild(mkButton("손패", () => actions.onViewPile("hand")));
+    piles.appendChild(mkButton("소모", () => actions.onViewPile("exhausted")));
+    piles.appendChild(mkButton("소실", () => actions.onViewPile("vanished")));
+    titleRow.appendChild(piles);
+  }
 
   left.appendChild(titleRow);
 
@@ -6513,6 +6877,8 @@ function renderTopHud(g: GameState, actions: UIActions) {
   if ((pst.weak ?? 0) > 0) pBadgeList.push(`약화 ${pst.weak}`);
   if ((pst.bleed ?? 0) > 0) pBadgeList.push(`출혈 ${pst.bleed}`);
   if ((pst.disrupt ?? 0) > 0) pBadgeList.push(`교란 ${pst.disrupt}`);
+  if ((pst.slash ?? 0) > 0) pBadgeList.push(`칼부림 ${pst.slash}`);
+
 
   for (const t of pBadgeList) pBadges.appendChild(badge(t));
 
@@ -6520,7 +6886,7 @@ function renderTopHud(g: GameState, actions: UIActions) {
 
   const inCombat = !g.run.finished && g.enemies.length > 0 && g.phase !== "NODE";
   if (inCombat) {
-    const center = div("enemyHudCenter");
+    const center = div(mobilePortrait ? "mobileEnemyStrip" : "enemyHudCenter");
     const mover = div("enemyHudCenterMover");
     const enemiesWrap = div("enemyHud");
 
@@ -6542,7 +6908,8 @@ function renderTopHud(g: GameState, actions: UIActions) {
 
     mover.appendChild(enemiesWrap);
     center.appendChild(mover);
-    document.body.appendChild(center);
+    if (mobilePortrait) top.appendChild(center);
+    else document.body.appendChild(center);
 
     for (let i = 0; i < g.enemies.length; i++) {
       const e = g.enemies[i];
@@ -6562,7 +6929,64 @@ function renderTopHud(g: GameState, actions: UIActions) {
 
       if (targeting && e.hp > 0 && !untargetable) banner.classList.add("targetable");
       if (untargetable) banner.classList.add("untargetable");
-      banner.onclick = () => actions.onSelectEnemy(i);
+
+      const toggleEnemyDetail = () => {
+        const alreadyOpen = banner.classList.contains("touchHover");
+        document.querySelectorAll(".enemyBanner.touchHover").forEach((el) => el.classList.remove("touchHover"));
+        if (!alreadyOpen) banner.classList.add("touchHover");
+      };
+      let skipNextClick = false;
+
+      banner.addEventListener("pointerdown", (ev) => {
+        const pe = ev as PointerEvent;
+        if (pe.pointerType !== "touch") return;
+        if (targeting) return;
+        toggleEnemyDetail();
+        skipNextClick = true;
+        ev.preventDefault();
+        ev.stopPropagation();
+      }, { passive: false });
+
+      banner.addEventListener("pointerenter", (ev) => {
+        const pe = ev as PointerEvent;
+        if (pe.pointerType === "touch") return;
+        banner.classList.add("touchHover");
+      });
+
+      banner.addEventListener("pointerleave", (ev) => {
+        const pe = ev as PointerEvent;
+        if (pe.pointerType === "touch") return;
+        banner.classList.remove("touchHover");
+      });
+
+      banner.addEventListener("pointerup", (ev) => {
+        const pe = ev as PointerEvent;
+        if (pe.pointerType !== "touch") return;
+        if (targeting) {
+          actions.onSelectEnemy(i);
+          return;
+        }
+        toggleEnemyDetail();
+        skipNextClick = true;
+        ev.preventDefault();
+        ev.stopPropagation();
+      }, { passive: false });
+
+      banner.onclick = (ev) => {
+        if (skipNextClick) {
+          skipNextClick = false;
+          ev.preventDefault();
+          ev.stopPropagation();
+          return;
+        }
+        if (targeting) {
+          actions.onSelectEnemy(i);
+          return;
+        }
+        toggleEnemyDetail();
+        ev.preventDefault();
+        ev.stopPropagation();
+      };
 
       const artWrap = div("enemyArtWrap");
       const artCard = div("enemyArtCard");
@@ -6644,7 +7068,7 @@ function renderTopHud(g: GameState, actions: UIActions) {
       hover.textContent =
         (g.enemies[i].name) + "\n\n" +
         (passiveLines.length ? `패시브:\n${passiveLines.join("\n")}\n\n` : "") +
-        (g.intentsRevealedThisTurn ? `${label}\n\n` : "") +
+        (`의도: ${label}\n\n`) +
         (lines.length ? `상태: ${lines.join(", ")}` : "상태: 없음");
 
       banner.appendChild(artWrap);
@@ -6656,6 +7080,72 @@ function renderTopHud(g: GameState, actions: UIActions) {
   }
 
   top.appendChild(left);
+
+  if (mobilePortrait) {
+    const enemyLeft = div("mobileEnemyLeftBtn");
+    enemyLeft.appendChild(mkButton("새 런", () => actions.onNewRun()));
+    top.appendChild(enemyLeft);
+
+    const enemyRight = div("mobileEnemyRightChrome");
+    enemyRight.appendChild(mkButton("룰북", () => actions.onViewRulebook()));
+    enemyRight.appendChild(mkButton("로그", () => actions.onToggleLogOverlay()));
+    enemyRight.appendChild(mkButton("설정", () => actions.onViewSettings()));
+    top.appendChild(enemyRight);
+
+    const right = div("mobileActionPanel");
+
+    const piles = div("mobilePileButtons");
+    piles.appendChild(mkButton("덱", () => actions.onViewPile("deck")));
+    piles.appendChild(mkButton("버림", () => actions.onViewPile("discard")));
+    piles.appendChild(mkButton("손패", () => actions.onViewPile("hand")));
+    piles.appendChild(mkButton("소모", () => actions.onViewPile("exhausted")));
+    piles.appendChild(mkButton("소실", () => actions.onViewPile("vanished")));
+    right.appendChild(piles);
+
+    const runRow = div("mobileRunButtons");
+
+    const f = ensureFaith(g);
+    const o0 = f.offered?.[0];
+    const o1 = f.offered?.[1];
+    const o2 = f.offered?.[2];
+    const a = o0 ? (f.points[o0] ?? 0) : 0;
+    const b = o1 ? (f.points[o1] ?? 0) : 0;
+    const c = o2 ? (f.points[o2] ?? 0) : 0;
+    const label = o0 && o1 && o2 ? `신앙 점수 ${a}·${b}·${c}` : "신앙 점수";
+    const faithBtn = mkButton(label, () => {
+      const tip = ensureFaithTip();
+      if (tip.classList.contains("show")) {
+        hideFaithTip();
+        return;
+      }
+      const r = faithBtn.getBoundingClientRect();
+      showFaithTipAt(g, r.left + (r.width / 2), r.top + (r.height / 2));
+    });
+    faithBtn.addEventListener("pointerenter", (ev) => {
+      const pe = ev as PointerEvent;
+      if (pe.pointerType === "touch") return;
+      showFaithTipAt(g, pe.clientX, pe.clientY);
+    });
+    faithBtn.addEventListener("pointermove", (ev) => {
+      const pe = ev as PointerEvent;
+      if (pe.pointerType === "touch") return;
+      moveFaithTip(pe.clientX, pe.clientY);
+    }, { passive: true });
+    faithBtn.addEventListener("pointerleave", (ev) => {
+      const pe = ev as PointerEvent;
+      if (pe.pointerType === "touch") return;
+      hideFaithTip();
+    });
+    runRow.appendChild(faithBtn);
+
+    right.appendChild(runRow);
+
+    const row = div("mobileHudRow");
+    row.appendChild(left);
+    row.appendChild(right);
+
+    top.appendChild(row);
+  }
 
   return top;
 }
@@ -6731,12 +7221,12 @@ function renderBattleTitleRow(g: GameState) {
 
   const warn = divText("targetHintInline", "");
   warn.style.cssText =
-    "padding:calc(5 * var(--u)) calc(10 * var(--u)); border-radius:calc(12 * var(--u)); border:calc(1 * var(--u)) solid rgba(0,0,0,.55);" +
+    "padding:calc(8 * var(--u)) calc(12 * var(--u)); border-radius:calc(12 * var(--u)); border:calc(1 * var(--u)) solid rgba(0,0,0,.55);" +
     "background: rgb(255, 0, 0);" +
     "opacity:1;" +
-    "font-weight:400; font-size:calc(12 * var(--u)); line-height:1.2;" +
+    "font-weight:700; font-size:calc(16 * var(--u)); line-height:1.25;" +
     "white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" +
-    "width: min(calc(240 * var(--u)), 92vw);" +
+    "width: min(calc(320 * var(--u)), 92vw);" +
     "max-width: none;" +
     "pointer-events:auto;";
 
@@ -6766,7 +7256,7 @@ function renderBattleTitleRow(g: GameState) {
 
   warn.style.position = "absolute";
   warn.style.right = "calc(207 * var(--u))";
-  warn.style.top = "calc(100% - calc(8 * var(--u)))";
+  warn.style.top = "calc(100% - calc(34 * var(--u)))";
   warn.style.marginTop = "0";
   warn.style.zIndex = "5";
   warn.style.pointerEvents = hintText ? "auto" : "none";
@@ -6842,6 +7332,17 @@ function renderCombat(root: HTMLElement, g: GameState, actions: UIActions) {
   const inCombat = !g.run.finished && g.enemies.length > 0 && g.phase !== "NODE";
   board.classList.toggle("slabOn", inCombat);
 
+  const mobilePortrait = document.body.classList.contains("mobile") && document.body.classList.contains("portrait");
+  if (mobilePortrait) {
+    board.appendChild(renderBattleTitleRow(g));
+  }
+
+  if (mobilePortrait && g.phase === "NODE") {
+    renderNodeSelect(board, g, actions);
+    wrap.appendChild(board);
+    root.appendChild(wrap);
+    return;
+  }
 
   const slotsWrap = div("boardSlotsWrap");
 
@@ -6934,6 +7435,9 @@ function renderHandDock(g: GameState, actions: UIActions, targeting: boolean) {
   }
 
   const hand = div("hand");
+  // 모바일에서 가로 스크롤(손패)과 드래그 제스처 충돌 완화
+  (hand as any).style.touchAction = "pan-x";
+
   hand.dataset.dropHand = "1";
   const row = div("handCardsRow");
   hand.appendChild(row);
@@ -6943,7 +7447,21 @@ function renderHandDock(g: GameState, actions: UIActions, targeting: boolean) {
     hint.textContent = "";
     row.appendChild(hint);
   } else {
-    for (const uid of g.hand) row.appendChild(renderCard(g, uid, true, actions.onSelectHandCard, { draggable: true }));
+    for (const uid of g.hand)
+      row.appendChild(
+        renderCard(g, uid, true, actions.onSelectHandCard, {
+          draggable: true,
+          hoverPreview: {
+            root: document.body,
+            api: cardHoverApi,
+            buildDetail: (gg, u) => {
+              const def = getCardDefByUid(gg, u);
+              return `전열: ${def.frontText}
+후열: ${def.backText}`;
+            },
+          },
+        })
+      );
   }
 
   dock.appendChild(hand);
@@ -6957,6 +7475,10 @@ function enableHorizontalWheelScroll(el: HTMLElement) {
   (el as any).dataset.wheelX = "1";
   el.addEventListener(
     "wheel", (e) => {
+      if (document.body.classList.contains("handDragScrollLock")) {
+        e.preventDefault();
+        return;
+      }
 
       if (e.shiftKey) return;
       const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
@@ -6967,11 +7489,25 @@ function enableHorizontalWheelScroll(el: HTMLElement) {
   );
 }
 
+function setHandScrollLocked(locked: boolean) {
+  document.body.classList.toggle("handDragScrollLock", locked);
+  const hand = document.querySelector<HTMLElement>(".hand");
+  if (!hand) return;
+  if (locked) {
+    hand.style.overflowX = "hidden";
+    hand.style.touchAction = "none";
+  } else {
+    hand.style.overflowX = "";
+    hand.style.touchAction = "";
+  }
+}
+
 
 
 
 
 function alignEnemyHudToViewportCenter() {
+  if (document.body.classList.contains("mobile")) return;
   const hud = document.querySelector<HTMLElement>(".enemyHudCenter");
   if (!hud) return;
 
@@ -7096,25 +7632,17 @@ function renderSlotsGrid(g: GameState, actions: UIActions, side: Side) {
   const capRaw = Number(side === "front" ? runAny.slotCapFront : runAny.slotCapBack);
   const cap = Math.max(3, Math.min(4, Math.floor(Number.isFinite(capRaw) ? capRaw : 3)));
 
-  for (let i = 0; i < slots.length; i++) {
+  for (let i = 0; i < cap; i++) {
     const disabled = side === "back" ? !!g.backSlotDisabled?.[i] : false;
-    const locked = i >= cap;
 
-    const s = div("slot" + (disabled ? " disabled" : "") + (locked ? " locked" : ""));
+    const s = div("slot" + (disabled ? " disabled" : ""));
     s.dataset.slotSide = side;
     s.dataset.slotIndex = String(i);
 
-    if (locked) {
-      const lk = div("slotLock");
-      lk.textContent = "🔒";
-      s.appendChild(lk);
-      grid.appendChild(s);
-      continue;
-    }
 
     if (hoverSlot && hoverSlot.side === side && hoverSlot.idx === i) s.classList.add("dropHover");
-    if (hasSelected && !disabled && !locked) s.classList.add("placeable");
-
+    if (hasSelected && !disabled) s.classList.add("placeable");
+    
     const uid = slots[i];
     if (uid) {
       const mode: CardRenderMode = (uiSettings as any).slotCardMode === "NAME_ONLY"
@@ -7212,8 +7740,17 @@ function bindGlobalInput(getG: () => GameState, actions: UIActions) {
 
   window.addEventListener("pointerup", (ev) => {
     const g = getG();
-    if (g.choice || overlay) return;
     if (!drag || ev.pointerId !== drag.pointerId) return;
+
+    setHandScrollLocked(false);
+
+    if (g.choice || overlay) {
+      if (drag?.sourceEl) drag.sourceEl.classList.remove("isDraggingSource");
+      drag = null;
+      hoverSlot = null;
+      render(g, actions);
+      return;
+    }
 
 
     if (drag.dragging) {
@@ -7400,6 +7937,7 @@ function beginDrag(
 
   suppressHover(250);
   clearCardHoverPreview();
+  setHandScrollLocked(true);
 
   const target = ev.currentTarget as HTMLElement;
   try { target.setPointerCapture(ev.pointerId); } catch {}
@@ -7417,6 +7955,19 @@ function beginDrag(
   const css = getComputedStyle(document.documentElement);
   const handW = parseFloat(css.getPropertyValue("--handCardW")) || undefined;
   const handH = parseFloat(css.getPropertyValue("--handCardH")) || undefined;
+  let slotW: number | undefined;
+  let slotH: number | undefined;
+
+  const slotCardEl = document.querySelector<HTMLElement>(".slot .slotCardInner")
+    ?? document.querySelector<HTMLElement>(".slot > .card")
+    ?? null;
+  if (slotCardEl) {
+    const sr = slotCardEl.getBoundingClientRect();
+    if (sr.width > 0 && sr.height > 0) {
+      slotW = sr.width;
+      slotH = sr.height;
+    }
+  }
 
   drag = {
     kind: init.kind,
@@ -7432,8 +7983,8 @@ function beginDrag(
     dragging: false,
 
     previewEl: undefined,
-    previewW: r?.width ?? handW,
-    previewH: r?.height ?? handH,
+    previewW: slotW ?? r?.width ?? handW,
+    previewH: slotH ?? r?.height ?? handH,
     grabDX,
     grabDY,
   };
@@ -7569,4 +8120,3 @@ function renderDragOverlay(_app: HTMLElement, g: GameState) {
   wrap.appendChild(drag.previewEl);
   layer.appendChild(wrap);
 }
-

@@ -3,8 +3,8 @@
 export type Zone = "deck" | "hand" | "discard" | "front" | "back" | "exhausted" | "vanished";
 export type Side = "front" | "back";
 
-export type StatusKey = "vuln" | "weak" | "bleed" | "disrupt";
-export type CardTag = "EXHAUST" | "VANISH" | "INSTALL" | "TOKEN" | "INNATE";
+export type StatusKey = "vuln" | "weak" | "bleed" | "disrupt" | "slash";
+export type CardTag = "EXHAUST" | "VANISH" | "INSTALL" | "TOKEN" | "INNATE" | "LOCKED";
 export type CardRarity = "BASIC" | "COMMON" | "SPECIAL" | "RARE" | "MADNESS";
 export type RelicId = string;
 export type ItemId = string;
@@ -253,6 +253,7 @@ export type CardInstance = {
   defId: string;
   zone: Zone;
   upgrade: number;
+  flipped?: boolean;
 };
 
 export type EnemyState = {
@@ -308,7 +309,20 @@ export type PlayerEffect =
   | { op: "blockFormula"; kind: string }
   | { op: "discardHandAllDraw"; extraDraw?: number }
   | { op: "discardHandRandom"; n: number }
-  | { op: "halveEnemyHpAtIndex"; index: number };
+  | { op: "repeat"; times: number; effects: PlayerEffect[] }
+  | { op: "ifPlacedThisTurn"; then: PlayerEffect[] }
+  | { op: "ifOtherRowHasDefId"; defId: string; then: PlayerEffect[] }
+  | { op: "triggerRandomVanished"; side: Side; times: number }
+  | { op: "exhaustSlot"; side: Side; index: number; then?: PlayerEffect[] }
+  | { op: "flipSelf" }
+  | { op: "ifPlaced"; side: Side; then: PlayerEffect[] }
+  | { op: "damageEnemyLowestHp"; n: number }
+  | { op: "damageEnemyRepeatByStatus"; target: "random"; n: number; key: StatusKey; reset?: boolean }
+  | { op: "halveEnemyHpAtIndex"; index: number }
+  | { op: "ifPlaced"; side: Side; then: PlayerEffect[] }
+  | { op: "flipAllPlayerCardsUntilCombatEnd" }
+  | { op: "pickVanishedToHand"; title?: string; prompt?: string };
+
 
 export type ItemData = {
   id: ItemId;
@@ -546,7 +560,8 @@ export type ChoiceCtx =
   | { kind: "REMOVE_PICK"; returnTo?: { kind: "SHOP"; nodeId: string }; priceGold?: number }
   | { kind: "FAITH_START"; offered: [GodId, GodId, GodId] }
   | { kind: "GOD_TEMPT"; tempter: GodId }
-  | { kind: "MADNESS_TEMPT"; offerBoon: 1 | 2 | 3; offerBane: 1 | 2 | 3 };
+  | { kind: "MADNESS_TEMPT"; offerBoon: 1 | 2 | 3; offerBane: 1 | 2 | 3 }
+  | { kind: "PICK_VANISHED_TO_HAND"; sourceCardUid: string };
 
 export type ChoiceFrame = { choice: ChoiceState; ctx: ChoiceCtx };
 

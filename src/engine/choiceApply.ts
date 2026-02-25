@@ -530,11 +530,12 @@ export function applyChoiceKey(g: GameState, key: string): boolean {
 
     if (key === "tempt:accept") {
       const tempter = (ctx as any).tempter as TemptGodId;
-      acceptTemptation(g, tempter);
+
       if (tempter === ("first_human" as any)) {
-        // 비용/신앙 이동은 수락 시점에 확정
+        // first_human: 비용/신앙 이동은 수락 시점에 확정
         g.player.fatigue = (g.player.fatigue ?? 0) + 3;
         logMsg(g, "유혹: 피로 +3");
+
         acceptTemptation(g, tempter);
 
         const candidates = Object.values(g.cards)
@@ -565,11 +566,37 @@ export function applyChoiceKey(g: GameState, key: string): boolean {
         return true;
       }
 
-      applyTemptationEffect(g, tempter);
+      // 일반 유혹
       acceptTemptation(g, tempter);
+      applyTemptationEffect(g, tempter);
+
       clearAllChoices(g);
       g.phase = "NODE";
       applyPendingRelicActivations(g);
+      return true;
+    }
+    return false;
+  }
+
+  const anyCtx = g.choiceCtx as any;
+  if (anyCtx?.kind === "PICK_VANISHED_TO_HAND") {
+    if (key === "cancel") {
+      clearAllChoices(g);
+      return true;
+    }
+
+    if (key.startsWith("pickVanished:")) {
+      const uid = key.slice("pickVanished:".length);
+      const inst = g.cards[uid];
+      if (inst && inst.zone === "vanished") {
+        inst.zone = "hand";
+        if (!g.hand.includes(uid)) g.hand.push(uid);
+        g.vanished = g.vanished.filter((x) => x !== uid);
+        const def = g.content.cardsById[inst.defId];
+        const nm = def?.name ?? inst.defId;
+        logMsg(g, `소실 카드 회수: ${nm}`);
+      }
+      clearAllChoices(g);
       return true;
     }
 

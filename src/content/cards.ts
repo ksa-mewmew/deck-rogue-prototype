@@ -1,6 +1,9 @@
-import type { CardData } from "../engine/types";
-import type { Content, GameState } from "../engine/types";
+import type { CardData, Content, GameState, PlayerEffect, Side } from "../engine/types";
 
+const whenPlaced = (side: Side, then: PlayerEffect[]): PlayerEffect => ({ op: "ifPlaced", side, then });
+
+export const ifInFront = (then: PlayerEffect[]) => whenPlaced("front", then);
+export const ifInBack = (then: PlayerEffect[]) => whenPlaced("back", then);
 export function getCardDefFor(g: GameState, uid: string) {
   const inst = g.cards[uid];
   const base = g.content.cardsById[inst.defId];
@@ -242,7 +245,7 @@ export const CARDS: CardData[] = [
   {
     id: "smoke",
     name: "연막",
-    rarity: "SPECIAL",
+    rarity: "RARE",
     vanishWhen: "FRONT",
     frontText: "이번 턴 적 공격 피해 무효, 소실",
     backText: "F +1",
@@ -256,7 +259,7 @@ export const CARDS: CardData[] = [
   {
     id: "redeploy",
     name: "재배치",
-    rarity: "COMMON",
+    rarity: "RARE",
     frontText: "S +2",
     backText: "3번 슬롯에 있는 후열 카드의 전열 효과 발동",
     front: [{ op: "supplies", n: 2 }],
@@ -285,11 +288,11 @@ export const CARDS: CardData[] = [
     rarity: "RARE",
     exhaustWhen: "BOTH",
     frontText: "무작위 피해 (F의 2배), 소모",
-    backText: "전체 취약 +3 및 약화 +2, 소모",
+    backText: "전체 취약 +3 및 약화 +3, 소모",
     front: [{ op: "damageEnemyByPlayerFatigue", target: "random", mult: 2 }],
     back: [
       { op: "statusEnemy", target: "all", key: "vuln", n: 3 },
-      { op: "statusEnemy", target: "all", key: "weak", n: 2 },
+      { op: "statusEnemy", target: "all", key: "weak", n: 3 },
     ],
 
     upgrades: [
@@ -298,9 +301,9 @@ export const CARDS: CardData[] = [
         frontText: "지정 피해 (F의 2배), 소모",
         front: [{ op: "damageEnemyByPlayerFatigue", target: "select", mult: 2 }],
 
-        backText: "전체 취약 +4 및 약화 +3, 소모",
+        backText: "전체 취약 +4 및 약화 +4, 소모",
         back: [{ op: "statusEnemy", target: "all", key: "vuln", n: 4 },
-        { op: "statusEnemy", target: "all", key: "weak", n: 3 },],
+        { op: "statusEnemy", target: "all", key: "weak", n: 4 },],
       },
     ]
 
@@ -335,14 +338,14 @@ export const CARDS: CardData[] = [
     name: "마름쇠",
     rarity: "SPECIAL",
     frontText: "전체 출혈 4 부여",
-    backText: "이번 턴에 자신을 공격하려는 적에게 출혈 3 부여",
+    backText: "자신을 공격하려는 적에게 출혈 3 부여",
     front: [{ op: "statusEnemy", target: "all", key: "bleed", n: 4 }],
     back: [{ op: "statusEnemiesAttackingThisTurn", key: "bleed", n: 3 }],
 
     upgrades: [
       {
         frontText: "전체 출혈 5 부여",
-        backText: "이번 턴에 자신을 공격하려는 적에게 출혈 4 부여",
+        backText: "자신을 공격하려는 적에게 출혈 4 부여",
         front: [{ op: "statusEnemy", target: "all", key: "bleed", n: 5 }],
         back: [{ op: "statusEnemiesAttackingThisTurn", key: "bleed", n: 4 }],
       },
@@ -608,13 +611,13 @@ export const CARDS: CardData[] = [
     id: "hand_blade",
     name: "손 안의 칼날",
     rarity: "RARE",
-    frontText: "지정 피해 4, 이 카드 제외 손패 1장당 피해 +2",
+    frontText: "지정 피해 4, 손패 1장당 피해 +2",
     backText: "손패 1장당 방어 +1 (최대 6)",
     front: [{ op: "damageEnemyFormula", target: "select", kind: "hand_blade" }],
     back: [{ op: "blockFormula", kind: "hand_blade_back" }],
     upgrades: [
       {
-        frontText: "지정 피해 6, 이 카드 제외 손패 1장당 피해 +2",
+        frontText: "지정 피해 6, 손패 1장당 피해 +2",
         backText: "손패 1장당 방어 +2",
         front: [{ op: "damageEnemyFormula", target: "select", kind: "hand_blade_u1" }],
         back: [{ op: "blockFormula", kind: "hand_blade_back_u1" }],
@@ -684,9 +687,7 @@ export const CARDS: CardData[] = [
     ],
   },
 
-  // =========================
   // 설치(장비) / 토큰(두루마리)
-  // =========================
 
   {
     id: "install_ballista",
@@ -793,7 +794,7 @@ export const CARDS: CardData[] = [
 
   // (신규) 중열 절단 — (2)번 적의 HP를 절반으로
   {
-    id: "rare_cut_second",
+    id: "cut_second",
     name: "중열 절단",
     rarity: "RARE",
     exhaustWhen: "BOTH",
@@ -882,6 +883,170 @@ export const CARDS: CardData[] = [
     ],
   },
 
+  // =========================
+  // 신규 카드 (요청 구현)
+  // =========================
+
+  {
+    id: "fuel_kindling",
+    name: "땔감 삼기",
+    rarity: "SPECIAL",
+    frontText: "전열 1번 슬롯 카드를 소모, 소모했다면 S +3",
+    backText: "후열 3번 슬롯 카드를 소모, 소모했다면 S +4",
+    front: [
+      { op: "exhaustSlot", side: "front", index: 0, then: [{ op: "supplies", n: 3 }] },
+    ],
+    back: [
+      { op: "exhaustSlot", side: "back", index: 2, then: [{ op: "supplies", n: 4 }] },
+    ],
+    upgrades: [
+      {
+        frontText: "전열 1번 슬롯 카드를 소모, 소모했다면 S +4",
+        backText: "후열 3번 슬롯 카드를 소모, 소모했다면 S +5",
+        front: [
+          { op: "exhaustSlot", side: "front", index: 0, then: [{ op: "supplies", n: 4 }] },
+        ],
+        back: [
+          { op: "exhaustSlot", side: "back", index: 2, then: [{ op: "supplies", n: 5 }] },
+        ],
+      },
+    ],
+  },
+
+  {
+    id: "impossible_plan",
+    name: "불가능한 계획",
+    rarity: "SPECIAL",
+    frontText: "이 카드가 후열에 배치되어있다면 전체 피해 25",
+    backText: "어떻게?",
+    front: [ifInBack([{ op: "damageEnemy", target: "all", n: 25 }])],
+    back: [],
+    upgrades: [
+      {
+        frontText: "이 카드가 후열에 배치되어있다면 전체 피해 30",
+        backText: "어떻게?",
+        front: [ifInBack([{ op: "damageEnemy", target: "all", n: 30 }])],
+        back: [],
+      },
+    ],
+  },
+
+  {
+    id: "slash_frenzy",
+    name: "칼부림",
+    rarity: "SPECIAL",
+    tags: ["INSTALL"],
+    installWhen: "BACK",
+    frontText: "무작위 피해 7, 🗡️ 칼부림만큼 추가 반복, 🗡️ 칼부림을 0으로",
+    backText: "[설치] S -1, 🗡️ 칼부림 +1",
+    front: [{ op: "damageEnemyRepeatByStatus", target: "random", n: 7, key: "slash", reset: true }],
+    back: [{ op: "supplies", n: -1 }, { op: "statusPlayer", key: "slash", n: 1 }],
+    upgrades: [
+      {
+        frontText: "무작위 피해 8, 🗡️ 칼부림만큼 추가 반복, 🗡️ 칼부림을 0으로",
+        front: [{ op: "damageEnemyRepeatByStatus", target: "random", n: 8, key: "slash", reset: true }],
+      },
+    ],
+  },
+
+  {
+    id: "install_wedge_spike",
+    name: "쐐기 박기",
+    rarity: "COMMON",
+    tags: ["LOCKED"],
+    frontText: "이번 턴에 설치 시, 체력이 가장 낮은 적 피해 20, (부동) (설치)",
+    backText: "이번 턴에 설치 시, 체력이 가장 낮은 적 피해 20, (부동) (설치)",
+    front: [{ op: "ifPlacedThisTurn", then: [{ op: "damageEnemyLowestHp", n: 20 }] }],
+    back: [{ op: "ifPlacedThisTurn", then: [{ op: "damageEnemyLowestHp", n: 20 }] }],
+    upgrades: [
+      {
+        frontText: "이번 턴에 설치 시, 체력이 가장 낮은 적 피해 25, (부동) (설치)",
+        backText: "이번 턴에 설치 시, 체력이 가장 낮은 적 피해 25, (부동) (설치)",
+        front: [{ op: "ifPlacedThisTurn", then: [{ op: "damageEnemyLowestHp", n: 25 }] }],
+        back: [{ op: "ifPlacedThisTurn", then: [{ op: "damageEnemyLowestHp", n: 25 }] }],
+      },
+    ],
+  },
+
+  {
+    id: "coin_toss",
+    name: "동전 던지기",
+    rarity: "RARE",
+    frontText: "후열이면 전체 피해 20, 이 카드를 뒤집음",
+    backText: "이 카드를 뒤집음",
+    front: [ifInBack([{ op: "damageEnemy", target: "all", n: 20 }]), { op: "flipSelf" }],
+    back: [{ op: "flipSelf" }],
+    upgrades: [
+      {
+        frontText: "후열이면 전체 피해 25, 이 카드를 뒤집음",
+        backText: "이 카드를 뒤집음",
+        front: [ifInBack([{ op: "damageEnemy", target: "all", n: 25 }]), { op: "flipSelf" }],
+        back: [{ op: "flipSelf" }],
+      },
+    ],
+  },
+
+  {
+    id: "doppelganger",
+    name: "도플갱어",
+    rarity: "SPECIAL",
+    frontText: "전열 효과: 후열에 도플갱어가 있으면 무작위 피해 4, 4번",
+    backText: "후열 효과: 전열에 도플갱어가 있으면 드로우 4, S +4",
+    front: [
+      {
+        op: "ifOtherRowHasDefId",
+        defId: "doppelganger",
+        then: [{ op: "repeat", times: 4, effects: [{ op: "damageEnemy", target: "random", n: 4 }] }],
+      },
+    ],
+    back: [
+      {
+        op: "ifOtherRowHasDefId",
+        defId: "doppelganger",
+        then: [{ op: "supplies", n: 4 }, { op: "draw", n: 4 }],
+      },
+    ],
+    upgrades: [
+      {
+        frontText: "전열 효과: 후열에 도플갱어가 있으면 무작위 피해 5, 5번",
+        backText: "후열 효과: 전열에 도플갱어가 있으면 드로우 5, S +5",
+        front: [
+          {
+            op: "ifOtherRowHasDefId",
+            defId: "doppelganger",
+            then: [{ op: "repeat", times: 5, effects: [{ op: "damageEnemy", target: "random", n: 5 }] }],
+          },
+        ],
+        back: [
+          {
+            op: "ifOtherRowHasDefId",
+            defId: "doppelganger",
+            then: [{ op: "supplies", n: 5 }, { op: "draw", n: 5 }],
+          },
+        ],
+      },
+    ],
+  },
+
+  {
+    id: "unforgettable_memory",
+    name: "잊을 수 없는 기억",
+    rarity: "RARE",
+    frontText: "무작위 소실된 카드의 전열 효과 발동, 두 번 반복",
+    backText: "무작위 소실된 카드의 후열 효과 발동, 두 번 반복",
+    front: [{ op: "triggerRandomVanished", side: "front", times: 2 }],
+    back: [{ op: "triggerRandomVanished", side: "back", times: 2 }],
+    upgrades: [
+      {
+        frontText: "무작위 소실된 카드의 전열 효과 발동, 세 번 반복",
+        backText: "무작위 소실된 카드의 후열 효과 발동, 세 번 반복",
+        front: [{ op: "triggerRandomVanished", side: "front", times: 3 }],
+        back: [{ op: "triggerRandomVanished", side: "back", times: 3 }],
+      },
+    ],
+  },
+
+
 
 // 광기 카드
   {
@@ -926,13 +1091,13 @@ export const CARDS: CardData[] = [
     name: "거래의 잔재",
     rarity: "MADNESS",
     exhaustWhen: "BOTH",
-    frontText: "지정 16 피해, S -1, F +1, 소모",
+    frontText: "지정 피해 16, S -1, F +1, 소모",
     backText: "HP +6, F +2, 소모",
     front: [{ op: "damageEnemy", target: "select", n: 16 }, { op: "supplies", n: -1 }, { op: "fatigue", n: 1 }],
     back: [{ op: "heal", n: 6 }, { op: "fatigue", n: 2 }],
     upgrades: [
       {
-        frontText: "지정 22 피해, S -1, F +2, 소모",
+        frontText: "지정 피해 22, S -1, F +2, 소모",
         front: [{ op: "damageEnemy", target: "select", n: 22 }, { op: "supplies", n: -1 }, { op: "fatigue", n: 2 }],
         backText: "HP +9, F +2, 소모",
         back: [{ op: "heal", n: 9 }, { op: "fatigue", n: 2 }],
@@ -940,7 +1105,37 @@ export const CARDS: CardData[] = [
     ],
   },
 
+  {
+    id: "mad_no_impossible",
+    name: "불가능은 없다",
+    rarity: "MADNESS",
+    frontText: "내 덱의 모든 카드를 뒤집음, 전투가 끝날 때 원래대로 돌아옴, S -5",
+    backText: "소실 카드 한 장을 선택하여 가져옴, 소실",
+    tags: ["VANISH"],
+    vanishWhen: "BACK",
+    front: [{ op: "flipAllPlayerCardsUntilCombatEnd" }, { op: "supplies", n: -5 }],
+    back: [{ op: "pickVanishedToHand" }],
+  },
 
+  {
+    id: "mad_bed_of_thorns",
+    name: "가시방석",
+    rarity: "MADNESS",
+    tags: ["INSTALL"],
+    installWhen: "BOTH",
+    frontText: "자신을 공격하려는 적에게 출혈 5 부여 (설치)",
+    backText: "매 턴 시작 시 플레이어 및 전체 취약 1 부여 (설치)",
+    front: [{ op: "statusEnemiesAttackingThisTurn", key: "bleed", n: 5 }],
+    back: [{ op: "statusPlayer", key: "vuln", n: 1 }, { op: "statusEnemy", target: "all", key: "vuln", n: 1 }],
+    upgrades: [
+      {
+        frontText: "자신을 공격하려는 적에게 출혈 6 부여 (설치)",
+        backText: "매 턴 시작 시 플레이어 및 전체 취약 2 부여 (설치)",
+        front: [{ op: "statusEnemiesAttackingThisTurn", key: "bleed", n: 6 }],
+        back: [{ op: "statusPlayer", key: "vuln", n: 2 }, { op: "statusEnemy", target: "all", key: "vuln", n: 2 }],
+      },
+    ],
+  },
 
 ];
 

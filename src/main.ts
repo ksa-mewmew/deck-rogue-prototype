@@ -3,6 +3,7 @@ import "./style.css";
 import { installUiFit, installLayoutMode } from "./ui/uiFit";
 import { buildContent } from "./content";
 import { render, createOrLoadGame, isDraggingNow, makeUIActions } from "./ui/ui";
+import { isMobileLike } from "./ui/uiFit";
 
 const content = buildContent();
 let g = createOrLoadGame(content);
@@ -151,3 +152,21 @@ installRerenderOnLayoutChange();
 render(g, actions);
 
 document.documentElement.style.setProperty("--base", import.meta.env.BASE_URL);
+
+// 모바일 감지 및 orientation 클래스 적용
+const { vw, vh } = (() => {
+  const vv = window.visualViewport;
+  return {
+    vw: vv?.width ?? window.innerWidth,
+    vh: vv?.height ?? window.innerHeight,
+  };
+})();
+
+const mobile = isMobileLike(vw);
+const orient = (vh >= vw * 1.08) ? "portrait" : (vw >= vh * 1.08) ? "landscape" : "square";
+
+document.body.classList.toggle("mobile", mobile);
+document.body.classList.toggle("desktop", !mobile);
+document.body.classList.toggle("portrait", orient === "portrait");
+document.body.classList.toggle("landscape", orient === "landscape");
+document.body.classList.toggle("square", orient === "square");

@@ -1,12 +1,3 @@
-// engine/faith.ts
-// Faith system (full v0.1)
-// - 3 gods offered at start, pick one -> points (5,0,0)
-// - Accepting another god's temptation moves points (+1 to tempter, -1 from current focus) (zero-sum, total 5)
-// - Focus always exists (A): max points among *non-hostile* offered gods; ties -> keep lastFocus if in tie; else pick rising god.
-// - Patron (= supported god) exists when focus points >= 3.
-// - Non-focus gods can tempt (we use EVENT injection in ui.ts).
-// - Treasure immediately triggers one-time Madness(0) choice (boon/bane are disclosed before choosing).
-// - Hostile overrides patron effects and removes god from temptation/focus candidates.
 
 import type { ChoiceOption, ChoiceState, GameState, GodId, FaithState } from "./types";
 import { setChoice } from "./choice";
@@ -19,9 +10,6 @@ import {
   upgradeCardByUid,
 } from "../content/rewards";
 
-// =========================
-// Data
-// =========================
 
 type GodDisplay = {
   id: Exclude<GodId, "madness">;
@@ -178,7 +166,6 @@ export const GOD_LINES = {
 } as const;
 
 export function createDefaultOfferedGods(): [GodId, GodId, GodId] {
-  // offered 풀에서 3개 랜덤 (중복 없음)
   const pool: Exclude<GodId, "madness">[] = [
     "dream_shadow",
     "wing_artery",
@@ -211,8 +198,9 @@ export function godName(id: GodId): string {
   return displayById(id).name;
 }
 
-export function godArt(id: Exclude<GodId, "madness">) {
-  return displayById(id).art;
+export function godArt(id: GodId) {
+  if (id === "madness") return "assets/gods/madness.png";
+  return displayById(id as any).art;
 }
 
 export function godAbilityBlock(id: Exclude<GodId, "madness">): string {
@@ -225,9 +213,6 @@ export function godAbilityBlock(id: Exclude<GodId, "madness">): string {
   ].join("\n");
 }
 
-// =========================
-// State helpers
-// =========================
 
 export function createFaithState(offered?: [GodId, GodId, GodId]): FaithState {
   const off = offered ?? createDefaultOfferedGods();
@@ -273,7 +258,6 @@ export function ensureFaith(g: GameState): FaithState {
     madness: 0,
   } as any;
 
-  // 새 신 추가 시 저장 호환
   const ensure0 = (id: GodId) => {
     const v = Number((f.points as any)[id]);
     if (!Number.isFinite(v)) (f.points as any)[id] = 0;
@@ -297,11 +281,9 @@ export function ensureFaith(g: GameState): FaithState {
   f.lastFocus ??= f.focus;
   f.chosen ??= false;
 
-  // shape
   f.madnessAwakened ??= false;
   f.madnessTemptUsed ??= false;
 
-  // focus는 항상 존재해야 함(A). hostile 제외하여 재계산.
   recalcFocus(f);
 
   return f;
@@ -344,7 +326,6 @@ function recalcFocus(f: FaithState, rising?: GodId) {
   const pts = f.points;
   const hostile = f.hostile ?? {};
 
-  // candidates: offered 중 hostile가 아닌 신. (A 룰)
   const candidates = offered.filter((id) => !hostile[id]);
   const pool = candidates.length > 0 ? candidates : offered;
 
@@ -366,19 +347,15 @@ function recalcFocus(f: FaithState, rising?: GodId) {
     return;
   }
 
-  // tie-break:
-  // 1) lastFocus가 동점 집합에 있으면 유지
   if (bestIds.includes(f.lastFocus)) {
     f.focus = f.lastFocus;
     return;
   }
-  // 2) lastFocus가 없으면, 이번에 오른 신(rising)이 동점 집합에 있으면 그 신
   if (rising && bestIds.includes(rising)) {
     f.focus = rising;
     f.lastFocus = rising;
     return;
   }
-  // 3) 그래도 애매하면 pool 순서(안정적)
   f.focus = bestIds[0];
   f.lastFocus = f.focus;
 }
@@ -394,9 +371,6 @@ export function scoreStr(g: GameState): string {
   return f.offered.map((id) => `${godName(id)}:${f.points[id] ?? 0}`).join(", ");
 }
 
-// =========================
-// Start choice
-// =========================
 
 export function chooseStartingGod(g: GameState, god: GodId) {
   const f = ensureFaith(g);
@@ -408,10 +382,8 @@ export function chooseStartingGod(g: GameState, god: GodId) {
   f.lastFocus = god;
   f.chosen = true;
 
-  // hostile reset (새 런 기준)
   f.hostile = {};
 
-  // 화로: 시작 카드 강화
   if (god === "forge_master") {
     const ids = Object.values(g.cards)
       .filter((c) => c.zone === "deck" && ["arrow", "power_arrow", "shield"].includes(c.defId))
@@ -446,9 +418,6 @@ export function openFaithStartChoice(g: GameState) {
   setChoice(g, choice, { kind: "FAITH_START", offered: off });
 }
 
-// =========================
-// Temptations
-// =========================
 
 export function pickTemptingGod(g: GameState): Exclude<GodId, "madness"> | null {
   const f = ensureFaith(g);
@@ -460,7 +429,6 @@ export function pickTemptingGod(g: GameState): Exclude<GodId, "madness"> | null 
   const candidates = f.offered.filter((id) => id !== focus && !hostile[id]) as Exclude<GodId, "madness">[];
   if (candidates.length === 0) return null;
 
-  // 연속 방지
   let pool = candidates;
   if (f.lastTempter && candidates.length >= 2) {
     pool = candidates.filter((id) => id !== f.lastTempter);
@@ -553,7 +521,6 @@ export function applyTemptationEffect(g: GameState, tempter: Exclude<GodId, "mad
     const candidates = Object.values(g.cards)
       .filter((c) => (c.zone === "deck" || c.zone === "hand" || c.zone === "discard") && canUpgradeUid(g, c.uid))
       .map((c) => c.uid);
-    // shuffle
     for (let i = candidates.length - 1; i > 0; i--) {
       const j = (Math.random() * (i + 1)) | 0;
       const tmp = candidates[i];
@@ -567,13 +534,11 @@ export function applyTemptationEffect(g: GameState, tempter: Exclude<GodId, "mad
   }
 
   if (tempter === "bright_darkness") {
-    // (유혹) 현재 위치 기준, 거리 3까지의 모든 노드를 즉시 공개(디테일)
     const map: any = (g.run as any).map as any;
     const pos = String(map?.pos ?? "");
     const edges: Record<string, string[]> = (map?.edges ?? {}) as any;
     const seen: Record<string, 0 | 1 | 2 | 3> = (map.seen ??= {});
 
-    // BFS 거리(최대 3)
     const MAX_D = 3;
     const dist: Record<string, number> = {};
     const q: string[] = [];
@@ -622,7 +587,6 @@ export function applyTemptationEffect(g: GameState, tempter: Exclude<GodId, "mad
     return;
   }
 
-  // first_human(카드 선택 복제)는 choiceApply.ts에서 후속 PICK_CARD로 처리
 
   if (tempter === "card_dealer") {
     const runAny = g.run as any;
@@ -641,9 +605,6 @@ export function applyTemptationEffect(g: GameState, tempter: Exclude<GodId, "mad
   }
 }
 
-// =========================
-// Madness (0)
-// =========================
 
 function madnessBoonText(i: 1 | 2 | 3) {
   if (i === 1) return "즉시 체력 전부 회복, 전투 돌입 시 30% 확률로 첫번째 적 즉사 (보스 제외)";
@@ -676,7 +637,7 @@ export function openMadnessTemptChoice(g: GameState) {
   const offerBoon = pickOne([1, 2, 3] as const, "madness boon");
   const offerBane = pickOne([1, 2, 3] as const, "madness bane");
 
-  const title = "광기의 신";
+  const title = "광기의 신 0";
   const prompt =
     `광기의 신이 깨어났습니다.\n\n` +
     `수락 시(배교): ${madnessBoonText(offerBoon)}\n` +
@@ -705,10 +666,8 @@ export function acceptMadness(g: GameState, offerBoon: 1 | 2 | 3) {
   f.madnessAccepted = true;
   f.madnessBoon = offerBoon;
 
-  // 즉시 F +10
   g.player.fatigue = (g.player.fatigue ?? 0) + 10;
 
-  // boon1: 즉시 풀회복
   if (offerBoon === 1) {
     g.player.hp = g.player.maxHp;
     logMsg(g, "광기: 즉시 체력 전부 회복");
@@ -717,11 +676,9 @@ export function acceptMadness(g: GameState, offerBoon: 1 | 2 | 3) {
   pushUiToast(g, "INFO", GOD_LINES.madness.accept, 2200);
   logMsg(g, GOD_LINES.madness.accept);
 
-  // 배교: 현재 포커스 신을 적대로 전환 (A 룰: 후원신이 없어도 포커스는 존재)
   const betrayed = f.focus;
   setHostile(g, betrayed);
 
-  // 배교 대사(있는 것만)
   if (betrayed === "wing_artery") {
     pushUiToast(g, "WARN", GOD_LINES.wing_artery.apostasy, 2200);
     logMsg(g, GOD_LINES.wing_artery.apostasy);
@@ -759,7 +716,6 @@ export function applyMadnessCombatStartHooks(g: GameState) {
   const boon = getMadnessBoon(g);
   const bane = getMadnessBane(g);
 
-  // bane2: 전투 시작 시 자신 취약/약화/출혈 2
   if (bane === 2) {
     applyStatusTo(g.player as any, "vuln", 2, g, "SYSTEM");
     applyStatusTo(g.player as any, "weak", 2, g, "SYSTEM");
@@ -767,7 +723,6 @@ export function applyMadnessCombatStartHooks(g: GameState) {
     logMsg(g, "광기(적대): 취약/약화/출혈 2");
   }
 
-  // boon2: 첫번째 적 취약/약화 4
   if (boon === 2) {
     const first = g.enemies?.[0];
     if (first && first.hp > 0 && !String(first.id ?? "").startsWith("boss_")) {
@@ -777,7 +732,6 @@ export function applyMadnessCombatStartHooks(g: GameState) {
     }
   }
 
-  // boon1: 30% 확률 첫번째 적 즉사(보스 제외)
   if (boon === 1) {
     const first = g.enemies?.[0];
     if (first && first.hp > 0 && !String(first.id ?? "").startsWith("boss_")) {
@@ -790,14 +744,8 @@ export function applyMadnessCombatStartHooks(g: GameState) {
   }
 }
 
-// =========================
-// Patron / hostile hooks used by UI and combat
-// =========================
 
 export function wingArteryMoveDelta(g: GameState): number {
-  // base 이동 시간(탐험 timeMove) 증가량
-  // patron: 30% 확률로 +0 (토스트)
-  // hostile: +1 추가
   const patron = getPatronGodOrNull(g);
   const hostile = isHostile(g, "wing_artery");
 
@@ -830,19 +778,16 @@ export function applyWingArteryEvery5Turns(g: GameState) {
 }
 
 export function applyDreamShadowRestHeal(g: GameState): { healed: boolean } {
-  // returns whether it handled heal
   const patron = getPatronGodOrNull(g);
   const hostile = isHostile(g, "dream_shadow");
 
   if (hostile) {
-    // 회복량 0
     pushUiToast(g, "WARN", GOD_LINES.dream_shadow.hostileRest, 1800);
     logMsg(g, GOD_LINES.dream_shadow.hostileRest);
     return { healed: true };
   }
 
   if (patron === "dream_shadow") {
-    // 최대체력 + F+3
     g.player.hp = g.player.maxHp;
     g.player.fatigue = (g.player.fatigue ?? 0) + 3;
     pushUiToast(g, "INFO", GOD_LINES.dream_shadow.restHeal, 1800);
@@ -876,23 +821,18 @@ export function isForgeHostile(g: GameState): boolean {
 }
 
 export function onEnterRestExplorationHooks(g: GameState) {
-  // 화로 적대: 휴식 진입 시 카드 1장 제거
   if (isForgeHostile(g)) {
     pushUiToast(g, "WARN", GOD_LINES.forge_master.hostileRestEnter, 2200);
     logMsg(g, GOD_LINES.forge_master.hostileRestEnter);
     removeRandomCardFromDeck(g);
   }
 
-  // 꿈그림자 적대: 휴식 방해 토스트(실제 효과는 applyDreamShadowRestHeal에서)
   if (isHostile(g, "dream_shadow")) {
     pushUiToast(g, "WARN", GOD_LINES.dream_shadow.hostileRest, 2200);
     logMsg(g, GOD_LINES.dream_shadow.hostileRest);
   }
 }
 
-// =========================
-// New gods: shared helpers
-// =========================
 
 export function faithCardRewardCount(g: GameState): number {
   let n = 3;
@@ -923,7 +863,6 @@ export function combatStartDrawDeltaFromFaith(g: GameState): number {
 export function applyFaithCombatStartHooks(g: GameState) {
   const patron = getPatronGodOrNull(g);
 
-  // 밝은 어둠: 전투 시작 취약
   if (patron === "bright_darkness") {
     applyStatusTo(g.player as any, "vuln", 1, g, "SYSTEM");
     pushUiToast(g, "WARN", GOD_LINES.bright_darkness.combatStart, 1800);
@@ -934,7 +873,6 @@ export function applyFaithCombatStartHooks(g: GameState) {
     logMsg(g, "밝은 어둠(적대): 전투 시작 취약 2");
   }
 
-  // 중갑 입은 호랑이: 시작 방어 / 적대 취약
   if (patron === "armored_tiger") {
     g.player.block = (g.player.block ?? 0) + 10;
     (g as any)._gainedBlockThisTurn = true;
@@ -949,13 +887,11 @@ export function applyFaithCombatStartHooks(g: GameState) {
     logMsg(g, "중갑 입은 호랑이(적대): 전투 시작 취약 2 / 드로우 -1");
   }
 
-  // 카드 딜러: 전투 시작 토스트
   if (patron === "card_dealer") {
     pushUiToast(g, "INFO", GOD_LINES.card_dealer.combatStart, 1800);
     logMsg(g, GOD_LINES.card_dealer.combatStart);
   }
 
-  // 토끼 사냥: 적 취약 / 적대 자신 취약
   if (patron === "rabbit_hunt") {
     for (const en of (g.enemies ?? [])) {
       if (en && en.hp > 0) applyStatusTo(en as any, "vuln", 2, g, "SYSTEM");
@@ -976,7 +912,6 @@ export function applyFaithOnCardUsedHooks(g: GameState) {
   const patron = getPatronGodOrNull(g);
   const used = Number(g.usedThisTurn ?? 0) || 0;
 
-  // 아무렇지 않은 자: 5장째에 피로 +1
   if (patron === "indifferent_one" && used === 5) {
     g.player.fatigue = (g.player.fatigue ?? 0) + 1;
     pushUiToast(g, "WARN", GOD_LINES.indifferent_one.at5Cards, 1800);
@@ -984,7 +919,6 @@ export function applyFaithOnCardUsedHooks(g: GameState) {
     logMsg(g, "아무렇지 않은 자: 5장째 사용 → 피로 +1");
   }
 
-  // 아무렇지 않은 자(적대): 첫 사용 시 경고, 4장째에 피로 +1
   if (isHostile(g, "indifferent_one")) {
     if (used === 1 && !(g as any)._indifferentHostileWarnedThisTurn) {
       (g as any)._indifferentHostileWarnedThisTurn = true;
@@ -1001,10 +935,8 @@ export function applyFaithOnCardUsedHooks(g: GameState) {
 export function applyFaithUpkeepEndTurnHooks(g: GameState) {
   const patron = getPatronGodOrNull(g);
 
-  // 아무렇지 않은 자: 0장 사용 시 보상
   if (patron === "indifferent_one" && (Number(g.usedThisTurn ?? 0) || 0) === 0) {
     healPlayer(g, 2);
-    // 블록은 resolve 단계 이후에도 의미가 있으니(턴 종료 피해/출혈), upkeep 초반에 적용
     g.player.block = (g.player.block ?? 0) + 6;
     (g as any)._gainedBlockThisTurn = true;
     pushUiToast(g, "INFO", GOD_LINES.indifferent_one.endTurnZero, 1800);
@@ -1012,7 +944,6 @@ export function applyFaithUpkeepEndTurnHooks(g: GameState) {
     logMsg(g, "아무렇지 않은 자: 0장 사용 → HP +2, 방어 +6");
   }
 
-  // 중갑 입은 호랑이: 방어를 얻지 못했으면 HP -2
   if (patron === "armored_tiger") {
     const gained = !!(g as any)._gainedBlockThisTurn;
     if (!gained) {

@@ -39,7 +39,15 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
     },
   },
 
-  relic_monster_leather_helm: {
+    relic_wrong_dice: {
+    id: "relic_wrong_dice",
+    name: "잘못된 주사위",
+    text: "카드의 모든 숫자가 1 증가합니다.",
+    unlockFlavor: "눈금이 하나씩 어긋나 있다.",
+    art: "assets/relics/relic_unknown_square.png",
+  },
+
+relic_monster_leather_helm: {
     id: "relic_monster_leather_helm",
     dormantName: "들러붙는 가죽",
     dormantText: "털과 피가 뒤섞인 가죽이 손에 들러붙는다.",
@@ -238,7 +246,7 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
     id: "relic_broken_millstone",
     dormantName: "금 간 맷돌",
     dormantText: "갈고 있으면 시간 가는 줄 모르겠다.",
-    unlockHint: "조건: 시간 10 흘려보내기",
+    unlockHint: "조건: 시간 10 지나기",
 
     art: "assets/relics/relic_broken_millstone.png",
     unlock: (g, base) => {
@@ -389,10 +397,6 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
       logMsg(g, "유물[달빛 깎개]: 무작위 적에게 3 피해");
     },
   },
-
-  // =========================
-  // (법령 유물) 순서/설치 테마
-  // =========================
 
   relic_order_whistle: {
     id: "relic_order_whistle",

@@ -2,8 +2,9 @@ import type { GameState, Side, PlayerEffect, EnemyState } from "./types";
 import { aliveEnemies, logMsg, applyStatusTo, pickOne } from "./rules";
 import { addBlock, addFatigue, addSupplies, applyDamageToEnemy, healPlayer } from "./effects";
 import { drawCards } from "./combat";
+import { enqueueChoice } from "./choice";
 import { cardNameWithUpgrade, getCardDefFor } from "../content/cards";
-import { checkRelicUnlocks, getUnlockProgress } from "./relics";
+import { checkRelicUnlocks, getUnlockProgress, isRelicActive } from "./relics";
 
 export type ResolveCtx = {
   game: GameState;
@@ -12,6 +13,25 @@ export type ResolveCtx = {
   sourceLabel?: string;
   reason?: "FRONT" | "BACK" | "ENEMY" | "EVENT" | "RELIC" | "OTHER";
 };
+
+function isCardPlacedOnSide(g: GameState, cardUid: string, side: Side): boolean {
+  const inst = g.cards[cardUid];
+  if (!inst) return false;
+  return inst.zone === side;
+}
+
+function flipAllPlayerCardsUntilCombatEnd(g: GameState) {
+  const key = "_flipAllCombatOriginal";
+  if (!(g as any)[key]) (g as any)[key] = {};
+  const snap = (g as any)[key] as Record<string, boolean | undefined>;
+
+  for (const [uid, inst] of Object.entries(g.cards)) {
+    if (!inst) continue;
+    if (inst.zone === "vanished") continue;
+    if (snap[uid] === undefined) snap[uid] = !!(inst as any).flipped;
+    (inst as any).flipped = !snap[uid];
+  }
+}
 
 function enqueueTargetSelectDamage(ctx: ResolveCtx, amount: number, formulaKind?: string) {
   const g = ctx.game;
@@ -32,7 +52,7 @@ function enqueueTargetSelectDamage(ctx: ResolveCtx, amount: number, formulaKind?
   logMsg(g, `대상 선택 필요: 적을 클릭하세요. (${1 + g.pendingTargetQueue.length}개 남음)`);
 }
 
-function enqueueTargetSelectStatus(ctx: ResolveCtx, key: "vuln" | "weak" | "bleed" | "disrupt", n: number) {
+function enqueueTargetSelectStatus(ctx: ResolveCtx, key: "vuln" | "weak" | "bleed" | "disrupt" | "slash", n: number) {
   const g = ctx.game;
   const req = {
     kind: "statusSelect" as const,
@@ -69,6 +89,55 @@ function onlyThisCardUsedThisTurn(ctx: ResolveCtx): boolean {
   return placed[0] === ctx.cardUid;
 }
 
+function findCardSlot(g: GameState, uid: string): { side: Side; index: number } | null {
+  const fi = g.frontSlots.indexOf(uid);
+  if (fi >= 0) return { side: "front", index: fi };
+  const bi = g.backSlots.indexOf(uid);
+  if (bi >= 0) return { side: "back", index: bi };
+  return null;
+}
+
+function exhaustCardNow(g: GameState, uid: string, note = "") {
+  // remove from slots/piles (idempotent)
+  for (let i = 0; i < g.frontSlots.length; i++) if (g.frontSlots[i] === uid) g.frontSlots[i] = null;
+  for (let i = 0; i < g.backSlots.length; i++) if (g.backSlots[i] === uid) g.backSlots[i] = null;
+
+  g.hand = g.hand.filter((x) => x !== uid);
+  g.deck = g.deck.filter((x) => x !== uid);
+  g.discard = g.discard.filter((x) => x !== uid);
+  g.exhausted = g.exhausted.filter((x) => x !== uid);
+  g.vanished = g.vanished.filter((x) => x !== uid);
+
+  g.exhausted.push(uid);
+  g.cards[uid].zone = "exhausted";
+  logMsg(g, `[${cardNameWithUpgrade(g, uid)}] 소모(강제)${note ? " — " + note : ""}`);
+}
+
+function flipCardBetweenRows(g: GameState, uid: string) {
+  const pos = findCardSlot(g, uid);
+  if (!pos) {
+    logMsg(g, `뒤집기 실패: 슬롯에서 카드를 찾지 못함 (${uid})`);
+    return;
+  }
+
+  const idx = pos.index;
+  const fromSlots = pos.side === "front" ? g.frontSlots : g.backSlots;
+  const toSlots = pos.side === "front" ? g.backSlots : g.frontSlots;
+
+  const other = toSlots[idx];
+
+  fromSlots[idx] = other ?? null;
+  toSlots[idx] = uid;
+
+  g.cards[uid].zone = pos.side === "front" ? "back" : "front";
+  if (other) g.cards[other].zone = pos.side;
+
+  logMsg(g, other
+    ? `[${cardNameWithUpgrade(g, uid)}] 뒤집음: ${pos.side}${idx + 1} ↔ ${pos.side === "front" ? "back" : "front"}${idx + 1}`
+    : `[${cardNameWithUpgrade(g, uid)}] 뒤집음: ${pos.side}${idx + 1} → ${pos.side === "front" ? "back" : "front"}${idx + 1}`
+  );
+}
+
 function calcDamageEnemyFormulaBase(ctx: ResolveCtx, kind: string): number {
   switch (kind) {
 
@@ -78,12 +147,12 @@ function calcDamageEnemyFormulaBase(ctx: ResolveCtx, kind: string): number {
     case "triple_bounty_u1": return 10;
     case "hand_blade": {
       const g = ctx.game;
-      const handOthers = Object.values(g.cards).filter((c) => c.zone === "hand" && c.uid !== ctx.cardUid).length;
+      const handOthers = g.hand.length;
       return 4 + 2 * handOthers;
     }
     case "hand_blade_u1": {
       const g = ctx.game;
-      const handOthers = Object.values(g.cards).filter((c) => c.zone === "hand" && c.uid !== ctx.cardUid).length;
+      const handOthers = g.hand.length;
       return 6 + 2 * handOthers;
     }
     case "lone_blow_20": {
@@ -199,10 +268,12 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
     }
   };
 
+  const numBonus = isRelicActive(g, "relic_wrong_dice") ? 1 : 0;
+
   for (const e of effects) {
     switch (e.op) {
       case "block":
-        addBlock(g, e.n);
+        addBlock(g, e.n + numBonus);
         break;
 
       case "blockFormula": {
@@ -212,15 +283,15 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
       }
 
       case "supplies":
-        addSupplies(g, e.n);
+        addSupplies(g, e.n + numBonus);
         break;
 
       case "fatigue":
-        addFatigue(g, e.n);
+        addFatigue(g, e.n + numBonus);
         break;
 
       case "heal":
-        healPlayer(g, e.n);
+        healPlayer(g, e.n + numBonus);
         break;
 
       case "hp":
@@ -230,7 +301,7 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
 
       case "maxHp":
         g.player.maxHp += e.n;
-        g.player.hp = Math.min(g.player.maxHp, g.player.hp + e.n);
+        g.player.hp = Math.min(g.player.maxHp, g.player.hp + e.n + numBonus);
         logMsg(g, `최대 HP +${e.n} (현재 ${g.player.hp}/${g.player.maxHp})`);
         break;
 
@@ -240,7 +311,7 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
         break;
 
       case "draw": {
-        const drawn = drawCards(g, e.n);
+        const drawn = drawCards(g, e.n + numBonus);
         g.drawCountThisTurn += drawn;
         break;
       }
@@ -268,7 +339,7 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
       }
 
       case "discardHandRandom": {
-        let n = Number((e as any).n ?? 0) || 0;
+        let n = (Number((e as any).n ?? 0) || 0) + numBonus;
         n = Math.max(0, Math.min(n, g.hand.length));
         if (n <= 0) {
           logMsg(g, `손패 무작위 버림: 0장`);
@@ -294,6 +365,41 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
         break;
       }
 
+      case "ifPlaced": {
+        if (isCardPlacedOnSide(g, ctx.cardUid, e.side)) {
+        resolvePlayerEffects(ctx, e.then);
+        }
+        break;
+      }
+
+      case "flipAllPlayerCardsUntilCombatEnd": {
+        flipAllPlayerCardsUntilCombatEnd(g);
+        break;
+      }
+
+      case "pickVanishedToHand": {
+        const options = g.vanished.map((uid) => {
+          const def = getCardDefFor(g, uid);
+          return {
+            key: `pickVanished:${uid}`,
+            label: cardNameWithUpgrade(g, uid),
+            detail: `전열: ${def.frontText} / 후열: ${def.backText}`,
+            cardUid: uid,
+          };
+        });
+        enqueueChoice(
+          g,
+          {
+            kind: "PICK_CARD",
+            title: e.title ?? "소실 카드 회수",
+            prompt: e.prompt ?? "가져올 소실 카드 1장을 선택하세요.",
+            options: [...options, { key: "cancel", label: "취소" }],
+          },
+          { kind: "PICK_VANISHED_TO_HAND", sourceCardUid: ctx.cardUid }
+        );
+        break;
+      }
+      
       case "ifDrewThisTurn": {
         if (g.drawCountThisTurn > 0) {
           resolvePlayerEffects(ctx, e.then);
@@ -305,11 +411,11 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
         if (e.target === "random") {
           const alive = aliveEnemies(g);
           if (alive.length === 0) break;
-          damageEnemyWithMeta(pickOne(alive), e.n);
+          damageEnemyWithMeta(pickOne(alive), e.n + numBonus);
         } else if (e.target === "all") {
-          for (const en of aliveEnemies(g)) damageEnemyWithMeta(en, e.n);
+          for (const en of aliveEnemies(g)) damageEnemyWithMeta(en, e.n + numBonus);
         } else {
-          enqueueTargetSelectDamage(ctx, e.n);
+          enqueueTargetSelectDamage(ctx, e.n + numBonus);
         }
         break;
 
@@ -399,7 +505,7 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
       }
 
       case "statusPlayer":
-        g.player.status[e.key] = Math.max(0, (g.player.status[e.key] ?? 0) + e.n);
+        g.player.status[e.key] = Math.max(0, (g.player.status[e.key] ?? 0) + e.n + numBonus);
         logMsg(g, `플레이어 상태: ${e.key} ${e.n >= 0 ? "+" : ""}${e.n}`);
         break;
 
@@ -408,7 +514,7 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
           const alive = aliveEnemies(g);
           if (alive.length === 0) break;
           const en = pickOne(alive);
-          applyStatusTo(en, e.key, e.n, g, "PLAYER");
+          applyStatusTo(en, e.key, e.n + numBonus, g, "PLAYER");
           logMsg(g, `적(${en.name}) 상태: ${e.key} ${e.n >= 0 ? "+" : ""}${e.n}`);
           if (e.key === "bleed" && e.n > 0) {
             const up = getUnlockProgress(g);
@@ -418,7 +524,7 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
         } else if (e.target === "all") {
           const alive = aliveEnemies(g);
           if (alive.length === 0) break;
-          for (const en of alive) applyStatusTo(en, e.key, e.n, g, "PLAYER");
+          for (const en of alive) applyStatusTo(en, e.key, e.n + numBonus, g, "PLAYER");
           logMsg(g, `모든 적 상태: ${e.key} ${e.n >= 0 ? "+" : ""}${e.n}`);
           if (e.key === "bleed" && e.n > 0) {
             const up = getUnlockProgress(g);
@@ -426,7 +532,7 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
             checkRelicUnlocks(g);
           }
         } else {
-          enqueueTargetSelectStatus(ctx, e.key, e.n);
+          enqueueTargetSelectStatus(ctx, e.key, e.n + numBonus);
         }
         break;
 
@@ -461,9 +567,12 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
         }
 
         const def = getCardDefFor(g, uid0);
-        logMsg(g, `재배치: [[${cardNameWithUpgrade(g, uid0)}]]의 전열 효과를 추가 발동`);
+        const inst0 = g.cards[uid0];
+        const flipped0 = Boolean((inst0 as any)?.flipped);
+        const eff = !flipped0 ? def.front : def.back;
+        logMsg(g, `재배치: [[${cardNameWithUpgrade(g, uid0)}]]의 전열 효과를 추가 발동${flipped0 ? "(뒤집힘)" : ""}`);
 
-        resolvePlayerEffects({ game: g, side: "front", cardUid: uid0 }, def.front);
+        resolvePlayerEffects({ game: g, side: "front", cardUid: uid0 }, eff);
         break;
       }
       case "addCardToHand": {
@@ -488,6 +597,99 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
         break;
       }
 
+
+
+      case "repeat": {
+        const t = Math.max(0, (e.times ?? 0) | 0) + numBonus;
+        for (let i = 0; i < t; i++) resolvePlayerEffects(ctx, e.effects ?? []);
+        break;
+      }
+
+      case "ifPlacedThisTurn": {
+        const placed = (g.placedUidsThisTurn ?? []).includes(ctx.cardUid);
+        if (placed) resolvePlayerEffects(ctx, e.then ?? []);
+        break;
+      }
+
+      case "ifOtherRowHasDefId": {
+        const want = String(e.defId ?? "");
+        const otherSlots = ctx.side === "front" ? g.backSlots : g.frontSlots;
+        const ok = otherSlots.some((u) => {
+          if (!u) return false;
+          const inst = g.cards[u];
+          return inst?.defId === want;
+        });
+        if (ok) resolvePlayerEffects(ctx, e.then ?? []);
+        break;
+      }
+
+      case "triggerRandomVanished": {
+        const times = Math.max(0, (e.times ?? 0) | 0) + numBonus;
+        const pool = (g.vanished ?? []).filter((u) => u && u !== ctx.cardUid);
+        if (pool.length === 0) {
+          logMsg(g, `소실된 카드가 없어 발동 없음`);
+          break;
+        }
+        for (let i = 0; i < times; i++) {
+          const uid0 = pickOne(pool, "triggerRandomVanished");
+          const def0 = getCardDefFor(g, uid0);
+          logMsg(g, `소실된 카드 발동: [[${cardNameWithUpgrade(g, uid0)}]] (${e.side === "front" ? "전열" : "후열"})`);
+          resolvePlayerEffects({ game: g, side: e.side, cardUid: uid0 }, e.side === "front" ? def0.front : def0.back);
+        }
+        break;
+      }
+
+      case "exhaustSlot": {
+        const side = e.side;
+        const idx = (e.index ?? -1) | 0;
+        const slots = side === "front" ? g.frontSlots : g.backSlots;
+        const uid0 = slots[idx];
+        if (!uid0) {
+          logMsg(g, `소모 실패: ${side}${idx + 1}번 슬롯이 비어 있음`);
+          break;
+        }
+        exhaustCardNow(g, uid0, `${side}${idx + 1} 슬롯`);
+        slots[idx] = null;
+        if (e.then) resolvePlayerEffects(ctx, e.then);
+        break;
+      }
+
+      case "flipSelf": {
+        const inst = g.cards[ctx.cardUid];
+        if (inst) {
+          (inst as any).flipped = !Boolean((inst as any).flipped);
+          logMsg(g, `뒤집음: [[${cardNameWithUpgrade(g, ctx.cardUid)}]] (${(inst as any).flipped ? "ON" : "OFF"})`);
+        }
+        break;
+      }
+
+      case "damageEnemyLowestHp": {
+        const alive = aliveEnemies(g);
+        if (alive.length === 0) break;
+        let minHp = Infinity;
+        for (const en of alive) minHp = Math.min(minHp, en.hp);
+        const cands = alive.filter((en) => en.hp === minHp);
+        const target = pickOne(cands, "damageEnemyLowestHp");
+        damageEnemyWithMeta(target, Math.max(0, (e.n ?? 0) + numBonus));
+        break;
+      }
+
+      case "damageEnemyRepeatByStatus": {
+        // 기본 1회 + 상태 수치만큼 추가
+        const st = Math.max(0, g.player.status[e.key] ?? 0);
+        const hits = 1 + st + numBonus;
+        const alive = aliveEnemies(g);
+        if (alive.length === 0) break;
+        const per = Math.max(0, (e.n ?? 0) + numBonus);
+        for (let i = 0; i < hits; i++) {
+          damageEnemyWithMeta(pickOne(alive), per);
+        }
+        if (e.reset) {
+          g.player.status[e.key] = 0;
+          logMsg(g, `상태 소모: ${String(e.key)} = 0`);
+        }
+        break;
+      }
       default: {
         const _exhaustive: never = e;
         return _exhaustive;

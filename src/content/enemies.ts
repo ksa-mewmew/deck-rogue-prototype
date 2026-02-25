@@ -360,15 +360,15 @@ export const ENEMIES = [
     id: "boss_giant_orc",
     name: "거대한 오크",
     omen: "거대한 짐승이 기다린다. 힘을 깎아야 한다.",
-    maxHp: 95,
+    maxHp: 90,
     intents: [
       { label: "내려치기: 취약 +2 부여, 10 피해", acts: [{ op: "statusPlayer", key: "vuln", n: 2 }, { op: "damagePlayer", n: 15 }] },
       { label: "단단한 피부: 다음 턴 동안 피해를 입지 않음", acts: [{ op: "enemyImmuneNextTurn" }] },
       { label: "타고난 회복: 자신 HP 15 회복", acts: [{ op: "enemyHealSelf", n: 15 }]},
       {
-        label: "광분: 6 피해 (타수가 증가합니다!)",
+        label: "광분: 4 피해 (타수가 증가합니다!)",
         acts: [
-          { op: "damagePlayerRampHits", n: 6, baseHits: 1, everyTurns: 1, capHits: 6 },
+          { op: "damagePlayerRampHits", n: 4, baseHits: 1, everyTurns: 1, capHits: 6 },
         ],
         meta: { cat: "ATTACK" },
       }
@@ -381,8 +381,8 @@ export const ENEMIES = [
     omen: "행동하지 않으면 종말이 온다.",
     maxHp: 80,
     intents: [
-      { label: "허기: 7 피해, S -2", acts: [{ op: "damagePlayer", n: 7 }, { op: "supplies", n: -2 }] },
-      { label: "나태: 7 피해, F +1", acts: [{ op: "damagePlayer", n: 7 }, { op: "fatiguePlayer", n: 1 }] },
+      { label: "허기: 7 피해, S -3", acts: [{ op: "damagePlayer", n: 7 }, { op: "supplies", n: -3 }] },
+      { label: "나태: 7 피해, F +2", acts: [{ op: "damagePlayer", n: 7 }, { op: "fatiguePlayer", n: 2 }] },
       { label: "예언: 카운트 진행", acts: [] },
     ],
   },

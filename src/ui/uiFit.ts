@@ -28,13 +28,49 @@ const getUBasePx = (vw: number, vh: number) => {
   return Math.min(vw / 1440, vh / 900);
 };
 
-const isMobileLike = (vw: number) => {
+const getOrientation = (vw: number, vh: number) => {
+  // 주소창/툴바 등으로 vh가 흔들릴 때 깜빡임 방지(약간의 히스테리시스)
+  if (vh >= vw * 1.08) return "portrait";
+  if (vw >= vh * 1.08) return "landscape";
+  return "square";
+};
+
+const getUrlFlags = () => {
+  // PC에서 모바일 레이아웃을 강제로 테스트하기 위한 플래그
+  // 예)
+  //  - ?mobile=1  (강제 모바일)
+  //  - ?mobile=0  (강제 데스크탑)
+  //  - ?m=1 / ?m=0 (동일)
+  //  - ?orient=portrait|landscape|square (강제 방향)
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    const m = sp.get("mobile") ?? sp.get("m");
+    const d = sp.get("desktop");
+    const orient = sp.get("orient") as any;
+    const forceMobile = m === "1" ? true : m === "0" ? false : null;
+    const forceDesktop = d === "1" ? true : null;
+
+    const forceDevice = forceDesktop ? false : forceMobile;
+    const forceOrient = orient === "portrait" || orient === "landscape" || orient === "square" ? orient : null;
+    return { forceDevice, forceOrient };
+  } catch {
+    return {
+      forceDevice: null as boolean | null,
+      forceOrient: null as ("portrait" | "landscape" | "square") | null,
+    };
+  }
+};
+
+
+export const isMobileLike = (vw: number) => {
   const coarse = window.matchMedia?.("(pointer: coarse)")?.matches ?? false;
   return coarse && vw <= 980;
 };
 
 export function installUiFit() {
   const r = document.documentElement;
+
+  const urlFlags = getUrlFlags();
 
   // ===== 보드(슬롯) 기본 설계 단위 =====
   const BASE_SLOT_W = 180;
@@ -68,7 +104,7 @@ export function installUiFit() {
     const { vw, vh } = getViewportWH();
 
     // 사용자 배율(설정)
-    const mobile = isMobileLike(vw);
+    const mobile = urlFlags.forceDevice ?? isMobileLike(vw);
     const userMulRaw = mobile
       ? cssNum(cs, "--uiScaleMobile", 1)
       : cssNum(cs, "--uiScaleDesktop", 1);
@@ -81,8 +117,21 @@ export function installUiFit() {
 
     // 전체 레이아웃이 동일한 u(=var(--u))로 스케일 된다고 가정.
     // (현재 style.css가 대부분 var(--u) 기반이므로 이 가정이 잘 맞음)
-    const totalWUnits = EDGE_PAD * 2 + PLAYER_W + LOG_W + LOG_GAP * 2 + baseBoardW;
-    const totalHUnits = HUD_H + DOCK_H + UI_GAP + baseBoardH;
+    //
+    // 모바일 세로(portrait)에서는 "보드 + 손패"가 최우선으로 들어오도록
+    // 사이드 패널(플레이어/로그)을 fit 계산에서 제외(배치는 CSS가 담당).
+    const orient = urlFlags.forceOrient ?? getOrientation(vw, vh);
+    const mobilePortrait = mobile && orient === "portrait";
+
+    const totalWUnits = mobilePortrait
+      ? (EDGE_PAD * 2 + baseBoardW)
+      : (EDGE_PAD * 2 + PLAYER_W + LOG_W + LOG_GAP * 2 + baseBoardW);
+
+    // 세로 모드에서 로그 패널을 하단에 스택/시트로 둘 때를 감안해 최소 여유를 둠
+    const MOBILE_LOG_MIN_H = 220;
+    const totalHUnits = mobilePortrait
+      ? (HUD_H + DOCK_H + UI_GAP + baseBoardH + MOBILE_LOG_MIN_H)
+      : (HUD_H + DOCK_H + UI_GAP + baseBoardH);
 
     // viewport(px)에서 필요한 design-unit(px) 값
     const desiredU = Math.min(vw / totalWUnits, vh / totalHUnits);
@@ -129,18 +178,39 @@ export function installLayoutMode() {
   let compact = false;
   let raf = 0;
 
+  let lastKey = "";
+
+  const urlFlags = getUrlFlags();
+
   const setMode = () => {
-    const vw = window.innerWidth;
+    const { vw, vh } = getViewportWH();
+    const orient = urlFlags.forceOrient ?? getOrientation(vw, vh);
+    const mobile = urlFlags.forceDevice ?? isMobileLike(vw);
 
     // 히스테리시스(깜빡임 방지)
     if (!compact && vw < 1180) compact = true;
     if (compact && vw > 1220) compact = false;
 
-    const before = document.body.classList.contains("compact");
-    document.body.classList.toggle("compact", compact);
-    const after = document.body.classList.contains("compact");
+    const b = document.body;
+    b.classList.toggle("compact", compact);
 
-    if (before !== after) {
+    b.classList.toggle("mobile", mobile);
+    b.classList.toggle("desktop", !mobile);
+
+    b.classList.toggle("portrait", orient === "portrait");
+    b.classList.toggle("landscape", orient === "landscape");
+    b.classList.toggle("square", orient === "square");
+
+    const key = [
+      compact ? "c" : "n",
+      mobile ? "m" : "d",
+      orient,
+      Math.round(vw),
+      Math.round(vh),
+    ].join("|");
+
+    if (key !== lastKey) {
+      lastKey = key;
       window.dispatchEvent(new CustomEvent("deckrogue:layout"));
     }
   };
@@ -155,6 +225,7 @@ export function installLayoutMode() {
 
   window.addEventListener("resize", request, { passive: true });
   window.visualViewport?.addEventListener("resize", request, { passive: true });
+  window.visualViewport?.addEventListener("scroll", request, { passive: true });
 
   setMode();
 }

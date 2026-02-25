@@ -16,6 +16,25 @@ function shuffleInPlace<T>(a: T[]) {
   }
 }
 
+function restoreFlipAllPlayerCardsAfterCombat(g: GameState) {
+  const snap = (g as any)._flipAllCombatOriginal as Record<string, boolean | undefined> | undefined;
+  if (!snap) return;
+
+  for (const [uid, wasFlipped] of Object.entries(snap)) {
+    const inst: any = g.cards[uid];
+    if (!inst) continue;
+
+    if (wasFlipped === undefined) {
+      delete inst.flipped;
+    } else {
+      inst.flipped = wasFlipped;
+    }
+  }
+
+  delete (g as any)._flipAllCombatOriginal;
+}
+
+  
 function endCombatReturnAllToDeck(g: GameState) {
   const pool: string[] = [];
 
@@ -91,12 +110,12 @@ export function checkEndConditions(g: GameState) {
 
   if (aliveEnemies(g).length === 0 && g.phase !== "NODE") {
     g.victoryResolvedThisCombat = true;
-    // 전투 도중 dead enemy를 배열에서 제거하는 경우가 있어, 스폰 시점 플래그를 신뢰
     const wasBoss = !!(g.run as any).lastBattleWasBoss;
     _cleanupBattleTransientForVictory(g);
     applyWinHooksWhileInBackThisTurn(g);
 
     logMsg(g, "적을 모두 처치!");
+    if (wasBoss) (g.run as any).bossOmenText = null;
     {
       const map = (g.run as any).map as any;
       if (map && map.nodes && map.pos && map.nodes[map.pos]) {
@@ -104,14 +123,12 @@ export function checkEndConditions(g: GameState) {
         map.nodes[map.pos].visited = true;
       }
     }
-    // 유물 해금 진행도: 엘리트 전투 승리 1회
     if (g.run.lastBattleWasElite) {
       const up = getUnlockProgress(g);
       up.eliteWins += 1;
       checkRelicUnlocks(g);
     }
 
-    // 유물 해금 진행도: 적이 3명인 전투 승리
     {
       const runAny: any = g.run as any;
       const enemyCount = Number(runAny.lastBattleEnemyCount ?? 0) || 0;
@@ -122,28 +139,22 @@ export function checkEndConditions(g: GameState) {
       }
     }
 
-    // =========================
-    // Victory rewards (gold, etc.)
-    // =========================
     {
       const runAny = g.run as any;
       const curGold = Number(runAny.gold ?? 0) || 0;
 
-      // 기본 전투 골드 보상
       const T = Number(runAny.timeMove ?? 0) + (g.time ?? 0);
       const tier = Math.min(3, Math.floor(Math.max(0, T) / 15));
       let gainGold = 3 + tier * 2;
       if (g.run.lastBattleWasElite) gainGold += 10;
       if (wasBoss) gainGold += 30;
 
-      // 이벤트 전투 추가 보상
       const eventGold = Number(runAny.pendingEventWinGold ?? 0) || 0;
       if (eventGold !== 0) {
         gainGold += eventGold;
         runAny.pendingEventWinGold = 0;
       }
 
-      // 카드 딜러(적대): 전투 골드 보상 없음
       if (isHostile(g, "card_dealer")) {
         gainGold = 0;
         runAny.pendingEventWinGold = 0;
@@ -155,7 +166,6 @@ export function checkEndConditions(g: GameState) {
         pushUiToast(g, "GOLD", `🪙 +${gainGold}`, 1600);
       }
 
-      // 카드 딜러(후원 -): 30% 확률로 🪙 -10
       if (getPatronGodOrNull(g) === "card_dealer") {
         if (Math.random() < 0.3) {
           const now = Number(runAny.gold ?? 0) || 0;
@@ -169,6 +179,7 @@ export function checkEndConditions(g: GameState) {
       }
     }
 
+    restoreFlipAllPlayerCardsAfterCombat(g);
     endCombatReturnAllToDeck(g);
     g.enemies = [];
     g.player.zeroSupplyTurns = 0;
@@ -185,17 +196,11 @@ export function checkEndConditions(g: GameState) {
     runRelicHook(g, "onVictory");
 
     if (wasBoss) {
-      // 불길한 예언: 보스 격파 후에는 다시 등장 가능
       (g.run as any).ominousProphecyLockedUntilBossKill = false;
       (g.run as any).ominousProphecySeen = false;
       g.player.hp = g.player.maxHp;
       logMsg(g, "보스 격파! 체력이 완전히 회복되었습니다.");
 
-      // =========================
-      // 보스 보상: 슬롯 확장
-      //  - 1번째 보스: 전열/후열 중 하나 선택(+1)
-      //  - 2번째 보스: 나머지 자동(+1)
-      // =========================
       {
         const runAny: any = g.run as any;
         runAny.slotCapFront = Math.max(3, Math.min(4, Math.floor(Number(runAny.slotCapFront ?? 3))));

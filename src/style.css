@@ -1,42 +1,34 @@
-/* =========================================================
-   FINAL style.css (DEDUPED + REORDERED)
-   - 중복 정의 제거: 동일 목적/변수/셀렉터는 "아래쪽 값"만 유지
-   - :root는 1개로 통합 (토큰 싱글 소스)
-   - 섹션 순서 정리 + 한글 주석 추가
-   ========================================================= */
 
 
-/* =========================
-   0) ROOT TOKENS (SINGLE SOURCE OF TRUTH)
-   - UI 스케일, 레이어, 색, 레이아웃, 트레이/토스트 등 전역 토큰
-   ========================= */
+
+
 :root{
-  /* ---------- UI SCALE ---------- */
+  
   --uiScale: 1;
   --uiScaleDesktop: 1;
   --uiScaleMobile: 1;
 
-  /* ---------- SAFE AREA (length) ---------- */
+  
   --safeT: env(safe-area-inset-top, 0);
   --safeR: env(safe-area-inset-right, 0);
   --safeB: env(safe-area-inset-bottom, 0);
   --safeL: env(safe-area-inset-left, 0);
 
-  /* ---------- DESIGN UNIT (design-pixel to viewport) ---------- */
+  
   --uBase: min(calc(100vw / 1440), calc(100vh / 900));
   --u: calc(var(--uBase) * var(--uiScale));
 
-  /* ---------- ANIMATION SPEED ---------- */
-  --animMul: 1;  /* 0=즉시, 1=기본, 2=느림 */
+  
+  --animMul: 1;  
 
-  /* ---------- Z-LAYERS ---------- */
+  
   --zBg: -10;
-  --zStatus: 10;         /* status bar region (배경 바로 위) */
+  --zStatus: 10;         
   --zMain: 1000;
   --zHandDock: 2000;
 
-  --zChrome: 60000;      /* 항상 클릭 가능한 크롬/고정 UI */
-  /* Choice overlay (must sit above player HUD / chrome) */
+  --zChrome: 60000;      
+  
   --zChoiceBackdrop: 60000;
   --zChoicePanel: 62000;
   --zChoice: 63000;
@@ -49,7 +41,7 @@
   --zSettings: 80000;
   --zDevConsole: 100000;
 
-  /* ---------- THEME ---------- */
+  
   --bg0:#060708;
   --bg1:#0b0d10;
   --panel:#0f1216cc;
@@ -59,20 +51,20 @@
   --text:#e7e9ee;
   --muted:#b7bdc8;
 
-  /* ---------- LAYOUT (scale-aware) ---------- */
+  
   --edgePad: calc(14 * var(--u));
   --logW:   calc(360 * var(--u));
   --logGap: calc(14 * var(--u));
 
-  /* HUD 높이 / 도크 높이 */
+  
   --hudH:  calc(64 * var(--u));
   --dockH: calc(160 * var(--u));
 
-  /* 스테이지(보드) 최대 폭 / 보드 비율 */
+  
   --stageMaxW: calc(760 * var(--u));
   --boardAR: 1200/922;
 
-  /* ---------- CARDS + SLOTS ---------- */
+  
   --cardW: calc(122 * var(--u));
   --cardH: calc(var(--cardW) * 7 / 5);
   --handCardW: var(--cardW);
@@ -80,12 +72,12 @@
 
   --boardScale: 1;
 
-  /* 보드 이미지 보정 */
+  
   --boardImgZoom: 1.1;
   --boardImgPosY: 32%;
   --boardImgShiftY: calc(34 * var(--u));
 
-  /* 슬롯 크기(보드 위 카드) */
+  
   --slotCardW: calc(110 * var(--u) * var(--boardScale));
   --slotCardH: calc(var(--slotCardW) * 7 / 5);
 
@@ -98,60 +90,60 @@
   --boardPadX: calc(56 * var(--u));
   --boardPadY: calc(34 * var(--u));
 
-  /* 슬롯 전체를 약간 위로 올리는 미세 보정 */
+  
   --slotCenterNudgeY: calc(50 * var(--u));
 
-  /* ---------- RADII / SHADOW ---------- */
+  
   --radius: calc(18 * var(--u));
   --selR: calc(8 * var(--u));
   --shadow: 0 calc(18 * var(--u)) calc(60 * var(--u)) rgba(0,0,0,.65);
 
-  /* ---------- HUD PANEL LOOK ---------- */
+  
   --hudPanelBg: rgba(10,12,14,1);
   --hudPanelLine: rgba(255,255,255,.14);
   --hudPanelR: calc(18 * var(--u));
 
-  /* ---------- LOGS ---------- */
+  
   --logLine: rgba(255,255,255,.22);
   --logLineStrong: rgba(255,255,255,.32);
   --logShadow: 0 calc(18 * var(--u)) calc(60 * var(--u)) rgba(0,0,0,.70);
   --logBg: rgba(0,0,0,.75);
 
-  /* ---------- ASSETS ---------- */
+  
   --bgUrl: url("assets/ui/background/dungeon_bg.png");
   --boardUrl: url("assets/ui/boards/battle_board.png");
   --mapBgUrl: url("assets/ui/background/map_bg.png");
 
-  /* ---------- CARD BACKGROUNDS (rarity) ---------- */
+  
   --cardBgBasic:   url("assets/ui/cards/card_basic.png");
   --cardBgCommon:  url("assets/ui/cards/card_common.png");
   --cardBgSpecial: url("assets/ui/cards/card_special.png");
   --cardBgRare:    url("assets/ui/cards/card_rare.png");
   --cardBgMadness: url("assets/ui/cards/card_madness.png");
 
-  /* 기본 배경(미설치 시에는 기존 parchment를 복사해 위 파일명들로 두셔도 됩니다) */
+  
   --cardUrl: var(--cardBgCommon, url("assets/ui/cards/card_parchment.png"));
 
-  /* ---------- ENEMY HUD ---------- */
+  
   --enemyBannerW: calc(360 * var(--u));
   --enemyHudDx: 0;
 
-  /* ---------- DOCK ---------- */
+  
   --dockDrop:        calc(0 * var(--u));
   --dockContentDrop: calc(0 * var(--u));
 
-  /* ---------- HP BARS ---------- */
+  
   --hpH: calc(10 * var(--u));
   --hpSeg: calc(6 * var(--u));
   --hpBorder: rgba(0,0,0,.65);
   --hpFrame: rgba(255,255,255,.18);
 
-  /* ---------- STAGE CORNER / HINTS ---------- */
+  
   --hudTop: calc(150 * var(--u));
   --hintGap: calc(20 * var(--u));
   --targetHintTop: calc(70 * var(--u));
 
-  /* ---------- CHOICE OVERLAY ---------- */
+  
   --choicePadTop: calc(180 * var(--u));
   --choicePadR:   calc(36 * var(--u));
   --choicePadB:   calc(12 * var(--u));
@@ -167,15 +159,15 @@
   --choiceIlluSize: calc(260 * var(--u));
   --choiceIlluMin:  calc(200 * var(--u));
 
-  /* Dx/Dy는 숫자 토큰(설계 단위). 변환 시 --u를 곱해 uiScale 중복을 방지 */
+  
   --choicePanelDx: 0;
   --choicePanelDy: 40;
   --choicePanelMarginY: 24;
 
-  /* ---------- PLAYER HUD POSITION ---------- */
+  
   --playerHudLeftX: calc(var(--safeL) + var(--edgePad));
 
-  /* 트레이 이동량과 연동되는 드롭(최종 규칙: trayRaise의 역값) */
+  
   --trayRaise: calc(-1 * var(--u));
   --playerHudTop:   calc(var(--safeT) + calc(620 * var(--u)));
   --playerHudDropY: 0px;
@@ -183,29 +175,29 @@
 
   --statusBarGap: calc(30 * var(--u));
 
-  /* ---------- NODE UI ---------- */
+  
   --gap: calc(6 * var(--u));
   --colNow:   calc(70 * var(--u));
   --colArrow: calc(22 * var(--u));
   --colNext:  calc(70 * var(--u));
   --colSlash: calc(18 * var(--u));
 
-  /* ---------- RELICS (기본 토큰) ---------- */
+  
   --relicImgZoom: 1.3;
 
-  /* ---------- ENEMY CARDS ---------- */
+  
   --enemyCardW: calc(160 * var(--u));
   --enemyCardH: calc(var(--enemyCardW) * 7 / 5);
   --enemyArtH:  calc(420 * var(--u));
   --enemyHudW: calc(208 * var(--u));
 
-  /* ---------- MAP TOKENS ---------- */
+  
   --mapPanelCX: 50%;
   --mapPanelCY: 50%;
   --mapPanelDX: 0%;
   --mapPanelDY: -24%;
 
-  /* Base sizes (numbers); 이름은 Px이지만 실제로는 --u로 스케일 */
+  
   --panelInsetPx: 3;
   --panelMaxInsetPx: 60;
   --panelMaxWidthPx: 800;
@@ -232,14 +224,14 @@
   --pillarPx: 90;
   --pillarW: calc(var(--pillarPx) * var(--u));
 
-  /* ---------- SHOP COMPACT TOKENS ---------- */
+  
   --shopPanelW:    calc(700 * var(--u));
   --shopSvcW:      calc(240 * var(--u));
   --shopSvcGap:    calc(8 * var(--u));
   --shopItemSize:  calc(76 * var(--u));
   --shopItemIcon:  calc(50 * var(--u));
 
-  /* ---------- TOAST TOKENS (스타일용) ---------- */
+  
   --toastGap:   calc(8 * var(--u));
   --toastPadY:  calc(8 * var(--u));
   --toastPadX:  calc(12 * var(--u));
@@ -247,7 +239,7 @@
   --toastFont:  calc(25 * var(--u));
   --toastMaxW:  calc(380 * var(--u));
 
-  /* ---------- 아이템/렐릭 공통 트레이 토큰 (최종 v4 승자) ---------- */
+  
   --trayCols: 4;
   --trayRowsMax: 3;
 
@@ -255,18 +247,18 @@
   --trayGap:  calc(10 * var(--u));
   --trayPad:  calc(10 * var(--u));
 
-  /* 화면 가장자리 기본 여백 + 추가 안쪽 이동(양쪽 대칭) */
+  
   --traySidePad: calc(22 * var(--u));
-  --trayInwardX: calc(14 * var(--u)); /* (+) => 아이템은 더 오른쪽, 렐릭은 더 왼쪽으로(중앙 쪽) */
+  --trayInwardX: calc(14 * var(--u)); 
 
-  /* 트레이 바닥 기준(손패 도크 위로) */
+  
   --trayBottom: calc(var(--safeB) + calc(10 * var(--u)) + var(--trayRaise));
 
-  /* 아이템/렐릭 위치(대칭) */
+  
   --itemTrayLeft:   calc(var(--safeL) + var(--traySidePad) + var(--trayInwardX));
   --relicTrayRight: calc(var(--safeR) + var(--traySidePad) + var(--trayInwardX));
 
-  /* 기존 코드 호환 매핑 */
+  
   --relicIconSize: var(--traySlot);
   --relicIconGap:  var(--trayGap);
   --relicTrayBottom: var(--trayBottom);
@@ -276,11 +268,11 @@
   --itemSlotSize:  var(--traySlot);
   --itemTrayRowsMax: var(--trayRowsMax);
 
-  /* ---------- 아이콘 테두리/글로우 ---------- */
+  
   --iconBorder: rgba(255,255,255,.28);
   --iconGlow:   rgba(210,240,255,.18);
 
-  /* ---------- S만 보이는 HUD ---------- */
+  
   --sHudLeft: calc(300 * var(--u));
   --sHudTop:  calc(var(--safeT) + var(--hudH) + calc(330 * var(--u)));
   --sHudOffX: calc(0 * var(--u));
@@ -291,25 +283,22 @@
   --sHudPadX: calc(14 * var(--u));
   --sHudR:    calc(12 * var(--u));
 
-  /* ---------- 다음 턴 버튼 ---------- */
+  
   --combatCtrlLift: calc(10 * var(--u));
 
-  /* ---------- TOAST 위치(중앙 고정 + 미세 이동) ---------- */
+  
   --toastCX: 50%;
   --toastCY: 50%;
-  --toastDx: 0; /* 숫자(설계 단위). --u 곱해 적용됨 */
-  --toastDy: -270; /* 숫자(설계 단위). 음수면 위로 이동 */
+  --toastDx: 0; 
+  --toastDy: -270; 
 }
 
 
-/* Optional: font scale (디자인 단위 기준 기본 폰트 스케일) */
+
 html{ font-size: calc(16 * var(--u)); }
 
 
-/* =========================
-   1) FONTS
-   - 게임 폰트 설치 + 로그는 가독성 폰트로 분리
-   ========================= */
+
 @font-face{
   font-family: "Mulmaru";
   src: url("assets/fonts/Mulmaru.woff2") format("woff2");
@@ -329,7 +318,7 @@ body{
   text-rendering: optimizeLegibility;
 }
 
-/* 로그는 산세리프 고정(가독성) */
+
 pre.log,
 .logPanel pre.log,
 .logOverlay pre.log,
@@ -339,10 +328,7 @@ pre.log.log{
 }
 
 
-/* =========================
-   2) BASE
-   - 기본 레이아웃/배경 안전장치
-   ========================= */
+
 html, body{ height:100%; }
 
 body{
@@ -362,21 +348,18 @@ body{
   pointer-events: none;
 }
 
-/* 배경이 흰색으로 튀지 않도록 안전장치 */
+
 html, body, #app,
 .mainRow, .stage, .stageInner,
 .combatRoot, .boardArea{
   background: transparent !important;
 }
 
-/* 오버플로 안전장치 */
+
 .battleTitleRow, .mainPanel, .stage, .stageInner{ overflow: visible !important; }
 
 
-/* =========================
-   3) GLOBAL BACKGROUND
-   - 던전 배경 이미지 + 비네팅
-   ========================= */
+
 .bgLayer{
   position: fixed;
   inset: 0;
@@ -398,10 +381,7 @@ html, body, #app,
 }
 
 
-/* =========================
-   4) TOP HUD + PLAYER HUD
-   - 상단 버튼 영역 + 좌측 플레이어 HUD 고정
-   ========================= */
+
 .topHud{
   height: var(--hudH);
   display: grid;
@@ -413,13 +393,13 @@ html, body, #app,
   overflow: visible;
   position: relative;
   z-index: var(--zChrome);
-  pointer-events: none !important; /* 기본적으로 상단 HUD는 클릭 불가, 내부에서 클릭 가능한 부분만 따로 지정 */
+  pointer-events: none !important; 
 }
 
 .topHudLeftSpacer{ pointer-events: none !important; }
 .playerHudLeft, .topHudRight{ pointer-events: auto; }
 
-/* 오른쪽 상단 버튼(항상 클릭 가능) */
+
 .topHudRight{
   position: fixed;
   top:   calc(var(--safeT) + calc(8 * var(--u)));
@@ -431,7 +411,7 @@ html, body, #app,
 
 .enemyHud{ display: flex; gap: calc(10 * var(--u)); flex-wrap: wrap; }
 
-/* 좌측 플레이어 HUD */
+
 .playerHudLeft{
   position: fixed;
   left: var(--playerHudLeftX);
@@ -466,7 +446,7 @@ html, body, #app,
   margin-bottom: calc(10 * var(--u));
 }
 
-/* 덱/묘지/드로우 등 버튼 5개를 오른쪽으로 모으기 */
+
 .pileButtons{
   display: flex;
   align-items: center;
@@ -476,10 +456,7 @@ html, body, #app,
 }
 
 
-/* =========================
-   5) MAIN AREA + STAGE
-   - 중앙 스테이지(보드) 영역 배치
-   ========================= */
+
 .mainRow{
   position: relative;
   flex: 1;
@@ -510,10 +487,7 @@ html, body, #app,
 }
 
 
-/* =========================
-   6) MAIN PANEL (board background)
-   - 전투 시 보드 배경 이미지 레이어
-   ========================= */
+
 .mainPanel{
   position: relative;
   width: 100%;
@@ -524,7 +498,7 @@ html, body, #app,
   overflow: visible;
 }
 
-/* 보드 이미지 레이어(전투에만 표시) */
+
 .mainPanel::before{
   content:"";
   position:absolute;
@@ -542,14 +516,11 @@ html, body, #app,
   transform: translateY(calc(210 * var(--u)));
 }
 
-/* 보드 위 실제 UI는 이미지 위로 */
+
 .mainPanel > *{ position: relative; }
 
 
-/* =========================
-   7) BOARD AREA (slots center)
-   - 슬롯 그리드 중심 정렬/간격
-   ========================= */
+
 .combatRoot,
 .boardArea{
   background: transparent !important;
@@ -570,10 +541,10 @@ html, body, #app,
   min-height: 82%;
 }
 
-/* 전투 시 보드 영역 높이(최종 승자: 86%) */
+
 .mainPanel.inCombat .boardArea{ min-height: 86%; }
 
-/* 슬롯 행(6칸) */
+
 .grid6{
   display: flex;
   justify-content: center;
@@ -583,10 +554,7 @@ html, body, #app,
 }
 
 
-/* =========================
-   8) SLOTS
-   - 슬롯 박스 + 슬롯 내부 카드 스케일링
-   ========================= */
+
 .slot{
   position: relative;
   display: grid;
@@ -600,7 +568,7 @@ html, body, #app,
   --slotTextScale: 0.78;
 }
 
-/* 슬롯 잠금(보스 보상 슬롯 확장 전) */
+
 .slot.locked{
   opacity: 0.38;
 }
@@ -616,7 +584,7 @@ html, body, #app,
 }
 
 
-/* 슬롯 안에서 정중앙 배치 컨테이너 */
+
 .slotCardScaler{
   position: absolute;
   inset: 0;
@@ -626,7 +594,7 @@ html, body, #app,
   pointer-events: auto;
 }
 
-/* 기준 박스(여기에 scale만 적용) */
+
 .slotCardInner{
   width: var(--handCardW);
   height: var(--handCardH);
@@ -635,7 +603,7 @@ html, body, #app,
   pointer-events: auto;
 }
 
-/* 슬롯 텍스트는 카드 스케일보다 조금 더 줄이기 */
+
 .slot .slotCardInner{
   --slotTextScale: calc(var(--slotCardScale, 1) * 0.92);
 }
@@ -645,24 +613,24 @@ html, body, #app,
   line-height: 1.12;
 }
 
-/* 슬롯 내부 텍스트는 em 단위로만 조절 */
+
 .slot .card .cardTitle{ font-size: 1.00em !important; line-height: 1.05 !important;}
 .slot .card .cardMeta,
 .slot .card .badge{ font-size: 0.80em; line-height: 1.05; }
 .slot .card .cardText{ font-size: 0.8em !important; line-height: 1.15 !important; }
 
-/* 슬롯 내부 패딩도 em로 축소 */
+
 .slot .card .cardHeader{ padding: 0.45em 0.55em; }
 .slot .card .cardBody{ padding: 0.45em 0.55em; }
 .slot .card .cardSection{ padding: 0.40em; }
 
-/* 카드가 기준 박스에 꽉 차도록 */
+
 .slotCardInner > .card{
   width: 100%;
   height: 100%;
 }
 
-/* 슬롯 오목한 느낌 레이어 */
+
 .slot::before{
   content:"";
   position:absolute;
@@ -678,7 +646,7 @@ html, body, #app,
 }
 .slot > *{ position: relative;}
 
-/* 슬롯 상태(놓을 수 있음 / 드롭 호버) */
+
 .slot.placeable::before{
   box-shadow:
     inset 0 calc(10 * var(--u)) calc(18 * var(--u)) rgba(0,0,0,.52),
@@ -692,7 +660,7 @@ html, body, #app,
     0 0 0 calc(2 * var(--u)) rgba(255,255,255,.18);
 }
 
-/* 슬롯에 들어간 카드 강제 크기 */
+
 .slot > .card,
 .slot .card.inSlot{
   width: var(--slotCardW) !important;
@@ -703,12 +671,12 @@ html, body, #app,
   --slotTextScale: calc(var(--slotCardScale, 1) * 1.25);
 }
 
-/* 교란(비활성) 슬롯 표시 */
+
 .slot.disabled{
   cursor: not-allowed;
 }
 
-/* 기본 오목 레이어 색감만 살짝 바꿔서 "이상 상태" 느낌 */
+
 .slot.disabled::before{
   background: rgba(40, 0, 60, .55);
   box-shadow:
@@ -718,7 +686,7 @@ html, body, #app,
   opacity: .95;
 }
 
-/* 사선 마스크 + 🌀 뱃지(우상단) */
+
 .slot.disabled::after{
   content: "🌀";
   position: absolute;
@@ -736,7 +704,7 @@ html, body, #app,
   color: rgba(235, 230, 255, .90);
   text-shadow: 0 0 calc(10 * var(--u)) rgba(170, 90, 255, .35);
 
-  /* 은은한 사선 */
+  
   background: repeating-linear-gradient(
     135deg,
     rgba(255,255,255,.08) 0,
@@ -747,20 +715,18 @@ html, body, #app,
   opacity: .85;
 }
 
-/* 슬롯 안 카드가 있으면 살짝 흐리게(필터 대신 opacity만) */
+
 .slot.disabled .slotCardInner{
   opacity: .82;
 }
 
-/* =========================
-   9) CARDS (parchment-only)
-   - 카드 기본 레이아웃 + 희귀도별 배경
-   ========================= */
+
 .card{
+  --cardInnerMul: 1;
   position: relative;
   width: var(--handCardW);
   height: var(--handCardH);
-  padding: calc(10 * var(--u)) calc(10 * var(--u));
+  padding: calc(10 * var(--u) * var(--cardInnerMul)) calc(10 * var(--u) * var(--cardInnerMul));
   box-sizing: border-box;
 
   display:flex;
@@ -777,7 +743,7 @@ html, body, #app,
   text-shadow: none !important;
 }
 
-/* 카드 바탕(파치먼트) */
+
 .card::before{
   content:"";
   position:absolute;
@@ -790,7 +756,7 @@ html, body, #app,
 .card::after{ content:none !important; display:none !important; }
 .card > *{ position: relative; }
 
-/* 희귀도 배경 매핑 */
+
 .card.rarity-basic{ --cardUrl: var(--cardBgBasic); }
 .card.rarity-common{ --cardUrl: var(--cardBgCommon); }
 .card.rarity-special{ --cardUrl: var(--cardBgSpecial); }
@@ -801,7 +767,7 @@ html, body, #app,
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
-  margin: 0 0 calc(6 * var(--u)) 0 !important;
+  margin: 0 0 calc(6 * var(--u) * var(--cardInnerMul)) 0 !important;
   padding: 0 !important;
 }
 
@@ -809,9 +775,9 @@ html, body, #app,
   text-align: center !important;
   font-family: "Mulmaru", serif !important;
   font-weight: 400 !important;
-  font-size: calc(13 * var(--u)) !important;
+  font-size: calc(13 * var(--u) * var(--cardInnerMul)) !important;
   line-height: 1.1 !important;
-  letter-spacing: -calc(0.2 * var(--u)) !important;
+  letter-spacing: -calc(0.2 * var(--u) * var(--cardInnerMul)) !important;
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
@@ -839,9 +805,9 @@ html, body, #app,
 }
 
 .cardText{
-  font-size: calc(11 * var(--u)) !important;
+  font-size: calc(11 * var(--u) * var(--cardInnerMul)) !important;
   line-height: 1.25 !important;
-  letter-spacing: -calc(0.2 * var(--u)) !important;
+  letter-spacing: -calc(0.2 * var(--u) * var(--cardInnerMul)) !important;
   margin: 0 !important;
   padding: 0 !important;
 
@@ -850,23 +816,23 @@ html, body, #app,
   word-break: keep-all !important;
 }
 
-/* 광기 카드 텍스트는 흰색 */
+
 .card.rarity-madness,
 .card.rarity-madness *{
   color: #fff !important;
 }
 
-/* 앞/뒤 구분선 */
+
 .cardSection.front{
   position: relative;
-  padding-bottom: calc(10 * var(--u));
-  margin-bottom: calc(8 * var(--u));
+  padding-bottom: calc(10 * var(--u) * var(--cardInnerMul));
+  margin-bottom: calc(8 * var(--u) * var(--cardInnerMul));
 }
 .cardSection.front::after{
   content:"";
   position:absolute;
-  left: calc(10 * var(--u));
-  right: calc(10 * var(--u));
+  left: calc(10 * var(--u) * var(--cardInnerMul));
+  right: calc(10 * var(--u) * var(--cardInnerMul));
   bottom: 0;
   height: calc(1 * var(--u));
   background: rgba(90,60,30,.45);
@@ -875,24 +841,24 @@ html, body, #app,
 }
 
 .cardSection.back{
-  padding-top: calc(10 * var(--u));
-  margin-top: calc(8 * var(--u));
+  padding-top: calc(10 * var(--u) * var(--cardInnerMul));
+  margin-top: calc(8 * var(--u) * var(--cardInnerMul));
   position: relative;
 }
 
-/* 뒤 섹션의 보조 구분선 */
+
 .cardSection.back::after{
   content: "";
   position: absolute;
-  left: calc(8 * var(--u));
-  right: calc(8 * var(--u));
-  top: calc(-17 * var(--u));
+  left: calc(8 * var(--u) * var(--cardInnerMul));
+  right: calc(8 * var(--u) * var(--cardInnerMul));
+  top: calc(-17 * var(--u) * var(--cardInnerMul));
   height: calc(1 * var(--u));
   background: rgba(110, 70, 35, .55);
   pointer-events: none;
 }
 
-/* 선택 강조 */
+
 .card.selected{
   border-radius: 0 !important;
   outline: none !important;
@@ -914,10 +880,10 @@ html, body, #app,
   100%{ transform: translateY(0); }
 }
 
-/* 드래그 소스 */
+
 .card.isDraggingSource{ opacity: 0.4; filter: saturate(.8); }
 
-/* 드래그 프리뷰 */
+
 .dragLayer .dragCardPreview{
   overflow: hidden;
   border-radius: 0;
@@ -933,7 +899,7 @@ html, body, #app,
   mix-blend-mode: normal !important;
 }
 
-/* 키워드 블록 */
+
 .kwRun, .kwBadge{
   display: inline-flex;
   align-items: baseline;
@@ -942,7 +908,7 @@ html, body, #app,
 }
 .kwRun *, .kwBadge *{ white-space: nowrap; }
 
-/* 슬롯 이름만 보이는 카드 */
+
 .card.slotNameOnly{
   height: 100%;
   display:flex;
@@ -976,7 +942,7 @@ html, body, #app,
 }
 .card.slotNameOnly .cardBody{ display:none !important; }
 
-/* 카드 호버 상세 프리뷰(우측) */
+
 .cardHoverPreview{
   position: fixed;
   right: calc(var(--edgePad) + calc(14 * var(--u)));
@@ -1026,10 +992,7 @@ html, body, #app,
 }
 
 
-/* =========================
-   9-1) HARD OVERRIDE — NO ROUNDING ANYWHERE
-   - 카드/슬롯 관련 영역 모서리 전부 각지게
-   ========================= */
+
 .slot,
 .slot::before,
 .slotCardScaler,
@@ -1049,10 +1012,7 @@ html, body, #app,
 }
 
 
-/* =========================
-   10) HAND DOCK
-   - 손패 도크(하단) + 가로 스크롤
-   ========================= */
+
 .handDock{
   position: fixed;
   left: 50%;
@@ -1091,15 +1051,20 @@ html, body, #app,
   overflow-y: visible;
   -webkit-overflow-scrolling: touch;
 
-  /* 스크롤바 숨김(스크롤은 유지) */
+  
   scrollbar-width: none;
   -ms-overflow-style: none;
+}
+
+body.handDragScrollLock .hand{
+  overflow-x: hidden !important;
+  touch-action: none !important;
 }
 .hand::-webkit-scrollbar{ width: 0; height: 0; }
 .hand::-webkit-scrollbar-thumb{ background: transparent; }
 .hand::-webkit-scrollbar-track{ background: transparent; }
 
-/* hand edge fades (cut이 노골적으로 보이는 것 완화) */
+
 .hand::before,
 .hand::after{
   content: "";
@@ -1110,14 +1075,7 @@ html, body, #app,
   pointer-events: none;
   z-index: 5;
 }
-/*.hand::before{
-  left: 0;
-  background: linear-gradient(90deg, rgba(0,0,0,.70), rgba(0,0,0,0));
-}
-.hand::after{
-  right: 0;
-  background: linear-gradient(-90deg, rgba(0,0,0,.70), rgba(0,0,0,0));
-}*/
+
 
 
 .handCardsRow{
@@ -1133,10 +1091,7 @@ html, body, #app,
 }
 
 
-/* =========================
-   11) LOG PANEL + OVERLAY
-   - 우측 로그 패널 + 오버레이 레이어
-   ========================= */
+
 .logPanel{
   position: fixed;
   top: calc(var(--safeT) + var(--hudH) + calc(8 * var(--u)));
@@ -1171,7 +1126,7 @@ html, body, #app,
   white-space: pre-wrap;
 }
 
-/* 접힘 상태: 버튼만 */
+
 .logPanel.collapsed{
   width: calc(56 * var(--u));
   height: calc(56 * var(--u));
@@ -1218,7 +1173,7 @@ html, body, #app,
   pointer-events: auto !important;
 }
 
-/* 로그 스크롤바 숨김 */
+
 .logScroll{
   scrollbar-width: none;
   scrollbar-color: transparent transparent;
@@ -1228,10 +1183,7 @@ html, body, #app,
 .logScroll::-webkit-scrollbar-track{ background: transparent; }
 
 
-/* =========================
-   12) NODE PREVIEW
-   - 노드 프리뷰 라인(아이콘/텍스트)
-   ========================= */
+
 .nodeIcon{
   display:inline-block;
   width:1.25em;
@@ -1265,10 +1217,7 @@ html, body, #app,
 }
 
 
-/* =========================
-   13) ENEMY HUD CENTER
-   - 중앙 상단 적 HUD(배너형)
-   ========================= */
+
 .enemyHudCenter{
   position: fixed;
   top: calc(8 * var(--u));
@@ -1303,7 +1252,7 @@ html, body, #app,
   pointer-events: auto;
 }
 
-/* 클릭 가능한 적 배너/칩 */
+
 .enemyHudCenter .enemyChip,
 .enemyHudCenter .enemyBanner{
   flex: 0 0 var(--enemyHudW) !important;
@@ -1343,10 +1292,7 @@ html, body, #app,
 }
 
 
-/* =========================
-   14) HP PIXEL BARS
-   - 적 체력바 픽셀 느낌
-   ========================= */
+
 .enemyHPOuter{
   height: var(--hpH) !important;
   border-radius: calc(2 * var(--u)) !important;
@@ -1377,12 +1323,9 @@ html, body, #app,
 }
 
 
-/* =========================
-   15) FX / MISC HUD
-   - 전투 컨트롤/페이즈 배너/상단 코너 HUD/S HUD/힌트/플로팅 숫자
-   ========================= */
 
-/* 전투 컨트롤(다음 턴 버튼) */
+
+
 .combatControls{
   position: fixed;
   display: flex;
@@ -1395,7 +1338,7 @@ html, body, #app,
   left: auto;
   transform: none;
 
-  z-index: var(--zHandDock, 2000); /* handDock보다 위 */
+  z-index: var(--zHandDock, 2000); 
   pointer-events: auto;
 }
 .combatControls *{ pointer-events: auto !important; }
@@ -1408,7 +1351,7 @@ html, body, #app,
 }
 .combatControls .stepBtn.primary{ font-weight: 600; }
 
-/* 페이즈 배너 */
+
 .phaseBanner{
   position: fixed;
   left: 50%;
@@ -1436,7 +1379,7 @@ html, body, #app,
   100% { opacity: 0; transform: translateX(-50%) translateY(calc(-12 * var(--u))); }
 }
 
-/* 스테이지 코너 HUD(상단 좌측 근처 고정) */
+
 .stageCornerHud{
   position: fixed;
   pointer-events: none;
@@ -1470,7 +1413,7 @@ html, body, #app,
   z-index: var(--zChrome);
 }
 
-/* S 전용 HUD */
+
 #hudSOnly{
   position: fixed;
   left: var(--sHudLeft);
@@ -1492,7 +1435,7 @@ html, body, #app,
   pointer-events: none;
 }
 
-/* 새 런 시작 버튼(좌상단) */
+
 .floatingNewRun,
 .newRunBtn{
   position: fixed;
@@ -1503,7 +1446,7 @@ html, body, #app,
 }
 .newRunBtn *{ pointer-events:auto !important; }
 
-/* 새 런 버튼 옆 신앙 배지 */
+
 .floatingFaithBadge{
   position: fixed;
   z-index: calc(var(--zChrome) + 10000);
@@ -1527,7 +1470,7 @@ html, body, #app,
                "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif !important;
 }
 
-/* 타겟 힌트(HUD 근처) */
+
 .targetHintInline{
   position: fixed;
   left: 50%;
@@ -1544,7 +1487,7 @@ html, body, #app,
   text-overflow: ellipsis;
 }
 
-/* 플로팅 숫자 FX */
+
 .floatFxLayer{
   position: fixed;
   inset: 0;
@@ -1575,10 +1518,7 @@ html, body, #app,
 }
 
 
-/* =========================
-   16) SETTINGS / RULEBOOK OVERLAYS
-   - 설정/룰북 등 전체 오버레이 레이아웃
-   ========================= */
+
 .overlay-layer{
   position: fixed !important;
   inset: 0 !important;
@@ -1619,10 +1559,7 @@ html, body, #app,
 }
 
 
-/* =========================
-   17) CHOICE / EVENT OVERLAY
-   - 이벤트/선택 모달 패널 + 리스트 스크롤
-   ========================= */
+
 .choice-contentRow{
   display:flex;
   gap: var(--choiceRowGap);
@@ -1699,7 +1636,7 @@ pre.choice-detail,
   z-index: var(--zChoiceBackdrop) !important;
   pointer-events: auto !important;
 
-  /* Faith selection should black out the screen (no transparency) */
+  
   background: rgba(0,0,0,0) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -1710,7 +1647,7 @@ pre.choice-detail,
   box-sizing:border-box;
 }
 
-/* 배경 제거(완전 투명) */
+
 .choice-backdrop{
   pointer-events: auto !important;
   background: rgba(0, 0, 0, 0) !important;
@@ -1718,7 +1655,7 @@ pre.choice-detail,
   -webkit-backdrop-filter: none !important;
 }
 
-/* 모달 패널(중앙 고정 + Dx/Dy 보정) */
+
 .choice-panel{
   position: fixed !important;
   z-index: var(--zChoicePanel) !important;
@@ -1748,17 +1685,14 @@ pre.choice-detail,
   background: rgba(0,0,0,1);
   box-shadow: 0 calc(18 * var(--u)) calc(60 * var(--u)) rgba(0,0,0,1);
 
-  /* Ensure Mulmaru inside choice panels (esp. Faith) */
+  
   font-family: "Mulmaru", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
 }
 
 
-/* =========================
-   18) TRAYS (ITEMS + RELICS)
-   - 아이템 트레이 / 렐릭 트레이 공통 레이아웃
-   ========================= */
 
-/* 아이템 슬롯 기본 스타일(트레이 밖에서도 사용 가능) */
+
+
 .itemSlot{
   width: calc(60 * var(--u));
   height: calc(60 * var(--u));
@@ -1782,7 +1716,7 @@ pre.choice-detail,
 .itemSlot:active{ transform: translateY(calc(1 * var(--u))); }
 .itemSlot.disabled{ opacity: .45; cursor: default; }
 
-/* 아이템: 버리기 버튼(호버 시 표시) */
+
 .itemDropBtn{
   position: absolute;
   top: calc(2 * var(--u));
@@ -1810,7 +1744,7 @@ pre.choice-detail,
 .itemDropBtn:hover{ background: rgba(0,0,0,.78); }
 .itemDropBtn:active{ transform: translateY(calc(1 * var(--u))); }
 
-/* 아이템 트레이: 수량/한도 배지 */
+
 .itemCapBadge{
   position: absolute;
   left: calc(6 * var(--u));
@@ -1825,7 +1759,7 @@ pre.choice-detail,
   z-index: 2;
 }
 
-/* 아이템 트레이: 배지 + 힌트(4/4 옆, 트레이보다 살짝 위) */
+
 .itemCapHud{
   position: fixed;
   display: flex;
@@ -1849,7 +1783,7 @@ pre.choice-detail,
   white-space: nowrap;
 }
 
-/* 아이콘 부모 박스는 항상 잘라내기 */
+
 #itemTray .itemSlot,
 #itemTray .itemCell,
 .itemSlot,
@@ -1860,7 +1794,7 @@ pre.choice-detail,
   position: relative;
 }
 
-/* 아이템 트레이(좌하단 고정) */
+
 :is(#itemTray, .itemTray){
   position: fixed !important;
   left: var(--itemTrayLeft) !important;
@@ -1892,7 +1826,7 @@ pre.choice-detail,
   overflow-x: hidden !important;
   align-content: start !important;
 
-  /* 스크롤바 숨김(스크롤은 유지) */
+  
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -1900,7 +1834,7 @@ pre.choice-detail,
 :is(#itemTray, .itemTray)::-webkit-scrollbar-thumb{ background: transparent; }
 :is(#itemTray, .itemTray)::-webkit-scrollbar-track{ background: transparent; }
 
-/* 트레이 셀(아이템 카드/셀 공통) */
+
 :is(#itemTray, .itemTray) :is(.itemSlot, .itemCell, .itemCard){
   width:  var(--traySlot) !important;
   height: var(--traySlot) !important;
@@ -1918,7 +1852,7 @@ pre.choice-detail,
   overflow: hidden !important;
 }
 
-/* 트레이 아이콘 이미지 핏 */
+
 :is(#itemTray, .itemTray) :is(.itemSlot, .itemCell, .itemCard) img{
   width: 86% !important;
   height: 86% !important;
@@ -1926,7 +1860,7 @@ pre.choice-detail,
   image-rendering: pixelated !important;
 }
 
-/* 아이콘 확대(아이템/상점/기타 공용) */
+
 #itemTray img,
 .itemSlot img,
 .itemCard img,
@@ -1937,17 +1871,14 @@ pre.choice-detail,
   display: block;
 }
 
-/* 트레이 내부에 붙는 툴팁은 완전히 제거(커서 호버로만 표시되는 툴팁만 유지) */
+
 :is(#itemTray, .itemTray) .itemHoverTip{
   display: none !important;
 }
 
 
 
-/* =========================
-   18-1) RELICS
-   - 우하단 렐릭 트레이 + 툴팁/모달
-   ========================= */
+
 .relicTray{
   position: fixed;
   right: var(--relicTrayRight) !important;
@@ -1962,7 +1893,7 @@ pre.choice-detail,
 
 }
 
-/* 렐릭 리스트(4열 3행 기준, 그 이상은 스크롤) */
+
 .relicTrayList{
   display: grid;
   grid-template-columns: repeat(var(--trayCols), var(--traySlot)) !important;
@@ -1994,16 +1925,16 @@ pre.choice-detail,
   scrollbar-gutter: stable;
   scroll-snap-type: y mandatory;
 
-  /* 아래에서 위로 쌓이는 느낌(스크롤 방향 반전) */
+  
   transform: rotate(180deg);
 }
 
-/* 아이콘은 다시 뒤집어서 정상 표시 */
+
 .relicTrayList .relicIcon{ transform: rotate(180deg); }
 
 .relicIcon, .relicHoverTip, .relicModalPanel{ direction: ltr; }
 
-/* 렐릭 스크롤바(보이는 버전) */
+
 .relicTrayList::-webkit-scrollbar{ width: calc(10 * var(--u)); }
 .relicTrayList::-webkit-scrollbar-thumb{
   background: rgba(255,255,255,0.18);
@@ -2124,10 +2055,7 @@ pre.choice-detail,
 }
 
 
-/* =========================
-   19) ENEMY CARDS
-   - 적 카드 프레임/아트/미니 HUD + 호버 상세
-   ========================= */
+
 .enemyBanner.enemyCardWrap{
   position: relative;
   flex: 0 0 auto;
@@ -2152,7 +2080,7 @@ pre.choice-detail,
   --artZoom: 1;
 }
 
-/* 프레임 PNG 비율(1365x2048)에 맞춘 박스 */
+
 .enemyArtCard{
   position: relative;
   width: calc(70% * var(--enemyUi));
@@ -2168,7 +2096,7 @@ pre.choice-detail,
   --frameBleed: calc(6 * var(--u));
 }
 
-/* 아트 레이어 */
+
 .enemyArtCard::before{
   content:"";
   position:absolute;
@@ -2181,7 +2109,7 @@ pre.choice-detail,
   z-index: 1;
 }
 
-/* 프레임 레이어 */
+
 .enemyArtCard::after{
   content:"";
   position:absolute;
@@ -2195,7 +2123,7 @@ pre.choice-detail,
   z-index: 5;
 }
 
-/* 하단 미니 HUD */
+
 .enemyMiniHud{
   width: 70%;
   padding: calc(7 * var(--u) * var(--enemyUi)) calc(9 * var(--u) * var(--enemyUi));
@@ -2238,7 +2166,7 @@ pre.choice-detail,
   text-overflow: ellipsis;
 }
 
-/* HP 라인 */
+
 .enemyMiniHud .enemyHpLine{
   display:flex;
   flex-direction: row;
@@ -2259,7 +2187,7 @@ pre.choice-detail,
 }
 .enemyMiniHud .enemyHPFill{ height: 100%; }
 
-/* 상태 이모지 라인(표시만, 주석에는 미사용) */
+
 .enemyStatusEmojiRow{
   display:flex;
   flex-wrap: wrap;
@@ -2278,7 +2206,7 @@ pre.choice-detail,
 
 
 
-/* 패시브 아이콘 라인 */
+
 .enemyPassiveRow{
   display:flex;
   justify-content:center;
@@ -2295,12 +2223,12 @@ pre.choice-detail,
   border-radius: calc(8 * var(--u) * var(--enemyUi));
 }
 
-/* 대상 선택 시 */
+
 .enemyBanner.targetable{ cursor:pointer; }
 .enemyBanner.untargetable{ cursor:not-allowed; opacity:.65; filter: grayscale(.20); }
 .enemyBanner.untargetable .enemyMiniHud{ opacity: .85; }
 
-/* 호버 상세 */
+
 .enemyHoverDetail{
   display:none;
   position:absolute;
@@ -2347,13 +2275,30 @@ pre.choice-detail,
   opacity: 1;
   transform: translateY(calc(-30 * var(--u)));
 }
+.enemyBanner.enemyCardWrap.touchHover .enemyHoverDetail{
+  display: block;
+  opacity: 1;
+  transform: translateY(calc(-30 * var(--u)));
+}
 .enemyBanner.enemyCardWrap:hover .enemyMiniHud{ opacity: 0.18; }
+.enemyBanner.enemyCardWrap.touchHover .enemyMiniHud{ opacity: 0.18; }
+
+/* Enemy intent/desc hover: bigger on mobile */
+body.mobile .enemyHoverDetail{
+  font-size: calc(24 * var(--u));
+  line-height: 1.45;
+  padding: calc(16 * var(--u)) calc(18 * var(--u));
+  border-radius: calc(10 * var(--u));
+}
+body.mobile .enemyBanner.enemyCardWrap .enemyHoverDetail{
+  font-size: calc(28 * var(--u));
+  padding: calc(20 * var(--u)) calc(22 * var(--u));
+  max-height: min(52vh, calc(520 * var(--u)));
+}
 
 
-/* =========================
-   20) MAP (2-column, full-viewport)
-   - 맵 노드 선택 UI(지도 + 사이드 패널)
-   ========================= */
+
+
 .nodeSelectWrap.mapNodeSelect{
   position: fixed !important;
   inset: auto !important;
@@ -2413,7 +2358,7 @@ pre.choice-detail,
   margin: 0 !important;
 }
 
-/* 스크롤러: 채우기 + 중앙 */
+
 .mapNodeSelectMapCol .mapMiniScroller,
 .mapNodeSelect .mapMiniScroller{
   flex: 1 1 auto;
@@ -2495,10 +2440,7 @@ pre.choice-detail,
 }
 
 
-/* =========================
-   21) TOASTS
-   - 화면 중앙 고정 + 최상단 레이어
-   ========================= */
+
 .toastLayer{
   position: fixed !important;
   z-index: calc(var(--zChrome) + 500) !important;
@@ -2538,10 +2480,7 @@ pre.choice-detail,
 .toast-info{ border: calc(1 * var(--u)) solid rgba(255,255,255,0.18); }
 
 
-/* =========================
-   22) SHOP COMPACT
-   - 상점 패널 내부 레이아웃(카드/아이템/서비스)
-   ========================= */
+
 .choice-panel.shopPanel{
   width: var(--shopPanelW);
   overflow: hidden;
@@ -2562,7 +2501,7 @@ pre.choice-detail,
   gap: calc(12 * var(--u));
 }
 
-/* 카드 3x2 그리드 */
+
 .shopCardsGrid{
   display:grid;
   grid-template-columns: repeat(3, var(--handCardW));
@@ -2588,7 +2527,7 @@ pre.choice-detail,
   opacity: .90;
 }
 
-/* 하단: 왼쪽 아이템 / 오른쪽 서비스 */
+
 .shopBottomRow{
   display:flex;
   gap: calc(14 * var(--u));
@@ -2596,7 +2535,7 @@ pre.choice-detail,
   justify-content: flex-start;
 }
 
-/* 아이템 */
+
 .shopItemsGrid{
   display:flex;
   gap: calc(10 * var(--u));
@@ -2625,7 +2564,7 @@ pre.choice-detail,
   image-rendering: pixelated;
 }
 
-/* 서비스 버튼 2x2 */
+
 .shopSvcGrid{
   display:grid;
   grid-template-columns: 1fr 1fr;
@@ -2646,10 +2585,7 @@ pre.choice-detail,
 }
 
 
-/* =========================
-   23) GLOBAL ITEM TOOLTIP
-   - 커서 호버 시만 보이는 툴팁(트레이 내부 고정 툴팁은 제거됨)
-   ========================= */
+
 .itemHoverTip{
   display: block !important;
   opacity: 0;
@@ -2671,7 +2607,818 @@ pre.choice-detail,
 
 
 /* =========================
-   24) MOBILE (placeholder)
-   - 현재 비워둠
+   MOBILE: TYPOGRAPHY + CHROME POSITION
+   - Respect existing PC layout; only enlarge non-card text.
+   - Hide ALL scrollbars (scroll still works).
    ========================= */
-/* keep empty for now */
+
+body.mobile{
+  /* Pull floating chrome upward (stage corner / player HUD / sHudOnly) */
+  --playerHudTop: calc(var(--safeT) + calc(1000* var(--u)));
+  --sHudTop:      calc(var(--safeT) + var(--hudH) + calc(280 * var(--u)));
+  --sHudOffY:     calc(10 * var(--u));
+  --stageCornerLiftY: calc(-18 * var(--u));
+
+  /* Make HUDs chunkier on mobile */
+  --sHudFont: clamp(calc(30 * var(--u)), 6vw, calc(46 * var(--u)));
+  --sHudPadY: calc(12 * var(--u));
+  --sHudPadX: calc(16 * var(--u));
+  --sHudR:    calc(14 * var(--u));
+}
+
+/* Hide scrollbars everywhere on mobile */
+body.mobile *{
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+}
+body.mobile *::-webkit-scrollbar{ width: 0; height: 0; }
+body.mobile *::-webkit-scrollbar-thumb{ background: transparent; }
+body.mobile *::-webkit-scrollbar-track{ background: transparent; }
+
+/* Log / Rulebook / Settings */
+body.mobile pre.log,
+body.mobile .logPanel pre.log,
+body.mobile .logOverlay pre.log,
+body.mobile pre.log.log{
+  font-size: calc(20 * var(--u));
+  line-height: 1.55;
+}
+
+body.mobile .settingsPanel{
+  font-size: calc(18 * var(--u));
+}
+
+body.mobile .overlay-panel{
+  font-size: calc(18 * var(--u));
+  line-height: 1.55;
+}
+
+body.mobile .relicModalText{
+  font-size: calc(18 * var(--u));
+  line-height: 1.55;
+}
+
+/* Faith hover tip (and other hover tips) */
+body.mobile #faithHoverTip,
+body.mobile .itemHoverTip{
+  font-size: calc(18 * var(--u));
+  max-width: min(calc(420 * var(--u)), calc(100vw - calc(24 * var(--u))));
+}
+body.mobile #faithHoverTip .relicTipTitle,
+body.mobile .itemHoverTip .relicTipTitle{
+  font-size: calc(20 * var(--u));
+  font-weight: 900;
+}
+body.mobile #faithHoverTip .relicTipBody,
+body.mobile .itemHoverTip .relicTipBody{
+  font-size: calc(18 * var(--u));
+}
+
+/* Enemy intent / HP / Block (includes player HUD mini bars that reuse enemyChipTop classes) */
+body.mobile .enemyChipTop{ font-size: calc(18 * var(--u)); }
+body.mobile .enemyHudCenter .enemyChipTop{ font-size: calc(18 * var(--u)); }
+body.mobile .enemyHudCenter .enemyIntent{ font-size: calc(16 * var(--u)); }
+
+/* Enemy description hover should be bigger on mobile */
+body.mobile .enemyHoverDetail{
+  font-size: calc(18 * var(--u));
+  line-height: 1.55;
+  padding: calc(14 * var(--u)) calc(16 * var(--u));
+}
+body.mobile .enemyBanner.enemyCardWrap .enemyHoverDetail{
+  font-size: calc(18 * var(--u));
+  max-height: min(52vh, calc(520 * var(--u)));
+}
+
+body.mobile .enemyHoverDetail{
+  font-size: calc(19 * var(--u));      /* 12 -> 19 정도로 */
+  line-height: 1.45;
+  padding: calc(16 * var(--u)) calc(18 * var(--u));
+  border-radius: calc(10 * var(--u));
+}
+
+/* 적 카드 위에 뜨는(=enemyCardWrap) 호버도 같이 */
+body.mobile .enemyBanner.enemyCardWrap .enemyHoverDetail{
+  font-size: calc(20 * var(--u));      /* 14 -> 22 정도로 */
+  padding: calc(18 * var(--u)) calc(20 * var(--u));
+  max-height: min(52vh, calc(420 * var(--u)));
+}
+
+/* Keep enemy UI readable, but shrink the illustration on mobile */
+body.mobile .enemyBanner.enemyCardWrap{ --enemyUi: 1.15; }
+body.mobile .enemyArtCard{
+  width: calc(46% * var(--enemyUi));
+  margin-top: calc(4 * var(--u));
+  --artZoom: 0.95;
+}
+body.mobile .enemyMiniHud{ width: 92%; }
+
+
+/* Mobile safe-area padding (PC testing + real phones) */
+body.mobile{
+  --safePad: calc(6 * var(--u));
+  --safeT: calc(env(safe-area-inset-top, 0) + var(--safePad));
+  --safeR: calc(env(safe-area-inset-right, 0) + var(--safePad));
+  --safeB: calc(env(safe-area-inset-bottom, 0) + var(--safePad));
+  --safeL: calc(env(safe-area-inset-left, 0) + var(--safePad));
+}
+
+body.mobile{
+  --playerHudTop: calc(var(--safeT) + calc(100 * var(--u))); /* 숫자 줄이면 위로 */
+  --playerHudLeftX: calc(var(--safeL) + calc(8 * var(--u))); /* 더 왼쪽 */
+}
+
+body.mobile{
+  --stageCornerLiftY: calc(-430 * var(--u)); /* 양수면 아래로, 음수면 위로(연결 방식에 따라 반대일 수도) */
+}
+
+body.mobile{
+  --sHudLeft: calc(var(--safeL) + calc(100 * var(--u)));
+}
+
+body.mobile .stageCornerHud{
+  left: calc(var(--safeL) + calc(210 * var(--u))) !important; /* 160 -> 90 */
+}
+
+body.mobile .nodeIcon{ font-size: 2.7em; }
+ 
+
+
+/* Hovered card preview panel: big readable text on mobile */
+body.mobile .cardHoverPreview{
+  width: min(calc(420 * var(--u)), calc(100vw - var(--edgePad) - var(--safeR) - calc(10 * var(--u))));
+  top: calc(var(--safeT) + var(--hudH) + calc(18 * var(--u)));
+  right: calc(var(--safeR) + calc(10 * var(--u)));
+}
+body.mobile .cardHoverPreviewTitle{ font-size: calc(40 * var(--u)); }
+body.mobile .cardHoverPreviewDetail{
+  font-size: calc(30 * var(--u));
+  line-height: 1.55;
+  max-height: min(46vh, calc(520 * var(--u)));
+  overflow: auto;
+}
+
+/* Rulebook + log readability (mobile: ~2x) */
+body.mobile pre.rulebook{ font-size: calc(26 * var(--u)) !important; line-height: 1.55 !important; }
+body.mobile pre.log,
+body.mobile .logPanel pre.log,
+body.mobile .logOverlay pre.log{ font-size: calc(24 * var(--u)) !important; line-height: 1.55 !important; }
+body.mobile .logHeaderRow h2{ font-size: calc(28 * var(--u)) !important; }
+body.mobile .logHeaderRow .chev{ font-size: calc(28 * var(--u)) !important; }
+
+
+/* Player HUD + stage corner: bigger on mobile */
+body.mobile .playerHudLeft{
+  width: min(calc(520 * var(--u)), calc(100vw - (var(--edgePad) * 2)));
+  padding: calc(18 * var(--u));
+}
+body.mobile .playerHudTitle{ font-size: calc(20 * var(--u)); }
+body.mobile .playerHudLeft .enemyChipTop{ font-size: calc(30 * var(--u)); }
+
+body.mobile .stageCornerHud{
+  font-size: calc(30 * var(--u));
+  padding: calc(18 * var(--u)) calc(12 * var(--u));
+}
+
+.floatingFaithBadge{ font-size: 150%; }
+.faithHoverTip{
+  font-size: 1000%;
+  line-height: 1.45;
+  padding: calc(16 * var(--u)) calc(18 * var(--u));
+  border-radius: calc(10 * var(--u));
+}
+/* When pinned (tap), keep it interactive */
+.cardHoverPreview.pinned{
+  pointer-events: auto;
+}
+
+
+html.mobile .mapNodeSelect .mapMiniScroller svg text,
+body.mobile .mapNodeSelect .mapMiniScroller svg text{
+  font-size: var(--mapNodeEmojiSize) !important;
+}
+
+
+
+
+/* =========================
+   MOBILE LAYOUT (respect PC logic)
+   - layout switches are driven by body classes set in uiFit.ts
+   - .mobile / .desktop
+   - .portrait / .landscape
+   ========================= */
+
+body.mobile{
+  /* 조금 더 타이트하게: 보드가 덜 작아지게 */
+  --edgePad: calc(10 * var(--u));
+  --logW:   calc(320 * var(--u));
+  --logGap: calc(10 * var(--u));
+
+  /* 손패가 화면을 너무 먹지 않도록 */
+  --dockH: calc(148 * var(--u));
+  --handCardW: calc(80 * var(--u));
+  --handCardH: calc(var(--handCardW) * 7 / 5);
+  --handTextMul: calc(var(--handCardW) / var(--cardW));
+
+  /* 보드 폭 확보 */
+  --slotGap: calc(10 * var(--u) * var(--boardScale));
+  --boardPadX: calc(44 * var(--u));
+  --boardPadY: calc(30 * var(--u));
+
+  /* 트레이 살짝 축소 */
+  --traySlot: calc(64 * var(--u));
+  --trayGap:  calc(8 * var(--u));
+  --trayPad:  calc(8 * var(--u));
+}
+
+body.mobile .hand .card,
+body.mobile .cardHoverPreviewCard .card{
+  --cardInnerMul: var(--handTextMul);
+}
+
+body.mobile .cardHoverPreviewCard{
+  width: min(var(--handCardW), calc(300 * var(--u)));
+}
+
+/* 모바일 세로: stage 위 / 로그 아래(바텀 패널), PC 구조 유지 */
+body.mobile.portrait .logPanel{
+  left: var(--edgePad);
+  right: var(--edgePad);
+  width: auto;
+
+  top: auto;
+  bottom: calc(var(--safeB) + var(--dockH) + calc(10 * var(--u)));
+
+  height: min(30vh, calc(340 * var(--u)));
+}
+
+body.mobile.portrait .logPanel.collapsed{
+  left: auto;
+  right: var(--edgePad);
+
+  bottom: calc(var(--safeB) + var(--dockH) + calc(10 * var(--u)));
+}
+
+body.mobile.portrait .playerHudLeft{
+  /* 기존 PC 배치(620u)는 세로에서 화면 밖으로 튀는 경우가 많아서 상단으로 */
+  top:  calc(var(--safeT) + var(--hudH) + calc(390 * var(--u)));
+  left: calc(var(--safeL) + var(--edgePad));
+  width: calc(520 * var(--u));
+  font-size: 150%;
+}
+
+body.mobile.portrait .topHudRight{
+  top:   calc(var(--safeT) + calc(8 * var(--u)));
+  right: calc(var(--safeR) + calc(8 * var(--u)));
+}
+
+/* 모바일 세로: 중앙 보드가 손패/로그에 가리지 않도록 여유 */
+body.mobile.portrait .mainRow{
+  padding-bottom: calc(var(--dockH) + calc(12 * var(--u)));
+}
+
+/* 모바일 가로(landscape): PC에 최대한 가깝게, 다만 높이만 제한 */
+body.mobile.landscape .logPanel{
+  height: min(48vh, calc(420 * var(--u)));
+}
+
+/* =========================
+   MOBILE PORTRAIT — COMBAT REBUILD
+   (enemies top → (player/status + action panel) → board
+    items left / relics right (scroll) → hand at bottom)
+   ========================= */
+
+/* Utility: hide scrollbars even on desktop when needed */
+.noScrollbar{
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+}
+.noScrollbar::-webkit-scrollbar{ width: 0; height: 0; }
+.noScrollbar::-webkit-scrollbar-thumb{ background: transparent; }
+.noScrollbar::-webkit-scrollbar-track{ background: transparent; }
+
+body.mobile.portrait .topHudRightChrome{ display:none !important; }
+body.mobile.portrait .floatingNewRun,
+body.mobile.portrait .floatingFaithBadge,
+body.mobile.portrait .relicHud{
+  display:none !important;
+}
+
+/* We use the log overlay button on mobile; keep the side logPanel out of the way */
+body.mobile.portrait .logPanel{ display:none !important; }
+
+body.mobile.portrait .topHud{
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--zChrome);
+  padding: calc(var(--safeT) + calc(8 * var(--u))) calc(var(--safeR) + var(--edgePad)) calc(10 * var(--u)) calc(var(--safeL) + var(--edgePad));
+  box-sizing: border-box;
+  background: rgba(0,0,0,.35);
+  backdrop-filter: blur(calc(6 * var(--u)));
+  -webkit-backdrop-filter: blur(calc(6 * var(--u)));
+}
+
+body.mobile.portrait .mobileEnemyStrip{
+  width: 100%;
+  margin: 0 0 calc(10 * var(--u)) 0;
+}
+body.mobile.portrait .mobileEnemyStrip .enemyHud{
+  gap: calc(10 * var(--u)) !important;
+  overflow-x: auto;
+  padding-bottom: calc(6 * var(--u));
+  justify-content: center;
+}
+
+body.mobile.portrait .enemyBanner.enemyCardWrap{ --enemyUi: 1.55; }
+
+body.mobile.portrait .mobileHudRow{
+  display: grid;
+  gap: calc(10 * var(--u));
+  align-items: start;
+}
+
+body.mobile.portrait .mobileHudRow,
+body.mobile.portrait .mobileActionPanel,
+body.mobile.portrait .mobileActionPanel *{
+  pointer-events: auto !important;
+}
+
+body.mobile.portrait .playerHudLeft{
+  width: 100% !important;
+  max-width: none !important;
+}
+
+body.mobile.portrait .mobileActionPanel{
+  width: 100%;
+  padding: calc(14 * var(--u));
+  border-radius: calc(16 * var(--u));
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.12);
+  background: rgba(0,0,0,.22);
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: calc(8 * var(--u));
+}
+
+body.mobile.portrait .mobileActionPanel button{
+  font-size: calc(18 * var(--u));
+  padding: calc(10 * var(--u)) calc(12 * var(--u));
+  border-radius: calc(14 * var(--u));
+  width: 100%;
+}
+
+body.mobile.portrait .mobilePileButtons,
+body.mobile.portrait .mobileChromeButtons,
+body.mobile.portrait .mobileRunButtons{
+  display: contents;
+}
+
+body.mobile.portrait .mobileActionPanel .mobileRunButtons button{
+  grid-column: span 3;
+}
+
+/* Stage/main panel spacing: topHud is sticky now */
+body.mobile.portrait .mainRow{
+  padding-top: 0;
+  padding-bottom: calc(var(--dockH) + calc(12 * var(--u)));
+}
+
+body.mobile.portrait .mainPanel{ min-height: 100vh; }
+body.mobile.portrait .mainRow{ min-height: 100vh; }
+body.mobile.portrait .combatRoot{
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+body.mobile.portrait .boardArea{
+  flex: 1 1 auto;
+  min-height: 0;
+  transform: none;
+  justify-content: flex-start;
+  padding-top: calc(8 * var(--u));
+  padding-bottom: calc(6 * var(--u));
+}
+
+/* Battle title row (=status bar + target hint) sits at the top of the board on mobile */
+body.mobile.portrait .battleTitleRow{
+  position: static;
+  top: auto;
+  z-index: auto;
+  width: 100%;
+  margin: 0 0 calc(10 * var(--u)) 0;
+}
+
+/* Item / Relic trays as left/right rails around the board */
+body.mobile.portrait .itemTray{
+  position: fixed;
+  left: calc(var(--safeL) + calc(8 * var(--u)));
+  top: calc(var(--safeT) + calc(330 * var(--u)));
+  bottom: calc(var(--safeB) + var(--dockH) + calc(14 * var(--u)));
+  z-index: var(--zChrome);
+  overflow-y: auto;
+  max-width: calc(96 * var(--u));
+}
+
+body.mobile.portrait .relicTray{
+  position: fixed;
+  right: calc(var(--safeR) + calc(8 * var(--u)));
+  top: calc(var(--safeT) + calc(330 * var(--u)));
+  bottom: calc(var(--safeB) + var(--dockH) + calc(14 * var(--u)));
+  z-index: var(--zChrome);
+  overflow: hidden;
+  max-width: calc(104 * var(--u));
+}
+
+body.mobile.portrait .relicTrayList{
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* Make sure the board doesn't hide behind rails */
+body.mobile.portrait .boardArea{
+  padding-left: calc(var(--boardPadX) + calc(90 * var(--u)));
+  padding-right: calc(var(--boardPadX) + calc(94 * var(--u)));
+}
+
+/* 터치 디바이스에서 스크롤/줌 제스처 충돌을 줄임 */
+body.mobile .hand{
+  touch-action: pan-x;
+}
+body.mobile .handDock{
+  touch-action: manipulation;
+}
+
+/* === Mobile portrait tweaks: bigger enemies + centered === */
+body.mobile.portrait .mobileEnemyStrip{ display:flex; justify-content:center; }
+body.mobile.portrait .mobileEnemyStrip .enemyHudCenterMover{ width:100% !important; display:flex; justify-content:center; }
+body.mobile.portrait .enemyBanner.enemyCardWrap{ --enemyUi: 1.45; }
+body.mobile.portrait .enemyArtCard{ width: calc(86% * var(--enemyUi)); }
+
+/* === Mobile portrait tuning (v2) === */
+body.mobile.portrait{
+  --handCardW: min(calc(300 * var(--u)), calc((100vw - var(--safeL) - var(--safeR) - calc(24 * var(--u))) / 5));
+  --handCardH: calc(var(--handCardW) * 7 / 5);
+  --dockH: calc(var(--handCardH) + calc(24 * var(--u)));
+}
+
+body.mobile.portrait .mobileHudRow{
+  grid-template-columns: auto 1fr !important;
+  align-items: start;
+}
+
+body.mobile.portrait .playerHudLeft{
+  width: auto !important;
+  max-width: 46vw !important;
+}
+
+/* Rotate-like feel: wider button block, shorter height */
+body.mobile.portrait .mobileActionPanel{
+  display: grid !important;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: calc(8 * var(--u));
+  align-content: start;
+  padding: calc(12 * var(--u));
+}
+
+body.mobile.portrait .mobilePileButtons,
+body.mobile.portrait .mobileChromeButtons,
+body.mobile.portrait .mobileRunButtons{
+  display: contents !important;
+}
+
+body.mobile.portrait .mobileActionPanel button{
+  width: 100%;
+  font-size: calc(16 * var(--u));
+  padding: calc(10 * var(--u)) calc(10 * var(--u));
+  border-radius: calc(14 * var(--u));
+}
+
+/* Let board/map reach right above the hand dock */
+body.mobile.portrait .boardArea{
+  flex: 1 1 auto;
+  min-height: 0 !important;
+  justify-content: flex-start;
+  transform: translateY(var(--boardSlotOffsetY, calc(-12 * var(--u)))) !important;
+  padding-bottom: 0;
+}
+
+/* === Mobile portrait tuning (round2 overrides; keep last) === */
+body.mobile.portrait{
+  --handCardW: calc(300 * var(--u));
+  --handCardH: calc(var(--handCardW) * 7 / 5);
+  --dockH: calc(var(--handCardH) + calc(26 * var(--u)));
+
+  --enemyBannerW: calc(560 * var(--u));
+}
+
+body.mobile.portrait .enemyBanner.enemyCardWrap{ --enemyUi: 1.65; }
+
+/* Mobile: keep main board directly above the hand dock */
+body.mobile .mainRow{
+  padding-bottom: var(--dockH) !important;
+}
+
+body.mobile .mainPanel.inCombat{
+  padding-bottom: 0 !important;
+}
+
+body.mobile .boardArea{
+  padding-bottom: 0 !important;
+}
+
+/* Mobile: keep battlefield background aspect ratio (avoid vertical stretch) */
+body.mobile .mainPanel.inCombat::before{
+  display: none !important;
+  opacity: 0 !important;
+  background: none !important;
+}
+
+body.mobile .mainPanel.inCombat .boardArea{
+  background: rgba(6, 8, 14, 0.92) !important;
+  border: calc(1 * var(--u)) solid rgba(255,255,255,.10);
+  border-radius: calc(12 * var(--u));
+}
+
+/* Mobile portrait: hand-dock anchored chained layout */
+body.mobile.portrait{
+  --mobileActionPanelDx: calc(0 * var(--u));
+  --mobileActionPanelDy: calc(0 * var(--u));
+  --mapNodeEmojiSize: calc(100 * var(--u));
+
+  --handDockTop: calc(100vh - var(--safeB) - var(--dockH));
+
+  --boardGapFromDock: calc(8 * var(--u));
+  --boardH: calc(500 * var(--u));
+  --boardSlotOffsetY: calc(0 * var(--u));
+
+  --boardBottom: calc(100vh - var(--handDockTop) + var(--boardGapFromDock));
+  --boardTop: calc(var(--handDockTop) - var(--boardGapFromDock) - var(--boardH));
+
+  --hudRowH: calc(130 * var(--u));
+  --hudRowGapFromBoard: calc(130 * var(--u));
+  --hudRowTop: calc(var(--boardTop) - var(--hudRowGapFromBoard) - var(--hudRowH));
+
+  --enemyRowH: calc(220 * var(--u));
+  --enemyRowGapFromHud: calc(400 * var(--u));
+  --enemyRowTop: calc(var(--hudRowTop) - var(--enemyRowGapFromHud) - var(--enemyRowH));
+
+  --hudRowLeft: calc(var(--safeL) + var(--edgePad));
+  --hudRowRight: calc(var(--safeR) + var(--edgePad));
+
+  --stageCornerX: calc(var(--hudRowLeft) + calc(320 * var(--u)));
+  --sHudLeft: calc(var(--hudRowLeft) + calc(520 * var(--u)));
+  --sHudTop: var(--hudRowTop);
+  --sHudOffX: calc(0 * var(--u));
+  --sHudOffY: calc(0 * var(--u));
+}
+
+body.mobile.portrait .topHud{
+  height: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.mobile.portrait .mobileHudRow{
+  position: fixed;
+  top: var(--hudRowTop);
+  left: var(--hudRowLeft);
+  right: var(--hudRowRight);
+  z-index: var(--zChrome);
+}
+
+body.mobile.portrait .mobileActionPanel{
+  position: relative;
+  transform: translate(var(--mobileActionPanelDx), var(--mobileActionPanelDy));
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+}
+
+body.mobile.portrait .mobilePileButtons{
+  display: grid !important;
+  grid-row: 1;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: calc(8 * var(--u));
+}
+body.mobile.portrait .mobileChromeButtons{
+  display: grid !important;
+  grid-row: 2;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: calc(8 * var(--u));
+}
+body.mobile.portrait .mobileRunButtons{
+  display: grid !important;
+  grid-row: 2;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr);
+  gap: calc(8 * var(--u));
+}
+body.mobile.portrait .mobileActionPanel .mobileRunButtons button{ grid-column: auto !important; }
+
+body.mobile.portrait .mobileEnemyLeftBtn,
+body.mobile.portrait .mobileEnemyRightChrome{
+  position: fixed;
+  top: calc(var(--enemyRowTop) - calc(58 * var(--u)));
+  z-index: var(--zChrome);
+  display: flex;
+  gap: calc(8 * var(--u));
+  pointer-events: auto;
+}
+body.mobile.portrait .mobileEnemyLeftBtn{
+  left: calc(var(--safeL) + var(--edgePad));
+}
+body.mobile.portrait .mobileEnemyRightChrome{
+  right: calc(var(--safeR) + var(--edgePad));
+}
+body.mobile.portrait .mobileEnemyLeftBtn button,
+body.mobile.portrait .mobileEnemyRightChrome button{
+  font-size: calc(16 * var(--u));
+  padding: calc(9 * var(--u)) calc(12 * var(--u));
+  border-radius: calc(12 * var(--u));
+}
+
+body.mobile.portrait .mobileEnemyStrip{
+  position: fixed;
+  top: var(--enemyRowTop);
+  left: 0;
+  right: 0;
+  z-index: var(--zChrome);
+  pointer-events: auto !important;
+}
+body.mobile.portrait .mobileEnemyStrip .enemyHud,
+body.mobile.portrait .mobileEnemyStrip .enemyBanner{
+  pointer-events: auto !important;
+}
+
+body.mobile.portrait .boardArea{
+  position: fixed;
+  top: var(--boardTop);
+  bottom: var(--boardBottom);
+  left: calc(var(--safeL) + var(--boardPadX));
+  right: calc(var(--safeR) + var(--boardPadX));
+  transform: translateY(var(--boardSlotOffsetY)) !important;
+  padding-bottom: 0 !important;
+}
+
+body.mobile.portrait .itemTray,
+body.mobile.portrait .relicTray{
+  top: var(--boardTop);
+  bottom: var(--boardBottom);
+}
+
+body.mobile.portrait .relicTrayList{
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+body.mobile.portrait .relicTrayList::-webkit-scrollbar{ width: 0; height: 0; }
+
+body.mobile.portrait .stageCornerHud{
+  top: var(--hudRowTop) !important;
+  left: var(--stageCornerX) !important;
+  transform: translateX(0) translateY(0) !important;
+}
+
+body.mobile.portrait #hudSOnly{
+  top: var(--sHudTop) !important;
+  left: var(--sHudLeft) !important;
+  transform: translate(var(--sHudOffX), var(--sHudOffY)) !important;
+}
+
+/* Mobile map node emoji size control */
+html.mobile .mapNodeSelect .mapMiniScroller svg text,
+body.mobile .mapNodeSelect .mapMiniScroller svg text{
+  font-size: var(--mapNodeEmojiSize) !important;
+}
+
+body.mobile.portrait .mobileActionPanel button,
+body.mobile.portrait .mobileEnemyLeftBtn button,
+body.mobile.portrait .mobileEnemyRightChrome button{
+  font-size: calc(20 * var(--u)) !important;
+}
+
+body.mobile .mapNodeSelect,
+body.mobile .mapNodeSelect .nodeSelectHeader,
+body.mobile .mapNodeSelect .nodeSelectHeaderRight button,
+body.mobile .mapNodeSelect .mapDetailPanel,
+body.mobile .mapNodeSelect .mapMiniOverlay{
+  font-size: calc(18 * var(--u)) !important;
+}
+
+/* === Mobile portrait final layout: board image + slots + 3-column HUD row === */
+body.mobile.portrait{
+  --hudColGap: calc(10 * var(--u));
+  --hudRowW: calc(100vw - var(--safeL) - var(--safeR) - (var(--edgePad) * 2));
+  --hudColW: calc((var(--hudRowW) - (var(--hudColGap) * 2)) / 3);
+  --hudCenterX: calc(var(--hudRowLeft) + var(--hudColW) + var(--hudColGap) + (var(--hudColW) / 2));
+}
+
+body.mobile.portrait .mainPanel.inCombat::before{
+  position: fixed;
+  top: var(--boardTop);
+  bottom: var(--boardBottom);
+  left: calc(var(--safeL) + var(--boardPadX));
+  right: calc(var(--safeR) + var(--boardPadX));
+  transform: none !important;
+  display: none !important;
+  opacity: 0 !important;
+  background: none !important;
+}
+
+body.mobile .hand .card,
+body.mobile .hand .card *,
+body.mobile .slot .card,
+body.mobile .slot .card *{
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+body.mobile .mapNodeSelect .mapMiniScroller svg path{
+  stroke-width: calc(3.4 * var(--u)) !important;
+}
+
+body.mobile .mapNodeSelect .mapMiniScroller svg circle{
+  stroke-width: calc(6.8 * var(--u)) !important;
+}
+
+body.mobile.portrait .mobileHudRow{
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) !important;
+  column-gap: var(--hudColGap);
+  align-items: start;
+}
+
+body.mobile.portrait .mobileHudRow > .playerHudLeft{
+  grid-column: 1;
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+  width: 86% !important;
+  max-width: none !important;
+  font-size: 100% !important;
+  justify-self: start;
+}
+
+body.mobile.portrait .mobileHudRow > .mobileActionPanel{
+  grid-column: 3;
+  width: 100%;
+}
+
+body.mobile.portrait .stageCornerHud{
+  top: calc(var(--hudRowTop) + calc(2 * var(--u))) !important;
+  left: var(--hudCenterX) !important;
+  transform: translateX(-50%) translateY(0) !important;
+}
+
+body.mobile.portrait #hudSOnly{
+  top: calc(var(--hudRowTop) + calc(58 * var(--u))) !important;
+  left: var(--hudCenterX) !important;
+  transform: translateX(-50%) translateY(150%)!important;
+  z-index: var(--zChrome) !important;
+  display: flex !important;
+}
+
+body.mobile .combatControls{
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
+  bottom: calc(var(--safeB) + var(--dockH) + calc(8 * var(--u))) !important;
+  z-index: var(--zChrome) !important;
+}
+
+/* Mobile: unify card size in all choice/reward/upgrade/remove overlays */
+body.mobile :is(
+  .choice-overlay,
+  .choice-panel,
+  .overlay-panel,
+  .pileView,
+  .shopCardsGrid,
+  .choice-rewardCardRow,
+  .upgradePair
+) .card,
+body.mobile :is(
+  .choice-overlay,
+  .choice-panel,
+  .overlay-panel,
+  .pileView,
+  .shopCardsGrid,
+  .choice-rewardCardRow,
+  .upgradePair
+) .overlayCard,
+body.mobile :is(
+  .choice-overlay,
+  .choice-panel,
+  .overlay-panel,
+  .pileView,
+  .shopCardsGrid,
+  .choice-rewardCardRow,
+  .upgradePair
+) .choicePickCard{
+  width: var(--handCardW) !important;
+  height: var(--handCardH) !important;
+  --cardInnerMul: var(--handTextMul, 1);
+}

@@ -257,30 +257,41 @@ export function generateDungeonMap(opt?: Partial<MapGenOptions>): DungeonMap {
 
   const others = Object.keys(nodes).filter((id) => id !== map.startId && id !== treasureId);
   shuffleInPlace(others);
-  // ===== forced battle columns (depths) =====
   const FORCE_BATTLE_COLS = 5;
 
-  // depth=1(START 다음 열)은 무조건 포함
   const forcedBattleDepths = new Set<number>();
   if (layers.length > 1) forcedBattleDepths.add(1);
 
-  // 나머지 후보 depth들 (원하면 범위 조절 가능)
   const depthCandidates: number[] = [];
   for (let d = 2; d < layers.length; d++) {
     depthCandidates.push(d);
   }
   shuffleInPlace(depthCandidates);
 
-  // 총 5개가 될 때까지 추가
   for (const d of depthCandidates) {
     if (forcedBattleDepths.size >= Math.min(FORCE_BATTLE_COLS, Math.max(0, layers.length - 1))) break;
     forcedBattleDepths.add(d);
   }
 
+  const FORCE_REST_COLS = 2;
+  const forcedRestDepths = new Set<number>();
+  const treasureDepth = nodes[treasureId]?.depth ?? -1;
+  const restCandidates: number[] = [];
+  for (let d = 2; d < layers.length; d++) {
+    if (forcedBattleDepths.has(d)) continue;
+    if (d === treasureDepth) continue;
+    restCandidates.push(d);
+  }
+  shuffleInPlace(restCandidates);
+  for (const d of restCandidates) {
+    if (forcedRestDepths.size >= Math.min(FORCE_REST_COLS, restCandidates.length)) break;
+    forcedRestDepths.add(d);
+  }
+
 
   const elitePool = others
     .filter((id) => (nodes[id]?.depth ?? 0) >= 2)
-    .filter((id) => !forcedBattleDepths.has(nodes[id]?.depth ?? 0));
+    .filter((id) => !forcedBattleDepths.has(nodes[id]?.depth ?? 0)).filter((id) => !forcedRestDepths.has(nodes[id]?.depth ?? 0));
   shuffleInPlace(elitePool);
   const elites = new Set(elitePool.slice(0, Math.min(eliteCount, elitePool.length)));
   const deadEndMinDepth = opt?.deadEndMinDepth ?? 4;
@@ -320,6 +331,11 @@ export function generateDungeonMap(opt?: Partial<MapGenOptions>): DungeonMap {
   for (const id of others) {
     const d = nodes[id]?.depth ?? 0;
 
+    if (forcedRestDepths.has(d)) {
+      nodes[id].kind = "REST";
+      continue;
+    }
+
     if (forcedBattleDepths.has(d)) {
       nodes[id].kind = "BATTLE";
       continue;
@@ -334,7 +350,6 @@ export function generateDungeonMap(opt?: Partial<MapGenOptions>): DungeonMap {
   }
 
 
-  // ensure at least one SHOP exists (디버그/테스트 편의)
   {
     const anyShop = Object.values(nodes).some((n) => n.kind === "SHOP");
     if (!anyShop) {

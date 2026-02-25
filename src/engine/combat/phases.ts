@@ -59,6 +59,7 @@ export function startCombat(g: GameState) {
   g.player.status.weak = 0;
   g.player.status.bleed = 0;
   g.player.status.disrupt = 0;
+  g.player.status.slash = 0;
   g.player.zeroSupplyTurns = 0;
 
   g.phase = "REVEAL";
@@ -314,6 +315,23 @@ function isInstalledHere(g: GameState, cardUid: string, usedSide: "front" | "bac
   const def = getCardDefFor(g, cardUid) as any;
   if (!(def.tags?.includes("INSTALL"))) return false;
 
+  // 설치 유지보다 소모/소실이 우선합니다.
+  const vanishWhen = def.vanishWhen as any;
+  const exhaustWhen = def.exhaustWhen as any;
+
+  const vanishOk =
+    vanishWhen === "BOTH" ||
+    (vanishWhen === "FRONT" && usedSide === "front") ||
+    (vanishWhen === "BACK" && usedSide === "back");
+
+  const exhaustOk =
+    exhaustWhen === "BOTH" ||
+    (exhaustWhen === "FRONT" && usedSide === "front") ||
+    (exhaustWhen === "BACK" && usedSide === "back");
+
+  if ((vanishWhen && vanishWhen !== "NONE" && vanishOk) || (!vanishWhen && def.tags?.includes("VANISH"))) return false;
+  if ((exhaustWhen && exhaustWhen !== "NONE" && exhaustOk) || (!exhaustWhen && def.tags?.includes("EXHAUST"))) return false;
+
   const w = def.installWhen as ("FRONT" | "BACK" | "BOTH" | "NONE" | undefined);
   if (!w || w === "BOTH") return true;
   if (w === "FRONT") return usedSide === "front";
@@ -364,6 +382,15 @@ function incrementInstallAges(g: GameState) {
   }
 }
 
+
+function getEffectiveEffectsForSide(g: GameState, uid: string, side: Side) {
+  const inst = g.cards[uid];
+  const def = getCardDefFor(g, uid);
+  const flipped = Boolean((inst as any)?.flipped);
+  if (!flipped) return side === "front" ? def.front : def.back;
+  return side === "front" ? def.back : def.front;
+}
+
 export function resolveBack(g: GameState) {
   if (g.phase !== "PLACE" && g.phase !== "BACK") return;
   g.phase = "BACK";
@@ -380,7 +407,7 @@ export function resolveBack(g: GameState) {
       continue;
     }
 
-    resolvePlayerEffects({ game: g, side: "back", cardUid: uid }, def.back);
+    resolvePlayerEffects({ game: g, side: "back", cardUid: uid }, getEffectiveEffectsForSide(g, uid, "back"));
   }
   g.phase = "FRONT";
 }
@@ -394,7 +421,7 @@ export function resolveFront(g: GameState) {
     if (!uid) continue;
 
     const def = getCardDefFor(g, uid);
-    resolvePlayerEffects({ game: g, side: "front", cardUid: uid }, def.front);
+    resolvePlayerEffects({ game: g, side: "front", cardUid: uid }, getEffectiveEffectsForSide(g, uid, "front"));
   }
 
   g.phase = "ENEMY";
