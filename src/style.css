@@ -3701,8 +3701,7 @@ body.mobile .choice-panel.shopPanel .shopCardsGrid :is(.card, .overlayCard, .cho
 
 /* While shop is open: keep status bar fixed at very top for gold check */
 body.mobile.portrait.shopChoiceOpen .stageCornerHud,
-body.mobile.shopChoiceOpen .stageCornerHud,
-body.shopChoiceOpen .stageCornerHud{
+body.mobile.shopChoiceOpen .stageCornerHud{
   top: calc(var(--safeT) + calc(4 * var(--u))) !important;
   left: 50% !important;
   right: auto !important;
