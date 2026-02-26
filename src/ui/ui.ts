@@ -214,6 +214,7 @@ function wireItemHover(el: HTMLElement, itemId: string) {
   let holdStartX = 0;
   let holdStartY = 0;
   let consumeClick = false;
+  let suppressActivateUntil = 0;
 
   const clearHold = () => {
     if (holdTimer != null) {
@@ -233,6 +234,8 @@ function wireItemHover(el: HTMLElement, itemId: string) {
     clearHold();
     holdTimer = window.setTimeout(() => {
       consumeClick = true;
+      suppressActivateUntil = performance.now() + 700;
+      (el as any).__itemHoverSuppressClickUntil = suppressActivateUntil;
       showItemTipAt(itemId, holdStartX, holdStartY);
     }, 320);
   }, { passive: true });
@@ -257,7 +260,11 @@ function wireItemHover(el: HTMLElement, itemId: string) {
 
   const endTouchHover = () => {
     clearHold();
-    if (ensureItemTip().classList.contains("show")) hideItemTip();
+    if (ensureItemTip().classList.contains("show")) {
+      suppressActivateUntil = Math.max(suppressActivateUntil, performance.now() + 420);
+      (el as any).__itemHoverSuppressClickUntil = suppressActivateUntil;
+      hideItemTip();
+    }
   };
 
   el.addEventListener("pointerup", (ev) => {
@@ -444,6 +451,11 @@ function applyAssetVarsOnce() {
 
   root.style.setProperty("--bgUrl", `url("${assetUrl("assets/ui/background/dungeon_bg.png")}")`);
   root.style.setProperty("--boardUrl", `url("${assetUrl("assets/ui/boards/battle_board.png")}")`);
+  root.style.setProperty("--cardBgBasic", `url("${assetUrl("assets/ui/cards/card_basic.png")}")`);
+  root.style.setProperty("--cardBgCommon", `url("${assetUrl("assets/ui/cards/card_common.png")}")`);
+  root.style.setProperty("--cardBgSpecial", `url("${assetUrl("assets/ui/cards/card_special.png")}")`);
+  root.style.setProperty("--cardBgRare", `url("${assetUrl("assets/ui/cards/card_rare.png")}")`);
+  root.style.setProperty("--cardBgMadness", `url("${assetUrl("assets/ui/cards/card_madness.png")}")`);
   root.style.setProperty("--cardUrl", `url("${assetUrl("assets/ui/cards/card_parchment.png")}")`);
 
   root.style.setProperty("--mapBgUrl", `url("${assetUrl("assets/ui/background/map_bg.png")}")`);
@@ -1532,6 +1544,30 @@ function showUpgradeHoverPreviewByDef(g: GameState, defId: string, upgrade: numb
   const big = renderCardPreviewByDef(g, defId, nextUp);
   big.classList.add("isPreviewCard");
 
+  const pv = document.querySelector<HTMLElement>(".cardHoverPreview");
+  if (pv) pv.classList.remove("previewAtBattlefield");
+
+  cardHoverApi.show({ title, detail, cardEl: big });
+}
+
+function showUpgradeHoverPreviewByDefAtBattlefield(g: GameState, defId: string, upgrade: number) {
+  if (!hasNextUpgradeForDef(g, defId, upgrade)) return;
+
+  cardHoverApi.ensure(document.body);
+
+  const baseName = (g.content as any)?.cardsById?.[defId]?.name ?? defId;
+  const u = Number(upgrade ?? 0) || 0;
+  const nextUp = u + 1;
+
+  const title = `${formatName(baseName, nextUp)} (강화 미리보기)`;
+  const detail = buildUpgradePreviewDetailByDef(g, defId, u);
+
+  const big = renderCardPreviewByDef(g, defId, nextUp);
+  big.classList.add("isPreviewCard");
+
+  const pv = document.querySelector<HTMLElement>(".cardHoverPreview");
+  if (pv) pv.classList.add("previewAtBattlefield");
+
   cardHoverApi.show({ title, detail, cardEl: big });
 }
 
@@ -1540,6 +1576,7 @@ function wireUpgradeHoverPreviewForChoice(el: HTMLElement, g: GameState, defId: 
   const u = Number(upgrade ?? 0) || 0;
   if (u !== 0) return;
   if (!hasNextUpgradeForDef(g, defId, 0)) return;
+  const showAtBattlefield = !!el.closest(".choice-rewardCardRow");
 
   // Mouse hover
   el.addEventListener("pointerenter", (ev) => {
@@ -1547,7 +1584,8 @@ function wireUpgradeHoverPreviewForChoice(el: HTMLElement, g: GameState, defId: 
     if (pe.pointerType !== "mouse") return;
     if (performance.now() < suppressHoverUntil) return;
     if (drag?.dragging) return;
-    showUpgradeHoverPreviewByDef(g, defId, 0);
+    if (showAtBattlefield) showUpgradeHoverPreviewByDefAtBattlefield(g, defId, 0);
+    else showUpgradeHoverPreviewByDef(g, defId, 0);
   });
   el.addEventListener("pointerleave", (ev) => {
     const pe = ev as PointerEvent;
@@ -1584,7 +1622,8 @@ function wireUpgradeHoverPreviewForChoice(el: HTMLElement, g: GameState, defId: 
     clearHold();
     holdTimer = window.setTimeout(() => {
       consumeClick = true;
-      showUpgradeHoverPreviewByDef(g, defId, 0);
+      if (showAtBattlefield) showUpgradeHoverPreviewByDefAtBattlefield(g, defId, 0);
+      else showUpgradeHoverPreviewByDef(g, defId, 0);
     }, 320);
   }, { capture: true, passive: true });
 
@@ -5843,6 +5882,7 @@ function renderRelicTray(g: GameState, actions: UIActions) {
 
 
 function renderChoiceLayer(g: GameState, actions: UIActions) {
+  const SHOP_CHOICE_BODY_CLASS = "shopChoiceOpen";
 
   document.querySelector(".choice-overlay")?.remove();
 
@@ -5850,13 +5890,18 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
   const main = document.querySelector<HTMLElement>(".mainPanel");
   if (!c) {
     main?.classList.remove("choiceOpen");
+    document.body.classList.remove(SHOP_CHOICE_BODY_CLASS);
     return;
   }
-  if (!main) return;
+  if (!main) {
+    document.body.classList.remove(SHOP_CHOICE_BODY_CLASS);
+    return;
+  }
   main.classList.add("choiceOpen");
 
 
   const isShopChoice = (g.choiceCtx as any)?.kind === "SHOP";
+  document.body.classList.toggle(SHOP_CHOICE_BODY_CLASS, isShopChoice);
   // 강경 모드: 모든 치수는 화면비 기반(var(--u))으로만 계산한다.
   // 여기 값들은 '디자인 기준치' (1440x900 기반)이고, 실제 렌더는 CSS가 var(--u)로 스케일합니다.
   const CHOICE_DROP = 70;
@@ -5884,6 +5929,7 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
 
 
   const overlayEl = div("choice-overlay");
+  if (isShopChoice) overlayEl.classList.add("shopOverlay");
   overlayEl.style.cssText =
     "position:fixed; inset:0; z-index: var(--zChoice);" +
     "display:flex; justify-content:center; align-items:flex-start;" +
@@ -6345,7 +6391,11 @@ function renderChoiceLayer(g: GameState, actions: UIActions) {
         tile.appendChild(price);
 
         if (!offer.sold) {
-          tile.onclick = () => actions.onChooseChoice(`shop:item:${i}`);
+          tile.onclick = () => {
+            const until = Number((tile as any).__itemHoverSuppressClickUntil ?? 0);
+            if (until > performance.now()) return;
+            actions.onChooseChoice(`shop:item:${i}`);
+          };
         }
 
         itemsGrid.appendChild(tile);
@@ -6887,6 +6937,9 @@ function renderTopHud(g: GameState, actions: UIActions) {
   const inCombat = !g.run.finished && g.enemies.length > 0 && g.phase !== "NODE";
   if (inCombat) {
     const center = div(mobilePortrait ? "mobileEnemyStrip" : "enemyHudCenter");
+    center.dataset.enemyCount = String(g.enemies.length);
+    if (g.enemies.length === 2) center.classList.add("enemyCount2");
+    if (g.enemies.length === 3) center.classList.add("enemyCount3");
     const mover = div("enemyHudCenterMover");
     const enemiesWrap = div("enemyHud");
 
@@ -7398,6 +7451,7 @@ function computeNextStep(g: GameState, actions: UIActions, targeting: boolean) {
 function renderHandDock(g: GameState, actions: UIActions, targeting: boolean) {
   const old = document.querySelector(".handDock");
   if (old) old.remove();
+  document.querySelectorAll(".mobileHandScrollBtn").forEach((el) => el.remove());
 
   const inCombat = !g.run.finished && g.enemies.length > 0 && g.phase !== "NODE";
 
@@ -7468,6 +7522,54 @@ function renderHandDock(g: GameState, actions: UIActions, targeting: boolean) {
   document.body.appendChild(dock);
 
   enableHorizontalWheelScroll(hand);
+
+  const isMobile = document.body.classList.contains("mobile");
+  if (!isMobile) return;
+
+  const getStep = () => {
+    const firstCard = hand.querySelector<HTMLElement>(".card");
+    if (firstCard) {
+      const rowEl = hand.querySelector<HTMLElement>(".handCardsRow");
+      const gapPx = rowEl ? parseFloat(getComputedStyle(rowEl).columnGap || "0") || 0 : 0;
+      return Math.max(24, Math.round(firstCard.getBoundingClientRect().width + gapPx));
+    }
+    return Math.max(48, Math.round(hand.clientWidth * 0.6));
+  };
+
+  const makeBtn = (dir: "left" | "right") => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `mobileHandScrollBtn mobileHandScrollBtn-${dir}`;
+    btn.textContent = dir === "left" ? "◀" : "▶";
+    btn.onclick = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const step = getStep();
+      const dx = dir === "left" ? -step : step;
+      hand.scrollBy({ left: dx, behavior: "smooth" });
+      window.setTimeout(syncBtnState, 120);
+    };
+    return btn;
+  };
+
+  const leftBtn = makeBtn("left");
+  const rightBtn = makeBtn("right");
+  document.body.appendChild(leftBtn);
+  document.body.appendChild(rightBtn);
+
+  const syncBtnState = () => {
+    const maxScroll = Math.max(0, hand.scrollWidth - hand.clientWidth);
+    if (maxScroll <= 1) {
+      leftBtn.disabled = true;
+      rightBtn.disabled = true;
+      return;
+    }
+    leftBtn.disabled = hand.scrollLeft <= 1;
+    rightBtn.disabled = hand.scrollLeft >= maxScroll - 1;
+  };
+
+  hand.addEventListener("scroll", syncBtnState, { passive: true });
+  window.setTimeout(syncBtnState, 0);
 }
 
 function enableHorizontalWheelScroll(el: HTMLElement) {
@@ -7955,6 +8057,7 @@ function beginDrag(
   const css = getComputedStyle(document.documentElement);
   const handW = parseFloat(css.getPropertyValue("--handCardW")) || undefined;
   const handH = parseFloat(css.getPropertyValue("--handCardH")) || undefined;
+  const isMobile = document.body.classList.contains("mobile");
   let slotW: number | undefined;
   let slotH: number | undefined;
 
@@ -7983,8 +8086,8 @@ function beginDrag(
     dragging: false,
 
     previewEl: undefined,
-    previewW: slotW ?? r?.width ?? handW,
-    previewH: slotH ?? r?.height ?? handH,
+    previewW: isMobile ? (r?.width ?? handW ?? slotW) : (slotW ?? r?.width ?? handW),
+    previewH: isMobile ? (r?.height ?? handH ?? slotH) : (slotH ?? r?.height ?? handH),
     grabDX,
     grabDY,
   };
@@ -7992,6 +8095,7 @@ function beginDrag(
   if (cardEl) {
     drag.sourceEl = cardEl;
     const clone = cardEl.cloneNode(true) as HTMLElement;
+    const sourceStyle = getComputedStyle(cardEl);
 
     clone.classList.remove("inSlot");
     clone.classList.remove("selected");
@@ -8008,6 +8112,13 @@ function beginDrag(
     clone.style.filter = "none";
     clone.style.transform = "none";
     clone.style.backgroundColor = "transparent";
+
+    const cardInnerMul = sourceStyle.getPropertyValue("--cardInnerMul").trim();
+    const slotTextScale = sourceStyle.getPropertyValue("--slotTextScale").trim();
+    if (cardInnerMul) clone.style.setProperty("--cardInnerMul", cardInnerMul);
+    if (slotTextScale) clone.style.setProperty("--slotTextScale", slotTextScale);
+    clone.style.fontSize = sourceStyle.fontSize;
+    clone.style.lineHeight = sourceStyle.lineHeight;
 
     drag.previewEl = clone;
   }
