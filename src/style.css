@@ -946,6 +946,16 @@ html, body, #app,
 }
 .kwRun *, .kwBadge *{ white-space: nowrap; }
 
+.numDeltaDown{
+  color: #ff6b6b !important;
+  font-weight: 900;
+}
+
+.numDeltaUp{
+  color: #8cc7ff !important;
+  font-weight: 900;
+}
+
 
 .card.slotNameOnly{
   height: 100%;

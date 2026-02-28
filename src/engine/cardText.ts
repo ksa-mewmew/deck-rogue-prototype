@@ -1,5 +1,6 @@
 import type { GameState } from "./types";
 import { isRelicActive } from "./relics";
+import { getPatronGodOrNull } from "./faith";
 
 function hasWrongDice(g: GameState): boolean {
   return isRelicActive(g, "relic_wrong_dice");
@@ -16,16 +17,31 @@ function applySignedAbsBonus(n: number, bonus: number): number {
   return n + Math.sign(n) * bonus;
 }
 
+function applyRabbitHuntBlockPenaltyToText(g: GameState, text: string): string {
+  if (getPatronGodOrNull(g) !== "rabbit_hunt") return text;
+  return text.replace(/(방어|블록)(\s*)([+-]?\d+)/g, (_m, kw, ws, nText) => {
+    const n = Number(nText);
+    if (!Number.isFinite(n)) return `${kw}${ws}${nText}`;
+    const reduced = Math.floor(n * 0.9);
+    return `${kw}${ws}${reduced}`;
+  });
+}
+
 export function displayCardText(g: GameState, text: string, cardUid?: string): string {
   if (!text) return text;
   const bonus = displayNumBonus(g, cardUid);
-  if (bonus <= 0) return text;
+  let out = text;
 
-  return text.replace(/-?\d+/g, (m) => {
-    const n = Number(m);
-    if (!Number.isFinite(n)) return m;
-    return String(applySignedAbsBonus(n, bonus));
-  });
+  if (bonus > 0) {
+    out = out.replace(/-?\d+/g, (m) => {
+      const n = Number(m);
+      if (!Number.isFinite(n)) return m;
+      return String(applySignedAbsBonus(n, bonus));
+    });
+  }
+
+  out = applyRabbitHuntBlockPenaltyToText(g, out);
+  return out;
 }
 
 export function displayCardTextPair(g: GameState, frontText: string, backText: string, cardUid?: string) {

@@ -105,15 +105,17 @@ export function renderCardWithCtx(
     const flipped = Boolean((inst as any)?.flipped);
     const frontRich = flipped ? textPair.backText : textPair.frontText;
     const backRich = flipped ? textPair.frontText : textPair.backText;
+    const frontBase = flipped ? def.backText : def.frontText;
+    const backBase = flipped ? def.frontText : def.backText;
 
     const sec1 = ctx.div("cardSection");
     sec1.classList.add("front");
-    sec1.appendChild(renderCardRichTextNode(frontRich));
+    sec1.appendChild(renderCardRichTextNode(frontRich, frontBase));
     body.appendChild(sec1);
 
     const sec2 = ctx.div("cardSection");
     sec2.classList.add("back");
-    sec2.appendChild(renderCardRichTextNode(backRich));
+    sec2.appendChild(renderCardRichTextNode(backRich, backBase));
     body.appendChild(sec2);
 
     d.appendChild(body);
