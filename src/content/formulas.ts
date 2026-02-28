@@ -100,14 +100,14 @@ export const BLOCK_FORMULAS: Record<BlockFormulaKind, (ctx: FormulaCtx) => numbe
   hand_blade_back: (ctx) => {
     const g = ctx.game;
     const b = nb(ctx);
-    const handCount = Object.values(g.cards).filter((c) => c.zone === "hand" && c.uid !== (ctx.cardUid ?? "")).length;
+    const handCount = Math.max(0, Number(g.hand?.length ?? 0) || 0);
     const amount = (1 + b) * Math.floor(handCount / (1 + b));
     return Math.min(6 + b, amount);
   },
   hand_blade_back_u1: (ctx) => {
     const g = ctx.game;
     const b = nb(ctx);
-    const handCount = Object.values(g.cards).filter((c) => c.zone === "hand" && c.uid !== (ctx.cardUid ?? "")).length;
+    const handCount = Math.max(0, Number(g.hand?.length ?? 0) || 0);
     return (2 + b) * Math.floor(handCount / (1 + b));
   },
   lone_blow_block_10: (ctx) => (onlyThisCardUsedThisTurn(ctx) ? 10 + nb(ctx) : 0),

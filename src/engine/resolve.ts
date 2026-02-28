@@ -164,6 +164,30 @@ function countInstalledCardsOnBoard(g: GameState, opt?: { excludeUid?: string; i
   return count;
 }
 
+function getBackInstalledImprovArrowBonus(g: GameState): number {
+  const relicNumBonus = isRelicActive(g, "relic_wrong_dice") ? 1 : 0;
+  let total = 0;
+
+  for (const uid of g.backSlots) {
+    if (!uid) continue;
+    const inst = g.cards[uid];
+    if (!inst || inst.defId !== "improv_arrow") continue;
+
+    const def: any = getCardDefFor(g, uid) as any;
+    const effects = Array.isArray(def?.back) ? def.back : [];
+    for (const eff of effects) {
+      if (!eff || eff.op !== "increaseCardDamageByTag" || eff.tag !== "ARROW") continue;
+      const base = Number(eff.n ?? 0) || 0;
+      if (base === 0) continue;
+      const overrunNumBonus = (inst as any)?.synth?.overrun ? 1 : 0;
+      const numBonus = relicNumBonus + overrunNumBonus;
+      total += base + Math.sign(base) * numBonus;
+    }
+  }
+
+  return Math.max(0, total);
+}
+
 export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
   const g = ctx.game;
 
@@ -211,7 +235,9 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
     const tags = Array.isArray(def?.tags) ? def.tags : [];
     let byTag = 0;
     for (const t of tags) {
-      byTag += Math.max(0, Number(runAny?.cardDamageBonusByTag?.[t] ?? 0) || 0);
+      const stored = Math.max(0, Number(runAny?.cardDamageBonusByTag?.[t] ?? 0) || 0);
+      byTag += t === "ARROW" ? 0 : stored;
+      if (t === "ARROW") byTag += getBackInstalledImprovArrowBonus(g);
     }
 
     return byDef + byTag;
@@ -731,6 +757,14 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
       case "increaseCardDamageByTag": {
         const tag = e.tag;
         if (!tag) break;
+
+        const srcInst = g.cards[ctx.cardUid];
+        if (srcInst?.defId === "improv_arrow" && tag === "ARROW") {
+          const delta = withNumBonus(e.n);
+          logMsg(g, `[태그:${tag}] 공격력 +${delta} (급조된 화살이 후열에 있는 동안 유지)`);
+          break;
+        }
+
         const runAny = g.run as any;
         runAny.cardDamageBonusByTag ??= {};
         const delta = withNumBonus(e.n);

@@ -2,6 +2,7 @@ import type { GameState, GodId } from "../../engine/types";
 import type { UIActions } from "../ui";
 import { ensureFaith, godAbilityBlock, godArt, godName } from "../../engine/faith";
 import { getItemDefById } from "../../content/items";
+import { RELICS_BY_ID } from "../../content/relicsContent";
 import { assetUrl, wireItemHover } from "../assets";
 
 function div(cls: string) {
@@ -562,6 +563,32 @@ export function renderChoiceLayer(
             if (until > performance.now()) return;
             actions.onChooseChoice(`shop:item:${i}`);
           };
+        }
+
+        itemsGrid.appendChild(tile);
+      }
+
+      for (let i = 0; i < (shop.relics?.length ?? 0); i++) {
+        const offer = shop.relics[i];
+        if (!offer?.relicId) continue;
+
+        const tile = div("shopItemTile");
+        if (offer.sold) tile.classList.add("sold");
+
+        const def: any = (RELICS_BY_ID as any)[String(offer.relicId)] ?? {};
+        const img = document.createElement("img");
+        img.alt = def?.name ?? String(offer.relicId);
+        if (def?.art) img.src = assetUrl(def.art);
+        tile.appendChild(img);
+
+        const price = divText(
+          "shopTilePrice",
+          offer.sold ? "품절" : `🪙${Number(offer.priceGold ?? 0) || 0}`
+        );
+        tile.appendChild(price);
+
+        if (!offer.sold) {
+          tile.onclick = () => actions.onChooseChoice(`shop:relic:${i}`);
         }
 
         itemsGrid.appendChild(tile);

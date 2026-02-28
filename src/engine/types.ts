@@ -528,10 +528,17 @@ export type ShopItemOffer = {
   sold?: boolean;
 };
 
+export type ShopRelicOffer = {
+  relicId: RelicId;
+  priceGold: number;
+  sold?: boolean;
+};
+
 export type ShopState = {
   nodeId: MapNodeId;
   cards: ShopCardOffer[];
   items?: ShopItemOffer[];
+  relics?: ShopRelicOffer[];
   usedUpgrade: boolean;
   usedRemove: boolean;
   art?: string;

@@ -488,13 +488,13 @@ export const CARDS: CardData[] = [
     id: "heavy_shield",
     name: "육중한 방패",
     rarity: "COMMON",
-    frontText: "방어도가 8 이상이면, 방어 +8",
+    frontText: "방어가 8 이상이면, 방어 +8",
     backText: "현재 방어도만큼 무작위 피해",
     front: [{ op: "ifPlayerBlockAtLeast", n: 8, then: [{ op: "block", n: 8 }] }],
     back: [{ op: "damageEnemyByPlayerBlock", target: "random", mult: 1 }],
     upgrades: [
       {
-        frontText: "방어도가 8 이상이면, 방어도를 두 배로 만듦",
+        frontText: "방어가 8 이상이면, 방어를 두 배로 만듦",
         backText: "현재 방어도만큼 지정 피해",
         front: [{ op: "ifPlayerBlockAtLeast", n: 8, then: [{ op: "blockByPlayerBlock", mult: 1 }] }],
         back: [{ op: "damageEnemyByPlayerBlock", target: "select", mult: 1 }],
@@ -1035,7 +1035,7 @@ export const CARDS: CardData[] = [
 
   {
     id: "install_scriptorium",
-    name: "피 묻은 필사대",
+    name: "핏빛 필사대",
     rarity: "RARE",
     tags: ["INSTALL"],
     installWhen: "BOTH",
@@ -1073,7 +1073,7 @@ export const CARDS: CardData[] = [
 
   {
     id: "unforgettable_memory",
-    name: "잊을 수 없는 기억",
+    name: "박제된 기억",
     rarity: "RARE",
     frontText: "무작위 소실된 카드의 전열 효과 발동, 2번 반복",
     backText: "무작위 소실된 카드의 후열 효과 발동, 2번 반복",

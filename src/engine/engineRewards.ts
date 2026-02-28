@@ -1,4 +1,4 @@
-import type { ChoiceOption, ChoiceState, GameState, ShopState, ShopCardOffer } from "./types";
+import type { ChoiceOption, ChoiceState, GameState, ShopState, ShopCardOffer, ShopRelicOffer } from "./types";
 import { addCardToDeck, offerRewardN, removeCardByUid, REWARD_POOL } from "../content/rewards";
 import { closeChoice, enqueueChoice } from "./choice";
 import { logMsg, pushUiToast } from "./rules";
@@ -6,7 +6,7 @@ import { getCardDefByIdWithUpgrade } from "../content/cards";
 import { offerRelicSingleContent } from "../content/relicRewards";
 import { ITEMS, getItemDefById } from "../content/items";
 import { RELICS_BY_ID } from "../content/relicsContent";
-import { grantRelic } from "./relics";
+import { grantRelic, isEventRelicId } from "./relics";
 import { displayCardTextPair, displayCardNameWithUpgrade } from "./cardText";
 import { addItemToInventory } from "./items";
 import { GOD_LINES, faithCardRewardCount, getPatronGodOrNull, isHostile, shopPriceGold } from "./faith";
@@ -463,10 +463,30 @@ function ensureShopState(g: GameState, nodeId: string): ShopState {
     });
   })();
 
+  const relics = (() => {
+    const owned = new Set<string>((g.run.relics ?? []) as string[]);
+    const pool = Object.keys(RELICS_BY_ID).filter((id) => {
+      if (owned.has(id)) return false;
+      if (isEventRelicId(id)) return false;
+      const def: any = RELICS_BY_ID[id];
+      if (!def) return false;
+      if (def.debugOnly) return false;
+      return true;
+    });
+
+    if (pool.length <= 0) return [] as ShopRelicOffer[];
+
+    const id = pool[Math.floor(Math.random() * pool.length)];
+    if (!id) return [] as ShopRelicOffer[];
+
+    return [{ relicId: id, priceGold: 60 + randInt(-10, 10), sold: false }];
+  })();
+
   const st: ShopState = {
     nodeId,
     cards,
     items,
+    relics,
     usedUpgrade: false,
     usedRemove: false,
     createdAtMove: Number((g.run as any).timeMove ?? 0) || 0,
@@ -532,6 +552,26 @@ export function openShopChoice(g: GameState, nodeId: string) {
       const priceGold = shopPriceGold(g, it.priceGold);
       const detail = `가격: 🪙${priceGold}\n\n${def?.text ?? ""}`;
       options.push({ key: `shop:item:${i}`, label: `${name} (🪙${priceGold})`, detail });
+    }
+
+    options.push({ key: `shop:sep:${sep++}`, label: "—", detail: "" });
+  }
+
+  // 유물 판매(이벤트 유물 제외, 해금 상태로 표시)
+  if (shop.relics && shop.relics.length > 0) {
+    for (let i = 0; i < shop.relics.length; i++) {
+      const r = shop.relics[i];
+      const def: any = RELICS_BY_ID[r.relicId];
+      const name = def?.name ?? r.relicId;
+
+      if (r.sold) {
+        options.push({ key: `shop:relic:${i}`, label: `${name} (품절)`, detail: "" });
+        continue;
+      }
+
+      const priceGold = shopPriceGold(g, r.priceGold);
+      const detail = `가격: 🪙${priceGold}\n\n${def?.text ?? ""}`;
+      options.push({ key: `shop:relic:${i}`, label: `${name} (🪙${priceGold})`, detail });
     }
 
     options.push({ key: `shop:sep:${sep++}`, label: "—", detail: "" });

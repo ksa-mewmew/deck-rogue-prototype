@@ -1,6 +1,8 @@
 import type { GameState } from "./types";
 import { isRelicActive } from "./relics";
 import { getPatronGodOrNull } from "./faith";
+import { getCardDefFor } from "../content/cards";
+import { calcBlockFormula } from "../content/formulas";
 
 function hasWrongDice(g: GameState): boolean {
   return isRelicActive(g, "relic_wrong_dice");
@@ -27,9 +29,34 @@ function applyRabbitHuntBlockPenaltyToText(g: GameState, text: string): string {
   });
 }
 
+function applyRabbitHuntBlockPenaltyToAmount(g: GameState, amount: number): number {
+  if (getPatronGodOrNull(g) !== "rabbit_hunt") return amount;
+  return Math.max(0, Math.floor(amount * 0.9));
+}
+
+function currentBlockFormulaAmount(g: GameState, text: string, cardUid: string | undefined, numBonus: number): number | null {
+  if (!cardUid) return null;
+  const inst = g.cards[cardUid];
+  if (!inst) return null;
+  const def: any = getCardDefFor(g, cardUid) as any;
+
+  const effects: any[] = text === def.frontText
+    ? (Array.isArray(def.front) ? def.front : [])
+    : text === def.backText
+      ? (Array.isArray(def.back) ? def.back : [])
+      : [];
+
+  const formula = effects.find((e) => e?.op === "blockFormula");
+  if (!formula?.kind) return null;
+
+  const base = Math.max(0, Number(calcBlockFormula({ game: g, cardUid, numBonus }, formula.kind)) || 0);
+  return applyRabbitHuntBlockPenaltyToAmount(g, base);
+}
+
 export function displayCardText(g: GameState, text: string, cardUid?: string): string {
   if (!text) return text;
   const bonus = displayNumBonus(g, cardUid);
+  const formulaBlockNow = currentBlockFormulaAmount(g, text, cardUid, bonus);
   let out = text;
 
   if (bonus > 0) {
@@ -38,6 +65,11 @@ export function displayCardText(g: GameState, text: string, cardUid?: string): s
       if (!Number.isFinite(n)) return m;
       return String(applySignedAbsBonus(n, bonus));
     });
+  }
+
+  if (formulaBlockNow != null) {
+    out = `${out} (현재 방어 +${formulaBlockNow})`;
+    return out;
   }
 
   out = applyRabbitHuntBlockPenaltyToText(g, out);

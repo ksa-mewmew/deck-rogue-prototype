@@ -2,7 +2,7 @@ import type { ChoiceOption, ChoiceState, GameState, GodId, TemptGodId } from "./
 import { applyRewardChoiceKey, openBattleCardRewardChoice, openShopChoice } from "./engineRewards";
 import { clearAllChoices, setChoice } from "./choice";
 import { logMsg, pushUiToast } from "./rules";
-import { applyPendingRelicActivations, checkRelicUnlocks, getUnlockProgress } from "./relics";
+import { applyPendingRelicActivations, checkRelicUnlocks, getUnlockProgress, grantRelic } from "./relics";
 import { displayCardTextPair, displayCardNameForUid, displayCardNameWithUpgrade } from "./cardText";
 import { getEventById } from "../content/events";
 import { getCardDefByIdWithUpgrade } from "../content/cards";
@@ -10,6 +10,7 @@ import { canUpgradeUid, upgradeCardByUid, removeCardByUid, addCardToDeck } from 
 import { healPlayer, applyDamageToPlayer } from "./effects";
 import { addItemToInventory, isItemInventoryFull } from "./items";
 import { getItemDefById } from "../content/items";
+import { RELICS_BY_ID } from "../content/relicsContent";
 import {
   acceptMadness,
   acceptTemptation,
@@ -535,6 +536,59 @@ function applyShopChoiceKey(g: GameState, key: string): boolean {
 
     const nm = getItemDefById(String(offer.itemId))?.name ?? String(offer.itemId);
     logMsg(g, `상점: 아이템 구매 (${nm}) (-🪙${price})`);
+    openShopChoice(g, nodeId);
+    return true;
+  }
+
+  // 유물 구매
+  if (key.startsWith("shop:relic:")) {
+    const idx = Number(key.slice("shop:relic:".length));
+    const offer = shop.relics?.[idx];
+    if (!offer) {
+      logMsg(g, "상점: 알 수 없는 유물 선택입니다.");
+      openShopChoice(g, nodeId);
+      return true;
+    }
+    if (offer.sold) {
+      logMsg(g, "상점: 품절되었습니다.");
+      openShopChoice(g, nodeId);
+      return true;
+    }
+
+    const price = shopPriceGold(g, Number(offer.priceGold ?? 0) || 0);
+    if (getGold(g) < price) {
+      logMsg(g, "골드가 부족합니다.");
+      openShopChoice(g, nodeId);
+      return true;
+    }
+
+    addGold(g, -price);
+    grantRelic(g, String(offer.relicId), "NORMAL");
+
+    const rid = String(offer.relicId);
+    g.run.relicUnlocked ??= {};
+    g.run.relicUnlocked[rid as any] = true as any;
+
+    (g.run as any).relicRuntime ??= {};
+    const prev = ((g.run as any).relicRuntime[rid] ?? {}) as any;
+    const wasActive = !!prev.active;
+    (g.run as any).relicRuntime[rid] = {
+      ...prev,
+      active: true,
+      pending: false,
+      obtainedAtNode: prev.obtainedAtNode ?? g.run.nodePickCount,
+      activatedAtNode: g.run.nodePickCount,
+    };
+
+    if (!wasActive) {
+      const def: any = (RELICS_BY_ID as any)[rid];
+      def?.onActivate?.(g);
+    }
+
+    offer.sold = true;
+
+    const name = (RELICS_BY_ID as any)?.[rid]?.name ?? rid;
+    logMsg(g, `상점: 유물 구매 (${name}) (-🪙${price})`);
     openShopChoice(g, nodeId);
     return true;
   }
