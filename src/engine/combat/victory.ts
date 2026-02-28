@@ -7,6 +7,7 @@ import { openBattleCardRewardChoice, openEliteRelicOfferChoice, openBossRelicOff
 import { _cleanupBattleTransientForVictory } from "./phases";
 import { rollBattleItemDrop } from "../items";
 import { GOD_LINES, getPatronGodOrNull, isHostile } from "../faith";
+import { addCardToDeck } from "../../content/rewards";
 
 
 function shuffleInPlace<T>(a: T[]) {
@@ -110,12 +111,12 @@ export function checkEndConditions(g: GameState) {
 
   if (aliveEnemies(g).length === 0 && g.phase !== "NODE") {
     g.victoryResolvedThisCombat = true;
-    const wasBoss = !!(g.run as any).lastBattleWasBoss;
+    const wasBoss = !!g.run.lastBattleWasBoss;
     _cleanupBattleTransientForVictory(g);
     applyWinHooksWhileInBackThisTurn(g);
 
     logMsg(g, "적을 모두 처치!");
-    if (wasBoss) (g.run as any).bossOmenText = null;
+    if (wasBoss) g.run.bossOmenText = null;
     {
       const map = (g.run as any).map as any;
       if (map && map.nodes && map.pos && map.nodes[map.pos]) {
@@ -133,8 +134,8 @@ export function checkEndConditions(g: GameState) {
       const runAny: any = g.run as any;
       const enemyCount = Number(runAny.lastBattleEnemyCount ?? 0) || 0;
       if (!wasBoss && enemyCount === 3) {
-        const up = getUnlockProgress(g) as any;
-        up.threeEnemyWins = (Number(up.threeEnemyWins ?? 0) || 0) + 1;
+        const up = getUnlockProgress(g);
+        up.threeEnemyWins += 1;
         checkRelicUnlocks(g);
       }
     }
@@ -145,7 +146,7 @@ export function checkEndConditions(g: GameState) {
 
       const T = Number(runAny.timeMove ?? 0) + (g.time ?? 0);
       const tier = Math.min(3, Math.floor(Math.max(0, T) / 15));
-      let gainGold = 3 + tier * 2;
+      let gainGold = 6 + tier;
       if (g.run.lastBattleWasElite) gainGold += 10;
       if (wasBoss) gainGold += 30;
 
@@ -167,7 +168,7 @@ export function checkEndConditions(g: GameState) {
       }
 
       if (getPatronGodOrNull(g) === "card_dealer") {
-        if (Math.random() < 0.3) {
+        if (Math.random() < 0.5) {
           const now = Number(runAny.gold ?? 0) || 0;
           const lost = Math.min(10, now);
           runAny.gold = now - lost;
@@ -175,6 +176,14 @@ export function checkEndConditions(g: GameState) {
           logMsg(g, GOD_LINES.card_dealer.victoryFee);
           if (lost > 0) pushUiToast(g, "GOLD", `🪙 -${lost}`, 1600);
           logMsg(g, `카드 딜러: 수수료 🪙 -${lost}`);
+        }
+      }
+
+      if (getPatronGodOrNull(g) === "nameless_vow") {
+        if (Math.random() < 0.2) {
+          addCardToDeck(g, "debt_paper", { upgrade: 0 });
+          pushUiToast(g, "WARN", (GOD_LINES as any).nameless_vow.victoryDebt, 1800);
+          logMsg(g, "무명의 서약: 전투 후 빚 문서 1장 추가 (20%)");
         }
       }
     }
@@ -225,7 +234,7 @@ export function checkEndConditions(g: GameState) {
         }
       }
 
-      openBossRelicOfferChoice(g); // 3개 중 1개
+      openBossRelicOfferChoice(g);
     }
 
     openEliteRelicOfferChoice(g);

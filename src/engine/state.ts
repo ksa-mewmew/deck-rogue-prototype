@@ -12,6 +12,7 @@ export function createInitialRunState(): RunState {
   return {
     relicRuntime: {},
     pendingRelicActivations: [],
+    relicUnlocked: {},
     unlock: {
       rest: 0,
       eliteWins: 0,
@@ -23,17 +24,20 @@ export function createInitialRunState(): RunState {
       skippedTurn: 0,
       bleedApplied: 0,
       endedTurnSupplyZero: 0,
+
+      moonScrollUses: 0,
+      threeEnemyWins: 0,
+      endedTurnWith3Installs: 0,
+      installDamageDealt: 0,
     },
 
     timeMove: 0,
-    // 슬롯 확장(보스 보상)
     slotCapFront: 3,
     slotCapBack: 3,
     bossKillCount: 0,
     bossSlotFirstPick: null,
 
     map: generateDungeonMap(),
-    pursuit: { heat: 0 },
     vision: { mode: "NORMAL", blind: false, presenceR: 2, typeR: 2, detailR: 0, noise: 0 },
 
     encounterCount: 0,
@@ -102,7 +106,7 @@ export function createInitialState(content: Content): GameState {
       supplies: 7,
       fatigue: 0,
       zeroSupplyTurns: 0,
-      status: { vuln: 0, weak: 0, bleed: 0, disrupt: 0 },
+      status: { vuln: 0, weak: 0, bleed: 0, disrupt: 0, slash: 0 },
       immuneToDisruptThisTurn: false,
       nullifyDamageThisTurn: false,
     },
@@ -154,7 +158,6 @@ export function createInitialState(content: Content): GameState {
   makeBasicDeck(g);
   logMsg(g, "새 런 시작.");
 
-  // 신앙 선택(런 시작 시 1회)
   ensureFaith(g);
   openFaithStartChoice(g);
 

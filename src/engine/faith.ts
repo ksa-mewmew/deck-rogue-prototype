@@ -21,6 +21,8 @@ type GodDisplay = {
   hostile: string;
 };
 
+//신 능력
+
 export const GODS: GodDisplay[] = [
   {
     id: "dream_shadow",
@@ -35,34 +37,70 @@ export const GODS: GodDisplay[] = [
     id: "wing_artery",
     name: "날개의 동맥",
     art: "assets/gods/wing_artery.png",
-    patronPlus: "이동: 30% 확률로 시간이 흐르지 않음 / 시작 보급 10",
+    patronPlus: "이동: 50% 확률로 시간이 흐르지 않음 / 시작 S 10",
     patronMinus: "전투: 5턴마다 피로도 +1",
     temptation: "시간 -7, 피로도 +2",
     hostile: "이동에 걸리는 시간이 1 늘어남",
   },
   {
+    id: "master_spear",
+    name: "달인의 창",
+    art: "assets/gods/master_spear.png",
+    patronPlus: "전투: 선두 적에게 피해를 줄 때 피해 +50%",
+    patronMinus: "대상 지정: 선두 적만 대상으로 지정 가능",
+    temptation: "다음 정예/보스 전투 시작: 모든 적 취약 3",
+    hostile: "정예/보스 전투 시작: 자신 취약/약화/교란 2",
+  },
+  {
+    id: "retort_fusion",
+    name: "레토르트 퓨전",
+    art: "assets/gods/retort_fusion.png",
+    patronPlus: "휴식: 합성 선택 가능",
+    patronMinus: "휴식-합성: 효과별 비용 지불",
+    temptation: "다음 휴식에서 합성 선택 가능",
+    hostile: "무작위 10장 소모 부여 / 카드가 소모될 때마다 HP -1",
+  },
+  {
+    id: "nameless_vow",
+    name: "무명의 서약",
+    art: "assets/gods/nameless_vow.png",
+    patronPlus: "빚 문서 1장당 첫 턴 드로우 +1, 방어도 +3",
+    patronMinus: "전투 종료: 20% 확률로 빚 문서 1장 추가",
+    temptation: "덱에 빚 문서 1장 추가, 다음 3전투 드로우 +2",
+    hostile: "배교: 빚 문서 2장 추가 / 전투 시작: 빚 문서 1장당 HP -1",
+  },
+  {
     id: "bright_darkness",
     name: "밝은 어둠",
     art: "assets/gods/bright_darkness.png",
-    patronPlus: "지도: 이웃 노드 정보가 더 멀리 표시(시야 3)",
+    patronPlus: "지도: 이웃 노드 정보가 더 멀리 표시(시야 4)",
     patronMinus: "전투 시작: 자신 취약 1",
-    temptation: "다음 3개 노드 내용 즉시 공개, 피로도 +1",
+    temptation: "다음 4개 노드 내용 즉시 공개, 피로도 +1",
     hostile: "지도: 노드 정보가 전부 ? / 전투 시작: 자신 취약 2",
+  },
+  {
+    id: "twin_heart",
+    name: "쌍둥이 심장",
+    art: "assets/gods/twin_heart.png",
+    patronPlus: "턴 종료: 사용한 카드 중 무작위 1장의 반대쪽 열 효과가 발동",
+    patronMinus: "턴 시작: S -1",
+    temptation: "카드 보상 1회",
+    hostile: "전투 시작: 교란 5",
   },
   {
     id: "indifferent_one",
     name: "아무렇지 않은 자",
     art: "assets/gods/indifferent_one.png",
-    patronPlus: "턴 종료: 카드 0장 사용 시 HP +2, 방어 +6",
-    patronMinus: "턴: 5장 이상 사용 시 피로도 +1(1회)",
+    patronPlus: "턴 종료: 카드 1장 이하 사용 시 HP +2, 방어 +6",
+    patronMinus: "턴: 5장 이상 사용 시 피로도 +1 (전투 당 1회)",
     temptation: "즉시 피로도 -5, 다음 전투 드로우 -1",
-    hostile: "턴: 4장 이상 사용 시 피로도 +1(1회)",
+    hostile: "턴: 4장 이상 사용 시 피로도 +1, HP -3 (전투 당 3회)",
   },
   {
     id: "armored_tiger",
     name: "중갑 입은 호랑이",
     art: "assets/gods/armored_tiger.png",
-    patronPlus: "전투 시작: 방어 10",
+    patronPlus: "전투 시작: 첫 턴에 방어 10, 그 다음 턴에 방어 5",
     patronMinus: "턴 종료: 방어를 얻지 못했으면 HP -2",
     temptation: "최대 체력 +5, 피로도 +2",
     hostile: "전투 시작: 취약 2, 드로우 -1",
@@ -81,7 +119,7 @@ export const GODS: GodDisplay[] = [
     name: "카드 딜러",
     art: "assets/gods/card_dealer.png",
     patronPlus: "전투 시작: 드로우 +1",
-    patronMinus: "전투 종료: 30% 확률로 골드 10 잃음",
+    patronMinus: "전투 종료: 50% 확률로 골드 10 잃음",
     temptation: "골드 +40, 덱에 빚 문서(저주) 1장 추가",
     hostile: "전투 골드 보상 없음",
   },
@@ -89,17 +127,26 @@ export const GODS: GodDisplay[] = [
     id: "rabbit_hunt",
     name: "토끼 사냥",
     art: "assets/gods/rabbit_hunt.png",
-    patronPlus: "전투 시작: 모든 적 취약 2",
-    patronMinus: "방어도 획득량 -25%",
+    patronPlus: "전투 시작: 모든 적 취약 3",
+    patronMinus: "방어도 획득량 -10%",
     temptation: "다음 3전투 동안 전투 시작 드로우 +1",
     hostile: "매 전투 첫 턴: 자신 취약 3",
+  },
+  {
+    id: "wave_breath",
+    name: "파도의 숨결",
+    art: "assets/gods/wave_breath.png",
+    patronPlus: "전투 당 1회, 대상을 선택하는 카드가 모든 적 대상",
+    patronMinus: "그 외 대상을 선택하는 카드는 무작위 적 대상",
+    temptation: "다음 전투: 처음 사용하는 대상을 선택하는 카드가 모든 적 대상",
+    hostile: "모든 대상 지정 카드가 무작위 적 대상",
   },
   {
     id: "forge_master",
     name: "화로의 주인",
     art: "assets/gods/forge_master.png",
     patronPlus: "시작: 화살/강력한 화살/방패가 강화된 채로 시작",
-    patronMinus: "없음",
+    patronMinus: "시작 S 6",
     temptation: "무작위 카드 1장 제거 후 2장 강화",
     hostile: "강화 불가 / 휴식 시 카드 1장 무작위 제거",
   },
@@ -118,16 +165,28 @@ export const GOD_LINES = {
     tempt: "정신을 차려보니 이곳입니다.",
     apostasy: "새가 날개를 잃었군요.",
   },
-  forge_master: {
-    firstBattle: "당신의 철은 누구보다 단단합니다.",
-    tempt: "화마가 철을 굽습니다.",
-    hostileRestEnter: "불이 붙지 않습니다. 당신을 따르지 않습니다.",
+  master_spear: {
+    tempt: "창끝이 꿰뚫습니다.",
+    hostileCombat: "틈이 보입니다.",
+    targetOnlyFront: "맨 앞의 적만 지정할 수 있습니다.",
+  },
+  retort_fusion: {
+    tempt: "레토르트는 다음 휴식을 약속합니다.",
+    hostile: "레토르트가 당신의 덱을 밀봉합니다.",
+  },
+  nameless_vow: {
+    tempt: "서약은 빚으로 남습니다.",
+    victoryDebt: "서약은 공짜가 아닙니다.",
+    hostileStart: "빚이 숨을 막습니다.",
   },
   bright_darkness: {
     nodeSelect: "빛이 당신을 인도합니다.",
     combatStart: "너무 밝아 숨을 곳이 없습니다.",
     tempt: "보이게 해주마. 대신 눈을 내어라.",
     hostileMap: "어둠이 당신의 눈을 먹었습니다.",
+  },
+  twin_heart: {
+    tempt: "심장이 당신의 선택을 부릅니다.",
   },
   indifferent_one: {
     endTurnZero: "아무 일도 없었습니다.",
@@ -151,13 +210,21 @@ export const GOD_LINES = {
     combatStart: "판을 깔아드리죠.",
     victoryFee: "수수료는 당연히 받습니다.",
     tempt: "오늘만 외상입니다.",
-    hostileShop: "딜러를 배신하고도 돈이 남아있군요?.",
+    hostileShop: "딜러를 배신하고도 돈이 남아있군요?",
   },
   rabbit_hunt: {
     combatStart: "먼저 잡습니다.",
     blockGain: "가벼운 방패는 잘 부러집니다.",
     tempt: "더 빨리. 더 깊이.",
     hostileCombatStart: "이번엔 당신이 쫓깁니다.",
+  },
+  wave_breath: {
+    tempt: "파도가 당신의 손을 바꿉니다.",
+  },
+  forge_master: {
+    firstBattle: "당신의 철은 누구보다 단단합니다.",
+    tempt: "화마가 철을 굽습니다.",
+    hostileRestEnter: "불이 붙지 않습니다. 당신을 따르지 않습니다.",
   },
   madness: {
     accept: "당신은 그 힘을 받아들이기로 했습니다.",
@@ -169,13 +236,18 @@ export function createDefaultOfferedGods(): [GodId, GodId, GodId] {
   const pool: Exclude<GodId, "madness">[] = [
     "dream_shadow",
     "wing_artery",
-    "forge_master",
+    "master_spear",
+    "retort_fusion",
+    "nameless_vow",
     "bright_darkness",
+    "twin_heart",
     "indifferent_one",
     "armored_tiger",
     "first_human",
     "card_dealer",
     "rabbit_hunt",
+    "wave_breath",
+    "forge_master",
   ];
   const picks: Exclude<GodId, "madness">[] = [];
   const src = [...pool];
@@ -219,13 +291,19 @@ export function createFaithState(offered?: [GodId, GodId, GodId]): FaithState {
   const points: Record<GodId, number> = {
     dream_shadow: 0,
     wing_artery: 0,
-    forge_master: 0,
+    master_spear: 0,
+    retort_fusion: 0,
+    nameless_vow: 0,
     bright_darkness: 0,
+    twin_heart: 0,
     indifferent_one: 0,
     armored_tiger: 0,
     first_human: 0,
     card_dealer: 0,
     rabbit_hunt: 0,
+    wave_breath: 0,
+    forge_master: 0,
+  
     madness: 0,
   };
   const focus = off[0];
@@ -248,13 +326,18 @@ export function ensureFaith(g: GameState): FaithState {
   f.points ??= {
     dream_shadow: 0,
     wing_artery: 0,
-    forge_master: 0,
+    master_spear: 0,
+    retort_fusion: 0,
+    nameless_vow: 0,
     bright_darkness: 0,
+    twin_heart: 0,
     indifferent_one: 0,
     armored_tiger: 0,
     first_human: 0,
     card_dealer: 0,
     rabbit_hunt: 0,
+    wave_breath: 0,
+    forge_master: 0,
     madness: 0,
   } as any;
 
@@ -265,13 +348,18 @@ export function ensureFaith(g: GameState): FaithState {
   for (const id of [
     "dream_shadow",
     "wing_artery",
-    "forge_master",
+    "master_spear",
+    "retort_fusion",
+    "nameless_vow",
     "bright_darkness",
+    "twin_heart",
     "indifferent_one",
     "armored_tiger",
     "first_human",
     "card_dealer",
     "rabbit_hunt",
+    "wave_breath",
+    "forge_master",
     "madness",
   ] as GodId[]) {
     ensure0(id);
@@ -294,10 +382,55 @@ export function isHostile(g: GameState, id: GodId): boolean {
   return !!f.hostile?.[id];
 }
 
+function applyRetortFusionHostileOnce(g: GameState) {
+  const runAny = g.run as any;
+  if (runAny._retortFusionHostileApplied) return;
+  runAny._retortFusionHostileApplied = true;
+
+  const pool = Object.values(g.cards)
+    .filter((c) => c && (c.zone === "deck" || c.zone === "hand" || c.zone === "discard"))
+    .map((c) => c.uid)
+    .filter((uid) => g.cards[uid]?.defId !== "goal_treasure");
+
+  const picks: string[] = [];
+  const src = [...pool];
+  while (picks.length < 10 && src.length > 0) {
+    const i = (Math.random() * src.length) | 0;
+    picks.push(src.splice(i, 1)[0]);
+  }
+
+  for (const uid of picks) {
+    const inst: any = g.cards[uid] as any;
+    inst.synth ??= {};
+    inst.synth.addTags ??= [];
+    if (!inst.synth.addTags.includes("EXHAUST")) inst.synth.addTags.push("EXHAUST");
+  }
+
+  logMsg(g, `레토르트 퓨전(적대): 무작위 ${picks.length}장에 소모 부여`);
+}
+
 export function setHostile(g: GameState, id: GodId, msg?: string) {
   const f = ensureFaith(g);
   f.hostile ??= {};
+  if (f.hostile[id]) {
+    if (msg) {
+      pushUiToast(g, "WARN", msg, 2200);
+      logMsg(g, msg);
+    }
+    recalcFocus(f);
+    return;
+  }
   f.hostile[id] = true;
+  if (id === "retort_fusion") {
+    applyRetortFusionHostileOnce(g);
+    pushUiToast(g, "WARN", GOD_LINES.retort_fusion.hostile, 2200);
+    logMsg(g, GOD_LINES.retort_fusion.hostile);
+  }
+  if (id === "nameless_vow") {
+    addCardToDeck(g, "debt_paper", { upgrade: 0 });
+    addCardToDeck(g, "debt_paper", { upgrade: 0 });
+    logMsg(g, "무명의 서약(배교): 빚 문서 2장 추가");
+  }
   if (msg) {
     pushUiToast(g, "WARN", msg, 2200);
     logMsg(g, msg);
@@ -386,7 +519,7 @@ export function chooseStartingGod(g: GameState, god: GodId) {
 
   if (god === "forge_master") {
     const ids = Object.values(g.cards)
-      .filter((c) => c.zone === "deck" && ["arrow", "power_arrow", "shield"].includes(c.defId))
+      .filter((c) => c.zone === "deck" && (g.content.cardsById[c.defId]?.tags ?? []).includes("FORGE_START"))
       .map((c) => c.uid);
     for (const uid of ids) upgradeCardByUid(g, uid);
     logMsg(g, `화로의 주인: 시작 카드 강화 (${ids.length}장)`);
@@ -411,7 +544,7 @@ export function openFaithStartChoice(g: GameState) {
   const choice: ChoiceState = {
     kind: "FAITH",
     title: "신앙 선택",
-    prompt: "세 신 중 하나를 선택합니다. (점수 총합 5, 유혹 수락 시 +1/-1, 후원 유지 기준: 포커스 ≥3)",
+    prompt: "",
     options,
   };
 
@@ -493,13 +626,18 @@ export function openGodTemptChoice(g: GameState, tempter: Exclude<GodId, "madnes
 function temptationDetail(id: Exclude<GodId, "madness">): string {
   if (id === "dream_shadow") return "체력 10 회복, 피로도 +3";
   if (id === "wing_artery") return "시간 -7, 피로도 +2";
-  if (id === "forge_master") return "무작위 카드 1장 제거 후 2장 강화";
-  if (id === "bright_darkness") return "다음 3개 노드의 내용이 즉시 공개, 피로도 +1";
+  if (id === "master_spear") return "다음 정예/보스 전투 시작: 모든 적 취약 3";
+  if (id === "retort_fusion") return "다음 휴식에서 합성 가능";
+  if (id === "nameless_vow") return "덱에 빚 문서 1장 추가, 다음 3전투 드로우 +2";
+  if (id === "bright_darkness") return "다음 4개 노드의 내용이 즉시 공개, 피로도 +1";
+  if (id === "twin_heart") return "카드 보상 1회";
   if (id === "indifferent_one") return "즉시 피로도 -5, 대신 다음 전투 드로우 -1";
   if (id === "armored_tiger") return "최대 체력 +5, 피로도 +2";
   if (id === "first_human") return "카드 1장 선택 복제, 피로도 +3";
   if (id === "card_dealer") return "골드 +40, 덱에 ‘빚 문서’(저주) 1장 추가";
   if (id === "rabbit_hunt") return "다음 3전투 동안 전투 시작 드로우 +1";
+  if (id === "wave_breath") return "다음 전투에서 처음 사용하는 대상 지정 카드가 모든 적을 대상으로 함";
+  if (id === "forge_master") return "무작위 카드 1장 제거 후 2장 강화";
   return "";
 }
 
@@ -516,20 +654,26 @@ export function applyTemptationEffect(g: GameState, tempter: Exclude<GodId, "mad
     logMsg(g, "유혹: 시간 -7, 피로 +2");
     return;
   }
-  if (tempter === "forge_master") {
-    removeRandomCardFromDeck(g);
-    const candidates = Object.values(g.cards)
-      .filter((c) => (c.zone === "deck" || c.zone === "hand" || c.zone === "discard") && canUpgradeUid(g, c.uid))
-      .map((c) => c.uid);
-    for (let i = candidates.length - 1; i > 0; i--) {
-      const j = (Math.random() * (i + 1)) | 0;
-      const tmp = candidates[i];
-      candidates[i] = candidates[j];
-      candidates[j] = tmp;
-    }
-    const picks = candidates.slice(0, 2);
-    for (const uid of picks) upgradeCardByUid(g, uid);
-    logMsg(g, `유혹: 카드 1장 제거, ${picks.length}장 강화`);
+
+  if (tempter === "master_spear") {
+    const runAny = g.run as any;
+    runAny.masterSpearVulnNextEliteBoss = true;
+    logMsg(g, "유혹: 다음 정예/보스 전투 시작 시 모든 적 취약 3");
+    return;
+  }
+
+  if (tempter === "retort_fusion") {
+    const runAny = g.run as any;
+    runAny.retortFusionNextRestSynth = true;
+    logMsg(g, "유혹: 다음 휴식에서 합성 가능");
+    return;
+  }
+
+  if (tempter === "nameless_vow") {
+    addCardToDeck(g, "debt_paper", { upgrade: 0 });
+    const runAny = g.run as any;
+    runAny.namelessVowDrawBoostBattles = Math.max(0, Number(runAny.namelessVowDrawBoostBattles ?? 0) || 0) + 3;
+    logMsg(g, "유혹: 빚 문서 1장 추가, 다음 3전투 드로우 +2");
     return;
   }
 
@@ -539,7 +683,7 @@ export function applyTemptationEffect(g: GameState, tempter: Exclude<GodId, "mad
     const edges: Record<string, string[]> = (map?.edges ?? {}) as any;
     const seen: Record<string, 0 | 1 | 2 | 3> = (map.seen ??= {});
 
-    const MAX_D = 3;
+    const MAX_D = 4;
     const dist: Record<string, number> = {};
     const q: string[] = [];
     if (pos) {
@@ -601,6 +745,30 @@ export function applyTemptationEffect(g: GameState, tempter: Exclude<GodId, "mad
     const runAny = g.run as any;
     runAny.rabbitHuntDrawBoostBattles = Math.max(0, Number(runAny.rabbitHuntDrawBoostBattles ?? 0) || 0) + 3;
     logMsg(g, "유혹: 다음 3전투 전투 시작 드로우 +1");
+    return;
+  }
+
+  if (tempter === "wave_breath") {
+    const runAny = g.run as any;
+    runAny.waveBreathNextCombatAll = true;
+    logMsg(g, "유혹: 다음 전투 첫 대상 지정 카드가 전체 대상");
+    return;
+  }
+
+  if (tempter === "forge_master") {
+    removeRandomCardFromDeck(g);
+    const candidates = Object.values(g.cards)
+      .filter((c) => (c.zone === "deck" || c.zone === "hand" || c.zone === "discard") && canUpgradeUid(g, c.uid))
+      .map((c) => c.uid);
+    for (let i = candidates.length - 1; i > 0; i--) {
+      const j = (Math.random() * (i + 1)) | 0;
+      const tmp = candidates[i];
+      candidates[i] = candidates[j];
+      candidates[j] = tmp;
+    }
+    const picks = candidates.slice(0, 2);
+    for (const uid of picks) upgradeCardByUid(g, uid);
+    logMsg(g, `유혹: 카드 1장 제거, ${picks.length}장 강화`);
     return;
   }
 }
@@ -725,7 +893,7 @@ export function applyMadnessCombatStartHooks(g: GameState) {
 
   if (boon === 2) {
     const first = g.enemies?.[0];
-    if (first && first.hp > 0 && !String(first.id ?? "").startsWith("boss_")) {
+    if (first && first.hp > 0 && !g.content.enemiesById[first.id]?.isBoss) {
       applyStatusTo(first as any, "vuln", 4, g, "SYSTEM");
       applyStatusTo(first as any, "weak", 4, g, "SYSTEM");
       logMsg(g, "광기: 첫번째 적 취약/약화 4");
@@ -734,7 +902,7 @@ export function applyMadnessCombatStartHooks(g: GameState) {
 
   if (boon === 1) {
     const first = g.enemies?.[0];
-    if (first && first.hp > 0 && !String(first.id ?? "").startsWith("boss_")) {
+    if (first && first.hp > 0 && !g.content.enemiesById[first.id]?.isBoss) {
       if (Math.random() < 0.3) {
         first.hp = 0;
         logMsg(g, "광기: 첫번째 적 즉사!");
@@ -751,7 +919,7 @@ export function wingArteryMoveDelta(g: GameState): number {
 
   let delta = 1;
   if (patron === "wing_artery") {
-    if (Math.random() < 0.3) {
+    if (Math.random() < 0.5) {
       delta = 0;
       pushUiToast(g, "INFO", GOD_LINES.wing_artery.moveNoTime, 1800);
       logMsg(g, GOD_LINES.wing_artery.moveNoTime);
@@ -763,7 +931,9 @@ export function wingArteryMoveDelta(g: GameState): number {
 
 export function wingArteryBaseSuppliesBonus(g: GameState): number {
   const patron = getPatronGodOrNull(g);
-  return patron === "wing_artery" ? 3 : 0;
+  if (patron === "wing_artery") return 3;
+  if (patron === "forge_master") return -1;
+  return 0;
 }
 
 export function applyWingArteryEvery5Turns(g: GameState) {
@@ -833,6 +1003,19 @@ export function onEnterRestExplorationHooks(g: GameState) {
   }
 }
 
+export function canRetortFusionSynthAtRest(g: GameState): boolean {
+  if (isHostile(g, "retort_fusion")) return false;
+  const patron = getPatronGodOrNull(g);
+  if (patron === "retort_fusion") return true;
+  const runAny = g.run as any;
+  return !!runAny.retortFusionNextRestSynth;
+}
+
+export function consumeRetortFusionRestCoupon(g: GameState) {
+  const runAny = g.run as any;
+  if (runAny.retortFusionNextRestSynth) runAny.retortFusionNextRestSynth = false;
+}
+
 
 export function faithCardRewardCount(g: GameState): number {
   let n = 3;
@@ -863,6 +1046,51 @@ export function combatStartDrawDeltaFromFaith(g: GameState): number {
 export function applyFaithCombatStartHooks(g: GameState) {
   const patron = getPatronGodOrNull(g);
 
+  {
+    const runAny = g.run as any;
+    const isEliteOrBoss = !!g.run.lastBattleWasElite || !!(runAny.lastBattleWasBoss);
+
+    if (runAny.masterSpearVulnNextEliteBoss && isEliteOrBoss) {
+      runAny.masterSpearVulnNextEliteBoss = false;
+      for (const en of (g.enemies ?? [])) {
+        if (!en || en.hp <= 0) continue;
+        applyStatusTo(en as any, "vuln", 3, g, "SYSTEM");
+      }
+      pushUiToast(g, "INFO", (GOD_LINES as any).master_spear.tempt, 1800);
+      logMsg(g, "달인의 창(유혹): 정예/보스 시작 취약 3");
+    }
+
+    if (isHostile(g, "master_spear") && isEliteOrBoss) {
+      applyStatusTo(g.player as any, "vuln", 2, g, "SYSTEM");
+      applyStatusTo(g.player as any, "weak", 2, g, "SYSTEM");
+      applyStatusTo(g.player as any, "disrupt", 2, g, "SYSTEM");
+      pushUiToast(g, "WARN", (GOD_LINES as any).master_spear.hostileCombat, 1800);
+      logMsg(g, "달인의 창(적대): 정예/보스 시작 취약/약화/교란 2");
+    }
+
+    if (patron === "nameless_vow" || isHostile(g, "nameless_vow")) {
+      const debtCount =
+        g.deck.filter((uid) => g.cards[uid]?.defId === "debt_paper").length +
+        g.discard.filter((uid) => g.cards[uid]?.defId === "debt_paper").length +
+        g.hand.filter((uid) => g.cards[uid]?.defId === "debt_paper").length;
+
+      if (patron === "nameless_vow") {
+        runAny.nextCombatDrawDelta = (Number(runAny.nextCombatDrawDelta ?? 0) || 0) + debtCount;
+        if (debtCount > 0) {
+          g.player.block = (g.player.block ?? 0) + debtCount * 3;
+          (g as any)._gainedBlockThisTurn = true;
+          logMsg(g, `무명의 서약: 빚 문서 ${debtCount}장 → 시작 드로우 +${debtCount}, 방어 +${debtCount * 3}`);
+        }
+      }
+
+      if (isHostile(g, "nameless_vow") && debtCount > 0) {
+        applyDamageToPlayer(g, debtCount, "OTHER", "무명의 서약");
+        pushUiToast(g, "WARN", (GOD_LINES as any).nameless_vow.hostileStart, 1800);
+        logMsg(g, `무명의 서약(적대): 빚 문서 ${debtCount}장 → 전투 시작 HP -${debtCount}`);
+      }
+    }
+  }
+
   if (patron === "bright_darkness") {
     applyStatusTo(g.player as any, "vuln", 1, g, "SYSTEM");
     pushUiToast(g, "WARN", GOD_LINES.bright_darkness.combatStart, 1800);
@@ -872,7 +1100,10 @@ export function applyFaithCombatStartHooks(g: GameState) {
     applyStatusTo(g.player as any, "vuln", 2, g, "SYSTEM");
     logMsg(g, "밝은 어둠(적대): 전투 시작 취약 2");
   }
-
+  if (isHostile(g, "twin_heart")) {
+    applyStatusTo(g.player as any, "disrupt", 5, g, "SYSTEM");
+    logMsg(g, "쌍둥이 심장(적대): 전투 시작 교란 5");
+  }
   if (patron === "armored_tiger") {
     g.player.block = (g.player.block ?? 0) + 10;
     (g as any)._gainedBlockThisTurn = true;
@@ -894,11 +1125,11 @@ export function applyFaithCombatStartHooks(g: GameState) {
 
   if (patron === "rabbit_hunt") {
     for (const en of (g.enemies ?? [])) {
-      if (en && en.hp > 0) applyStatusTo(en as any, "vuln", 2, g, "SYSTEM");
+      if (en && en.hp > 0) applyStatusTo(en as any, "vuln", 3, g, "SYSTEM");
     }
     pushUiToast(g, "INFO", GOD_LINES.rabbit_hunt.combatStart, 1800);
     logMsg(g, GOD_LINES.rabbit_hunt.combatStart);
-    logMsg(g, "토끼 사냥: 모든 적 취약 2");
+    logMsg(g, "토끼 사냥: 모든 적 취약 3");
   }
   if (isHostile(g, "rabbit_hunt")) {
     applyStatusTo(g.player as any, "vuln", 3, g, "SYSTEM");
@@ -906,28 +1137,54 @@ export function applyFaithCombatStartHooks(g: GameState) {
     logMsg(g, GOD_LINES.rabbit_hunt.hostileCombatStart);
     logMsg(g, "토끼 사냥(적대): 전투 시작 취약 3");
   }
+  {
+    const runAny = g.run as any;
+    const wbHostile = isHostile(g, "wave_breath");
+    const wbPatron = patron === "wave_breath";
+
+    let all = 0;
+    if (wbPatron) all += 1;
+
+    if (wbHostile) {
+      all = 0;
+      runAny.waveBreathNextCombatAll = false;
+    } else if (runAny.waveBreathNextCombatAll) {
+      all += 1;
+      runAny.waveBreathNextCombatAll = false;
+    }
+
+    (g as any)._waveBreathAllRemainingThisCombat = all;
+    (g as any)._waveBreathForceRandomThisCombat = wbPatron || wbHostile;
+    (g as any)._waveBreathNoAllThisCombat = wbHostile;
+  }
+
 }
 
 export function applyFaithOnCardUsedHooks(g: GameState) {
   const patron = getPatronGodOrNull(g);
   const used = Number(g.usedThisTurn ?? 0) || 0;
 
-  if (patron === "indifferent_one" && used === 5) {
+  if (
+    patron === "indifferent_one" &&
+    used >= 5 &&
+    !(g as any)._indifferentPatronPenaltyAppliedThisCombat
+  ) {
+    (g as any)._indifferentPatronPenaltyAppliedThisCombat = true;
     g.player.fatigue = (g.player.fatigue ?? 0) + 1;
     pushUiToast(g, "WARN", GOD_LINES.indifferent_one.at5Cards, 1800);
     logMsg(g, GOD_LINES.indifferent_one.at5Cards);
-    logMsg(g, "아무렇지 않은 자: 5장째 사용 → 피로 +1");
+    logMsg(g, "아무렇지 않은 자: 5장 이상 사용(전투당 1회) → 피로 +1");
   }
 
   if (isHostile(g, "indifferent_one")) {
-    if (used === 1 && !(g as any)._indifferentHostileWarnedThisTurn) {
-      (g as any)._indifferentHostileWarnedThisTurn = true;
+    const hostilePenaltyCount = Number((g as any)._indifferentHostilePenaltyAppliedThisCombat ?? 0) || 0;
+    if (used >= 4 && hostilePenaltyCount < 3) {
+      (g as any)._indifferentHostilePenaltyAppliedThisCombat = hostilePenaltyCount + 1;
+      g.player.fatigue = (g.player.fatigue ?? 0) + 1;
+      applyDamageToPlayer(g, 3, "OTHER", "아무렇지 않은 자");
       pushUiToast(g, "WARN", GOD_LINES.indifferent_one.hostileFirstUse, 1800);
       logMsg(g, GOD_LINES.indifferent_one.hostileFirstUse);
-    }
-    if (used === 4) {
-      g.player.fatigue = (g.player.fatigue ?? 0) + 1;
-      logMsg(g, "아무렇지 않은 자(적대): 4장째 사용 → 피로 +1");
+      logMsg(g, `아무렇지 않은 자(적대): 4장 이상 사용(전투당 ${(g as any)._indifferentHostilePenaltyAppliedThisCombat}/3회) → 피로 +1, HP -3`);
     }
   }
 }
@@ -935,13 +1192,13 @@ export function applyFaithOnCardUsedHooks(g: GameState) {
 export function applyFaithUpkeepEndTurnHooks(g: GameState) {
   const patron = getPatronGodOrNull(g);
 
-  if (patron === "indifferent_one" && (Number(g.usedThisTurn ?? 0) || 0) === 0) {
+  if (patron === "indifferent_one" && (Number(g.usedThisTurn ?? 0) || 0) <= 1) {
     healPlayer(g, 2);
     g.player.block = (g.player.block ?? 0) + 6;
     (g as any)._gainedBlockThisTurn = true;
     pushUiToast(g, "INFO", GOD_LINES.indifferent_one.endTurnZero, 1800);
     logMsg(g, GOD_LINES.indifferent_one.endTurnZero);
-    logMsg(g, "아무렇지 않은 자: 0장 사용 → HP +2, 방어 +6");
+    logMsg(g, "아무렇지 않은 자: 1장 이하 사용 → HP +2, 방어 +6");
   }
 
   if (patron === "armored_tiger") {

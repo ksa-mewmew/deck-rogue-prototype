@@ -1,12 +1,13 @@
 import type { ChoiceOption, ChoiceState, GameState, GodId, TemptGodId } from "./types";
-import { applyRewardChoiceKey, openShopChoice } from "./engineRewards";
+import { applyRewardChoiceKey, openBattleCardRewardChoice, openShopChoice } from "./engineRewards";
 import { clearAllChoices, setChoice } from "./choice";
 import { logMsg, pushUiToast } from "./rules";
 import { applyPendingRelicActivations, checkRelicUnlocks, getUnlockProgress } from "./relics";
+import { displayCardTextPair, displayCardNameForUid, displayCardNameWithUpgrade } from "./cardText";
 import { getEventById } from "../content/events";
 import { getCardDefByIdWithUpgrade } from "../content/cards";
 import { canUpgradeUid, upgradeCardByUid, removeCardByUid, addCardToDeck } from "../content/rewards";
-import { healPlayer } from "./effects";
+import { healPlayer, applyDamageToPlayer } from "./effects";
 import { addItemToInventory, isItemInventoryFull } from "./items";
 import { getItemDefById } from "../content/items";
 import {
@@ -21,6 +22,8 @@ import {
   isForgeHostile,
   rejectMadness,
   shopPriceGold,
+  wingArteryBaseSuppliesBonus,
+  consumeRetortFusionRestCoupon,
 } from "./faith";
 
 function getGold(g: GameState): number {
@@ -51,7 +54,7 @@ function addNextBattleSuppliesBonus(g: GameState, delta: number) {
 }
 
 function nextBattleSupplies(g: GameState): number {
-  return Math.max(0, 7 + getNextBattleSuppliesBonus(g));
+  return Math.max(0, 7 + getNextBattleSuppliesBonus(g) + wingArteryBaseSuppliesBonus(g));
 }
 
 
@@ -63,6 +66,22 @@ function applyRestHighF(g: GameState, highF: boolean) {
   g.player.fatigue = Math.max(0, f - 2);
   g.time = (g.time ?? 0) + 1;
   logMsg(g, "피로가 너무 높아 휴식이 더 오래 걸립니다. (F -2, 시간 +1)");
+}
+
+const SYNTH_TAG_SPECS = [
+  { id: "overrun", label: "폭주", detail: "모든 수 +1", costHp: 10, costF: 2, overrun: true },
+  { id: "install", label: "설치", detail: "설치 부여", costHp: 5, costF: 0, addTag: "INSTALL" as const },
+  { id: "innate", label: "선천성", detail: "선천성 부여", costHp: 5, costF: 0, addTag: "INNATE" as const },
+  { id: "flip", label: "뒤집기", detail: "발동 후 자동 뒤집기", costHp: 0, costF: 1, autoFlip: true },
+  { id: "remove_exhaust", label: "소모 제거", detail: "소모 제거", costHp: 8, costF: 1, removeExhaust: true },
+] as const;
+
+type SynthTagSpec = (typeof SYNTH_TAG_SPECS)[number];
+
+function synthGuideText() {
+  return SYNTH_TAG_SPECS
+    .map((s) => `- ${s.label}: ${s.detail} (HP -${s.costHp}${s.costF ? `, F +${s.costF}` : ""})`)
+    .join("\n");
 }
 
 function buildUpgradePickChoice(g: GameState): ChoiceState | null {
@@ -97,11 +116,12 @@ function buildUpgradePickChoice(g: GameState): ChoiceState | null {
       const curDef = getCardDefByIdWithUpgrade(g.content, c.defId, c.upgrade ?? 0);
       const nextDef = getCardDefByIdWithUpgrade(g.content, c.defId, (c.upgrade ?? 0) + 1);
 
-      const name = (g.content.cardsById[c.defId]?.name ?? c.defId);
-      const label = (c.upgrade ?? 0) > 0 ? `${name} +${c.upgrade}` : name;
+      const label = displayCardNameForUid(g, uid);
+      const curText = displayCardTextPair(g, curDef.frontText, curDef.backText, uid);
+      const nextText = displayCardTextPair(g, nextDef.frontText, nextDef.backText, uid);
       const detail =
-        `현재: 전열 ${curDef.frontText} / 후열 ${curDef.backText}\n` +
-        `강화: 전열 ${nextDef.frontText} / 후열 ${nextDef.backText}`;
+        `현재: 전열 ${curText.frontText} / 후열 ${curText.backText}\n` +
+        `강화: 전열 ${nextText.frontText} / 후열 ${nextText.backText}`;
 
       return { key: `up:${uid}`, label, detail, cardUid: uid };
     }),
@@ -130,9 +150,9 @@ function buildRemovePickChoice(g: GameState, title: string, prompt: string): Cho
     ...candidates.map((uid) => {
       const c = g.cards[uid];
       const def = getCardDefByIdWithUpgrade(g.content, c.defId, c.upgrade ?? 0);
-      const name = (g.content.cardsById[c.defId]?.name ?? c.defId);
-      const label = (c.upgrade ?? 0) > 0 ? `${name} +${c.upgrade}` : name;
-      return { key: `remove:${uid}`, label, detail: `전열: ${def.frontText} / 후열: ${def.backText}`, cardUid: uid };
+      const label = displayCardNameForUid(g, uid);
+      const t = displayCardTextPair(g, def.frontText, def.backText, uid);
+      return { key: `remove:${uid}`, label, detail: `전열: ${t.frontText} / 후열: ${t.backText}`, cardUid: uid };
     }),
     { key: "skip", label: "취소" },
   ];
@@ -140,11 +160,76 @@ function buildRemovePickChoice(g: GameState, title: string, prompt: string): Cho
   return { kind: "REMOVE_PICK" as any, title, prompt, options };
 }
 
+function buildSynthPickChoice(g: GameState): ChoiceState | null {
+  const CURSED_TREASURE_ID = "goal_treasure";
+  const candidates = Object.values(g.cards)
+    .filter((c) => (c.zone === "deck" || c.zone === "hand" || c.zone === "discard") && c.defId !== CURSED_TREASURE_ID)
+    .filter((c) => !Boolean((c as any).synth?.done))
+    .map((c) => c.uid);
+
+  if (candidates.length === 0) return null;
+
+  const sorted = [...candidates].sort((ua, ub) => {
+    const a = g.cards[ua];
+    const b = g.cards[ub];
+    const na = (g.content.cardsById[a.defId]?.name ?? a.defId);
+    const nb = (g.content.cardsById[b.defId]?.name ?? b.defId);
+    const nc = na.localeCompare(nb, "ko");
+    if (nc !== 0) return nc;
+    return (a.upgrade ?? 0) - (b.upgrade ?? 0);
+  });
+
+  const options: ChoiceOption[] = [
+    ...sorted.map((uid) => {
+      const c = g.cards[uid];
+      const def = getCardDefByIdWithUpgrade(g.content, c.defId, c.upgrade ?? 0);
+      const label = displayCardNameForUid(g, uid);
+      const t = displayCardTextPair(g, def.frontText, def.backText, uid);
+      return { key: `synth:pick:${uid}`, label, detail: `전열: ${t.frontText} / 후열: ${t.backText}`, cardUid: uid };
+    }),
+    { key: "skip", label: "취소" },
+  ];
+
+  return {
+    kind: "EVENT",
+    title: "합성",
+    art: "assets/events/event_retort_fusion_synth.png",
+    prompt: "합성할 카드 1장을 선택하세요.",
+    options,
+  } as any;
+}
+
+function buildSynthTagChoice(g: GameState, uid: string): ChoiceState | null {
+  const inst: any = g.cards[uid];
+  if (!inst) return null;
+  if (inst.synth?.done) return null;
+
+  const label = displayCardNameForUid(g, uid);
+
+  const options: ChoiceOption[] = [
+    ...SYNTH_TAG_SPECS.map((s) => {
+      const cost = `HP -${s.costHp}${s.costF ? `, F +${s.costF}` : ""}`;
+      return { key: `synth:tag:${s.id}`, label: `${s.label}`, detail: `${s.detail}\n(${cost})` };
+    }),
+    { key: "skip", label: "취소" },
+  ];
+
+  return {
+    kind: "EVENT",
+    title: `합성: ${label}`,
+    art: "assets/events/event_retort_fusion_synth.png",
+    prompt: "부여할 합성 효과를 선택하세요.",
+    options,
+  } as any;
+}
+
 function applyRestChoiceKey(g: GameState, key: string): boolean {
   const highF =
     g.choiceCtx && g.choiceCtx.kind === "REST" && typeof g.choiceCtx.highF === "boolean"
       ? g.choiceCtx.highF
       : (g.player.fatigue ?? 0) >= 10;
+
+  if (key.startsWith("rest:") && key !== "rest:synth") consumeRetortFusionRestCoupon(g);
 
   // 유물 해금 진행도: 휴식 1회
   if (key.startsWith("rest:")) {
@@ -194,9 +279,9 @@ function applyRestChoiceKey(g: GameState, key: string): boolean {
     const options: ChoiceOption[] = [
       ...candidates.map((c) => {
         const def = getCardDefByIdWithUpgrade(g.content, c.defId, c.upgrade ?? 0);
-        const name = (g.content.cardsById[c.defId]?.name ?? c.defId);
-        const label = (c.upgrade ?? 0) > 0 ? `${name} +${c.upgrade}` : name;
-        return { key: `up:${c.uid}`, label, detail: `전열: ${def.frontText} / 후열: ${def.backText}`, cardUid: c.uid };
+        const label = displayCardNameForUid(g, c.uid);
+        const t = displayCardTextPair(g, def.frontText, def.backText, c.uid);
+        return { key: `up:${c.uid}`, label, detail: `전열: ${t.frontText} / 후열: ${t.backText}`, cardUid: c.uid };
       }),
       { key: "skip", label: "취소" },
     ];
@@ -212,6 +297,22 @@ function applyRestChoiceKey(g: GameState, key: string): boolean {
     return true;
   }
 
+  if (key === "rest:synth") {
+    applyRestHighF(g, highF);
+
+    const next = buildSynthPickChoice(g);
+    if (!next) {
+      logMsg(g, "합성할 카드가 없습니다.");
+      return true;
+    }
+
+    const returnChoice = g.choice;
+    const returnCtx = g.choiceCtx;
+
+    setChoice(g, next, { kind: "SYNTH_PICK" as any, returnChoice, returnCtx } as any);
+    return true;
+  }
+
   if (key === "rest:skip") {
     applyRestHighF(g, highF);
     logMsg(g, "휴식: 생략");
@@ -222,6 +323,109 @@ function applyRestChoiceKey(g: GameState, key: string): boolean {
   }
 
   return false;
+}
+
+function applySynthPickChoiceKey(g: GameState, key: string): boolean {
+  const anyCtx = g.choiceCtx as any;
+  if (!anyCtx || anyCtx.kind !== "SYNTH_PICK") return false;
+
+  if (key === "skip") {
+    if (anyCtx.returnChoice) {
+      setChoice(g, anyCtx.returnChoice, anyCtx.returnCtx ?? null);
+      return true;
+    }
+    clearAllChoices(g);
+    g.phase = "NODE";
+    applyPendingRelicActivations(g);
+    return true;
+  }
+
+  if (!key.startsWith("synth:pick:")) return false;
+  const uid = key.slice("synth:pick:".length);
+
+  const next = buildSynthTagChoice(g, uid);
+  if (!next) {
+    logMsg(g, "합성할 수 없는 카드입니다.");
+    if (anyCtx.returnChoice) {
+      setChoice(g, anyCtx.returnChoice, anyCtx.returnCtx ?? null);
+      return true;
+    }
+    clearAllChoices(g);
+    g.phase = "NODE";
+    applyPendingRelicActivations(g);
+    return true;
+  }
+
+  setChoice(g, next, { kind: "SYNTH_TAG" as any, cardUid: uid, returnChoice: anyCtx.returnChoice, returnCtx: anyCtx.returnCtx } as any);
+  return true;
+}
+
+function applySynthTagChoiceKey(g: GameState, key: string): boolean {
+  const anyCtx = g.choiceCtx as any;
+  if (!anyCtx || anyCtx.kind !== "SYNTH_TAG") return false;
+
+  const uid = String(anyCtx.cardUid ?? "");
+  const inst: any = g.cards[uid];
+  if (!inst) {
+    logMsg(g, "합성 실패: 카드를 찾을 수 없습니다.");
+    clearAllChoices(g);
+    g.phase = "NODE";
+    applyPendingRelicActivations(g);
+    return true;
+  }
+
+  if (key === "skip") {
+    const back = buildSynthPickChoice(g);
+    if (back) {
+      setChoice(g, back, { kind: "SYNTH_PICK" as any, returnChoice: anyCtx.returnChoice, returnCtx: anyCtx.returnCtx } as any);
+      return true;
+    }
+    if (anyCtx.returnChoice) {
+      setChoice(g, anyCtx.returnChoice, anyCtx.returnCtx ?? null);
+      return true;
+    }
+    clearAllChoices(g);
+    g.phase = "NODE";
+    applyPendingRelicActivations(g);
+    return true;
+  }
+
+  if (!key.startsWith("synth:tag:")) return false;
+  const id = key.slice("synth:tag:".length);
+  const spec = SYNTH_TAG_SPECS.find((s) => s.id === id) as SynthTagSpec | undefined;
+  if (!spec) {
+    logMsg(g, "합성 실패: 알 수 없는 태그");
+    return true;
+  }
+
+  if (inst.synth?.done) {
+    logMsg(g, "이미 합성된 카드입니다.");
+    return true;
+  }
+
+  inst.synth ??= {};
+  inst.synth.done = true;
+
+  if ("overrun" in spec && spec.overrun) inst.synth.overrun = true;
+  if ("autoFlip" in spec && spec.autoFlip) inst.synth.autoFlip = true;
+  if ("removeExhaust" in spec && spec.removeExhaust) inst.synth.removeExhaust = true;
+
+  if ("addTag" in spec && spec.addTag) {
+    inst.synth.addTags ??= [];
+    if (!inst.synth.addTags.includes(spec.addTag)) inst.synth.addTags.push(spec.addTag);
+  }
+
+  if (spec.costHp > 0) applyDamageToPlayer(g, spec.costHp, "OTHER", "합성");
+  if (spec.costF > 0) g.player.fatigue = (g.player.fatigue ?? 0) + spec.costF;
+
+  logMsg(g, `합성 완료: ${spec.label} (HP -${spec.costHp}${spec.costF ? `, F +${spec.costF}` : ""})`);
+
+  consumeRetortFusionRestCoupon(g);
+
+  clearAllChoices(g);
+  g.phase = "NODE";
+  applyPendingRelicActivations(g);
+  return true;
 }
 
 
@@ -247,7 +451,6 @@ function applyShopChoiceKey(g: GameState, key: string): boolean {
     return true;
   }
 
-  // 구분선(클릭해도 그냥 새로고침)
   if (key === "shop:sep" || key.startsWith("shop:sep:")) {
     openShopChoice(g, nodeId);
     return true;
@@ -348,7 +551,7 @@ function applyShopChoiceKey(g: GameState, key: string): boolean {
 
     addGold(g, -priceG);
     addNextBattleSuppliesBonus(g, gainS);
-    logMsg(g, `상점: 보급 구매 (-🪙${priceG}, 다음 전투 🍞 +${gainS})`);
+    logMsg(g, `상점: 보급 구매 (-🪙${priceG}, 다음 전투 S +${gainS})`);
     openShopChoice(g, nodeId);
     return true;
   }
@@ -364,7 +567,7 @@ function applyShopChoiceKey(g: GameState, key: string): boolean {
 
     addNextBattleSuppliesBonus(g, -costS);
     addGold(g, gainG);
-    logMsg(g, `상점: 보급 판매 (다음 전투 🍞 -${costS}, 🪙 +${gainG})`);
+    logMsg(g, `상점: 보급 판매 (다음 전투 S -${costS}, 🪙 +${gainG})`);
     openShopChoice(g, nodeId);
     return true;
   }
@@ -472,9 +675,9 @@ function applyEventChoiceKey(g: GameState, key: string): boolean {
       ...candidates.map((uid) => {
         const c = g.cards[uid];
         const def = getCardDefByIdWithUpgrade(g.content, c.defId, c.upgrade ?? 0);
-        const name = (g.content.cardsById[c.defId]?.name ?? c.defId);
-        const label = (c.upgrade ?? 0) > 0 ? `${name} +${c.upgrade}` : name;
-        return { key: `remove:${uid}`, label, detail: `전열: ${def.frontText} / 후열: ${def.backText}`, cardUid: uid };
+        const label = displayCardNameForUid(g, uid);
+        const t = displayCardTextPair(g, def.frontText, def.backText, uid);
+        return { key: `remove:${uid}`, label, detail: `전열: ${t.frontText} / 후열: ${t.backText}`, cardUid: uid };
       }),
       { key: "skip", label: "취소" },
     ];
@@ -500,9 +703,7 @@ export function applyChoiceKey(g: GameState, key: string): boolean {
 
   if (c.kind === "REWARD") return applyRewardChoiceKey(g, key);
 
-  // =========================
-  // Faith (MVP)
-  // =========================
+
   if (c.kind === "FAITH") {
     if (!g.choiceCtx || g.choiceCtx.kind !== "FAITH_START") return false;
     if (!key.startsWith("faith:choose:")) return false;
@@ -546,9 +747,9 @@ export function applyChoiceKey(g: GameState, key: string): boolean {
           ...candidates.map((uid) => {
             const card = g.cards[uid];
             const def = getCardDefByIdWithUpgrade(g.content, card.defId, card.upgrade ?? 0);
-            const nm = (g.content.cardsById[card.defId]?.name ?? card.defId);
-            const label = (card.upgrade ?? 0) > 0 ? `${nm} +${card.upgrade}` : nm;
-            return { key: `dup:${uid}`, label, detail: `전열: ${def.frontText} / 후열: ${def.backText}`, cardUid: uid };
+            const label = displayCardNameForUid(g, uid);
+            const t = displayCardTextPair(g, def.frontText, def.backText, uid);
+            return { key: `dup:${uid}`, label, detail: `전열: ${t.frontText} / 후열: ${t.backText}`, cardUid: uid };
           }),
           { key: "skip", label: "복제하지 않는다" },
         ];
@@ -566,6 +767,17 @@ export function applyChoiceKey(g: GameState, key: string): boolean {
         return true;
       }
 
+
+
+      if (tempter === ("twin_heart" as any)) {
+        acceptTemptation(g, tempter);
+
+        clearAllChoices(g);
+        g.phase = "NODE";
+        openBattleCardRewardChoice(g);
+        applyPendingRelicActivations(g);
+        return true;
+      }
       // 일반 유혹
       acceptTemptation(g, tempter);
       applyTemptationEffect(g, tempter);
@@ -765,6 +977,8 @@ export function applyChoiceKey(g: GameState, key: string): boolean {
   }
 
   if (c.kind === "EVENT") {
+    if ((g.choiceCtx as any)?.kind === "SYNTH_PICK") return applySynthPickChoiceKey(g, key);
+    if ((g.choiceCtx as any)?.kind === "SYNTH_TAG") return applySynthTagChoiceKey(g, key);
     if (g.choiceCtx?.kind === "REST") return applyRestChoiceKey(g, key);
     if (g.choiceCtx?.kind === "EVENT") return applyEventChoiceKey(g, key);
     if ((g.choiceCtx as any)?.kind === "SHOP") return applyShopChoiceKey(g, key);

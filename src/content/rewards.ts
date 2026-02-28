@@ -1,6 +1,6 @@
 import type { GameState } from "../engine/types";
 import { shuffle, logMsg, pickOne, madnessP } from "../engine/rules";
-import { getCardDefFor } from "./cards";
+import { displayCardNameWithUpgrade } from "../engine/cardText";
 import { currentTotalDeckLikeSize } from "../engine/combat";
 import { awakenMadness, openMadnessTemptChoice, isForgeHostile } from "../engine/faith";
 
@@ -34,6 +34,7 @@ function repopulateDungeonAfterTreasure(g: GameState) {
   const treasureId = map.treasureId;
 
   const ids = Object.keys(map.nodes);
+  const repopulatedIds: string[] = [];
   for (const id of ids) {
     if (id === startId) continue;
     if (id === treasureId) continue;
@@ -52,12 +53,39 @@ function repopulateDungeonAfterTreasure(g: GameState) {
     if (node.kind === "ELITE") continue;
     if (node.kind === "START" || node.kind === "TREASURE") continue;
 
-    // 깊을수록 전투 확률 ↑ (보물 이후 전체적으로 더 위험)
-    const pBattle = Math.min(0.8, 0.68 + depth * 0.01);
-    const pEvent = 0.18;
+    repopulatedIds.push(id);
+
+    // 보물 이후 가혹함 완화: 전투 비중을 조금 낮추고 상점을 포함.
+    const pBattle = Math.min(0.7, 0.54 + depth * 0.008);
+    const pEvent = 0.20;
+    const pRest = 0.16;
     const r = Math.random();
 
-    node.kind = r < pBattle ? "BATTLE" : r < pBattle + pEvent ? "EVENT" : "REST";
+    node.kind =
+      r < pBattle
+        ? "BATTLE"
+        : r < pBattle + pEvent
+        ? "EVENT"
+        : r < pBattle + pEvent + pRest
+        ? "REST"
+        : "SHOP";
+  }
+
+  // 보물 이후 맵: 상점 최소 보장
+  const minShopCount = Math.min(2, repopulatedIds.length);
+  let shopCount = repopulatedIds.reduce((acc, id) => acc + (map.nodes[id]?.kind === "SHOP" ? 1 : 0), 0);
+  if (shopCount < minShopCount) {
+    const convertCandidates = repopulatedIds
+      .filter((id) => map.nodes[id]?.kind !== "SHOP")
+      .sort((a, b) => Number(map.nodes[a]?.depth ?? 999) - Number(map.nodes[b]?.depth ?? 999));
+
+    for (const id of convertCandidates) {
+      const node: any = map.nodes[id];
+      if (!node) continue;
+      node.kind = "SHOP";
+      shopCount += 1;
+      if (shopCount >= minShopCount) break;
+    }
   }
 }
 
@@ -88,8 +116,6 @@ const MAD_REWARD_POOL: RewardEntry[] = [
 ];
 
 export const REWARD_POOL: RewardEntry[] = [
-  { id: "berserk", weight: 0 },
-  { id: "arrow_rain", weight: 0 },
   { id: "smoke", weight: 0 },
 
   { id: "redeploy", weight: 3 },
@@ -121,6 +147,8 @@ export const REWARD_POOL: RewardEntry[] = [
   { id: "slash_frenzy", weight: 12 },
   { id: "doppelganger", weight: 12 },
 
+  { id: "berserk", weight: 20 },
+  { id: "arrow_rain", weight: 20 },
   { id: "camp_prep", weight: 20 },
   { id: "rapid_fire", weight: 20 },
   { id: "blood_contract", weight: 20 },
@@ -130,6 +158,10 @@ export const REWARD_POOL: RewardEntry[] = [
   { id: "install_iron_bulwark", weight: 20 },
   { id: "install_castle_ballista", weight: 20 },
   { id: "install_wedge_spike", weight: 20 },
+  { id: "blood_tribute", weight: 20 },
+  { id: "heavy_shield", weight: 20 },
+  { id: "reinforced_bastion", weight: 20 },
+  { id: "improv_arrow", weight: 20 },
 
 ];
 
@@ -175,9 +207,9 @@ function buildWeightMap(pool: RewardEntry[]): Array<{ id: string; w: number }> {
 function buildWeightMapBiased(
   pool: RewardEntry[],
   opt: {
-    mult3?: number;   // weight=3 배수
-    mult12?: number;  // weight=12 배수
-    mult20?: number;  // weight=20 배수
+    mult3?: number;
+    mult12?: number;
+    mult20?: number;
     drop3?: boolean;
     drop12?: boolean;
     drop20?: boolean;
@@ -321,24 +353,20 @@ function isHighRarity(g: GameState, defId: string): boolean {
 }
 
 function rewardBiasForContext(g: GameState, ctx: RewardPickContext): Parameters<typeof buildWeightMapBiased>[1] {
-  // 기존 풀의 weight는 사실상 희귀도 슬롯
-  // 20=일반, 12=특별, 3=희귀
 
   if (ctx === "BOSS") {
-    // a) 보스는 레어만 남기기
     return { drop12: true, drop20: true };
   }
 
   if (ctx === "ELITE") {
-    // b) 엘리트는 특별/희귀 확률 ↑
     return { mult3: 2.7, mult12: 1.8, mult20: 0.8 };
   }
 
-  // c) 일반 전투: 특별/희귀 pity
+  // 일반 전투: 특별/희귀 pity
   const pity = Math.max(0, Math.min(10, Number((g.run as any).rewardPityNonElite ?? 0) || 0));
   const mult12 = 1 + pity * 0.18; // 특별 상승
   const mult3  = 1 + pity * 0.30; // 희귀 상승
-  const mult20 = Math.max(0.65, 1 - pity * 0.04); // 일반은 조금씩 눌러줌
+  const mult20 = Math.max(0.65, 1 - pity * 0.04);
   return { mult3, mult12, mult20 };
 }
 
@@ -432,7 +460,12 @@ export function removeRandomCardFromDeck(g: GameState) {
   g.hand = g.hand.filter((x) => x !== c.uid);
   g.discard = g.discard.filter((x) => x !== c.uid);
 
-  logMsg(g, `카드 제거: [${getCardDefFor(g, c.uid).name} +${g.cards[c.uid].upgrade ?? 0}]`);
+  const removedName = displayCardNameWithUpgrade(
+    g,
+    g.content.cardsById[g.cards[c.uid].defId]?.name ?? g.cards[c.uid].defId,
+    g.cards[c.uid].upgrade ?? 0
+  );
+  logMsg(g, `카드 제거: [${removedName}]`);
 }
 
 const CURSED_TREASURE_ID = "goal_treasure";
@@ -456,7 +489,12 @@ export function removeCardByUid(g: GameState, uid: string): boolean {
   inst.zone = "vanished";
   g.vanished.push(uid);
 
-  logMsg(g, `카드 제거: [${getCardDefFor(g, inst.uid).name} +${g.cards[inst.uid].upgrade ?? 0}]`);
+  const removedName = displayCardNameWithUpgrade(
+    g,
+    g.content.cardsById[g.cards[inst.uid].defId]?.name ?? g.cards[inst.uid].defId,
+    g.cards[inst.uid].upgrade ?? 0
+  );
+  logMsg(g, `카드 제거: [${removedName}]`);
 
   return true;
 }

@@ -12,14 +12,9 @@ export type HasStatus = { status: Record<StatusKey, number> };
 export type StatusSource = "PLAYER" | "ENEMY" | "SYSTEM";
 
 export function pushUiToast(g: GameState, kind: UiToastKind, text: string, ms = 1600) {
-  const anyG = g as any;
-  if (!anyG.uiToasts) anyG.uiToasts = [];
-
-  const q = anyG.uiToasts as UiToast[];
-  q.push({ kind, text, ms });
-
-  // runaway 방지
-  if (q.length > 30) anyG.uiToasts = q.slice(-30);
+  g.uiToasts ??= [];
+  g.uiToasts.push({ kind, text, ms });
+  if (g.uiToasts.length > 30) g.uiToasts = g.uiToasts.slice(-30);
 }
 
 export function applyStatusTo(target: HasStatus, key: StatusKey, n: number, g?: GameState, src: StatusSource = "SYSTEM") {
@@ -29,11 +24,10 @@ export function applyStatusTo(target: HasStatus, key: StatusKey, n: number, g?: 
     const bonus = Number((g as any)._bleedBonusPerApply ?? 0);
     if (bonus) amount += bonus;
   }
-  if (g && key === "vuln" && amount > 0 && target === g.player) {
-    const rs = g.run as any;
-    const relics: string[] = rs?.relics ?? [];
+    if (g && key === "vuln" && amount > 0 && target === g.player) {
+    const relics = g.run.relics ?? [];
     if (relics.includes("relic_ratskin_charm")) {
-      const rt = rs?.relicRuntime?.["relic_ratskin_charm"];
+      const rt = g.run.relicRuntime?.["relic_ratskin_charm"];
       const active = rt?.active !== false;
       if (active) amount = Math.max(0, amount - 1);
     }

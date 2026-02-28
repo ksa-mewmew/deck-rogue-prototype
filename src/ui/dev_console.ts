@@ -1,4 +1,3 @@
-// src/ui/dev_console.ts
 import type { GameState, PileKind } from "../engine/types";
 import { addCardToDeck } from "../content";
 import { removeCardByUid } from "../content";
@@ -122,9 +121,24 @@ function getCmdSpecs(): CmdSpec[] {
     { name: "faith", desc: "print faith state" },
     {
       name: "tempt",
-      args: "<dream_shadow|wing_artery|forge_master>",
+      args: "<dream_shadow|wing_artery|master_spear|retort_fusion|...>",
       desc: "open a god temptation choice",
-      suggest: () => ["dream_shadow","wing_artery","forge_master"],
+      suggest: () => [
+        "dream_shadow",
+        "wing_artery",
+        "master_spear",
+        "retort_fusion",
+        "nameless_vow",
+        "bright_darkness",
+        "twin_heart",
+        "indifferent_one",
+        "armored_tiger",
+        "first_human",
+        "card_dealer",
+        "rabbit_hunt",
+        "wave_breath",
+        "forge_master",
+      ],
     },
   ];
 }
@@ -160,7 +174,7 @@ export function renderDevConsole() {
   layer.className = "devConsole";
   layer.style.cssText = `
     position: fixed; inset: 0;
-    z-index: 60000;
+    z-index: var(--zDevConsole);
     pointer-events: auto;
     background: rgba(0,0,0,.35);
     backdrop-filter: blur(calc(4 * var(--u)));
@@ -477,7 +491,7 @@ function runDevCommand(raw: string) {
       "gold <n>",
       "additem <itemId> [n=1]",
       "faith",
-      "tempt <dream_shadow|wing_artery|forge_master>",
+      "tempt <dream_shadow|wing_artery|master_spear|retort_fusion|...>",
     ].join("\n"));
     return;
   }
@@ -513,7 +527,7 @@ function runDevCommand(raw: string) {
 
   if (cmd === "tempt") {
     const id = (a1 ?? "") as any;
-    if (!id) { out("ERR: tempt <dream_shadow|wing_artery|forge_master>"); return; }
+    if (!id) { out("ERR: tempt <dream_shadow|wing_artery|master_spear|retort_fusion|...>"); return; }
     openGodTemptChoice(g, id);
     c.rerender();
     out(`OK: tempt ${id}`);

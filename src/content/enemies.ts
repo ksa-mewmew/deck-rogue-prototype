@@ -6,6 +6,7 @@ export const ENEMIES = [
     id: "other_adventurer",
     name: "보물을 노리는 다른 모험가",
     maxHp: 60,
+    intentRules: { noRepeatIntentIndexes: [1] },
     intents: [
       { label: "창 찌르기: 5 피해, 3번 발동", acts:
         [{ op: "damagePlayer", n: 5 }, { op: "damagePlayer", n: 5 }, { op: "damagePlayer", n: 5 }] },
@@ -51,6 +52,7 @@ export const ENEMIES = [
     id: "pebble_golem",
     name: "조약돌 골렘",
     maxHp: 30,
+    intentRules: { noRepeatIntentIndexes: [1] },
     passives: [
       { id: "ramp_atk_1", icon: "🪨", name: "돌의 경화", text: "매 턴 공격력이 +1 증가합니다." },
     ],
@@ -64,6 +66,7 @@ export const ENEMIES = [
     id: "rock_golem",
     name: "바위 골렘",
     maxHp: 50,
+    intentRules: { noRepeatIntentIndexes: [1] },
     passives: [
       { id: "ramp_atk_2", icon: "⛰️", name: "거대화", text: "매 턴 공격력이 +2 증가합니다." },
     ],
@@ -76,6 +79,7 @@ export const ENEMIES = [
     id: "slime",
     name: "슬라임",
     maxHp: 30,
+    intentRules: { noRepeatIntentIndexes: [0, 1] },
     intents: [
       {label: "산성액: 출혈 +3 부여",
         acts: [{ op: "statusPlayer", key: "bleed", n: 3 }]},
@@ -91,6 +95,7 @@ export const ENEMIES = [
     id: "poison_spider",
     name: "독거미",
     maxHp: 28,
+    intentRules: { noRepeatIntentIndexes: [0, 2] },
     intents: [
       {
         label: "독니로 물기: 출혈 +4 부여",
@@ -195,6 +200,9 @@ export const ENEMIES = [
     id: "goblin_assassin",
     name: "고블린 암살자",
     maxHp: 22,
+    targeting: {
+      forbidTargetedAttackWhenNotLeftmost: true,
+    },
     passives: [
       {
         id: "shadow_veil",
@@ -336,6 +344,7 @@ export const ENEMIES = [
     name: "중력 통달자",
     omen: "몸이 점점 무겁다. 짐을 비워라.",
     maxHp: 90,
+    isBoss: true,
     intents: [
       { label: "중력 수축: 약화 +3 부여", acts: [{ op: "statusPlayer", key: "weak", n: 3 }] },
       { label: "특이점 생성", acts: [{ op: "damagePlayerByDeckSize", base: 8, per: 3, div: 5, cap: 30 }] },
@@ -349,6 +358,8 @@ export const ENEMIES = [
     name: "저주받은 벽",
     omen: "움직이지 않는다. 닳아간다.",
     maxHp: 160,
+    isBoss: true,
+    intentRules: { noRepeatIntentIndexes: [0] },
     intents: [
       { label: "저주의 기운: 출혈 +3 부여", acts: [{ op: "statusPlayer", key: "bleed", n: 3 }] },
       { label: "저주의 기운: F +1", acts: [{ op: "fatiguePlayer", n: 1 }] },
@@ -361,6 +372,8 @@ export const ENEMIES = [
     name: "거대한 오크",
     omen: "거대한 짐승이 기다린다. 힘을 깎아야 한다.",
     maxHp: 90,
+    isBoss: true,
+    intentRules: { noRepeatIntentIndexes: [1] },
     intents: [
       { label: "내려치기: 취약 +2 부여, 10 피해", acts: [{ op: "statusPlayer", key: "vuln", n: 2 }, { op: "damagePlayer", n: 15 }] },
       { label: "단단한 피부: 다음 턴 동안 피해를 입지 않음", acts: [{ op: "enemyImmuneNextTurn" }] },
@@ -380,6 +393,11 @@ export const ENEMIES = [
     name: "영혼 강탈자",
     omen: "행동하지 않으면 종말이 온다.",
     maxHp: 80,
+    isBoss: true,
+    passives: [
+      { id: "soul_apocalypse", icon: "☄️", name: "예언된 종말", text: "예언(카운트)이 3회 누적되면 폭발 가능 상태가 됩니다. 폭발하면 50 피해를 줍니다." },
+    ],
+    special: { kind: "SOUL_STEALER", warnIntentIndex: 2, warnCap: 3, nukeChance: 0.6, nukeDamage: 50, nukeLabel: "종말: 50 피해" },
     intents: [
       { label: "허기: 7 피해, S -3", acts: [{ op: "damagePlayer", n: 7 }, { op: "supplies", n: -3 }] },
       { label: "나태: 7 피해, F +2", acts: [{ op: "damagePlayer", n: 7 }, { op: "fatiguePlayer", n: 2 }] },

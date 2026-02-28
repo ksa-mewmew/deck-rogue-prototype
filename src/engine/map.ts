@@ -311,8 +311,8 @@ export function generateDungeonMap(opt?: Partial<MapGenOptions>): DungeonMap {
   const rollKind = (d: number, isDeadEnd: boolean): MapNode["kind"] => {
     let wB = 0.5, wE = 0.25, wR = 0.20, wS = 0.05;
     if (d <= 1) { wB = 0.8; wE = 0.14; wR = 0.04; wS = 0.02; }
-    else if (d <= 3) { wB = 0.7; wE = 0.16; wR = 0.08; wS = 0.06; }
-    else { wB = 0.6; wE = 0.2; wR = 0.12; wS = 0.08; }
+    else if (d <= 3) { wB = 0.6; wE = 0.2; wR = 0.15; wS = 0.05; }
+    else { wB = 0.5; wE = 0.25; wR = 0.15; wS = 0.1; }
 
     if (isDeadEnd) {
       wB *= (deadEndBias.battleMul ?? 0.25);
@@ -503,11 +503,4 @@ export function maybeShiftTopology(
   }
 
   return { changed: false };
-}
-
-export function pursuitTier(heat: number): 0 | 1 | 2 | 3 {
-  if (heat >= 18) return 3;
-  if (heat >= 12) return 2;
-  if (heat >= 6) return 1;
-  return 0;
 }

@@ -3,6 +3,7 @@ import "./style.css";
 import { installUiFit, installLayoutMode } from "./ui/uiFit";
 import { buildContent } from "./content";
 import { render, createOrLoadGame, isDraggingNow, makeUIActions } from "./ui/ui";
+import { applyAssetVarsOnce } from "./ui/assets";
 import { isMobileLike } from "./ui/uiFit";
 
 const content = buildContent();
@@ -16,9 +17,33 @@ function setGame(next: typeof g) {
   render(g, actions);
 }
 
-function setAssetCssVars() {
+function runtimeBasePath() {
   let base = import.meta.env.BASE_URL || "/";
-  if (!base.endsWith("/")) base += "/";
+  if (base && base !== "/") {
+    if (!base.endsWith("/")) base += "/";
+    return base;
+  }
+
+  try {
+    const p = new URL(import.meta.url).pathname;
+    const idx = p.indexOf("/src/");
+    if (idx >= 0) {
+      const inferred = p.slice(0, idx + 1);
+      return inferred.endsWith("/") ? inferred : `${inferred}/`;
+    }
+  } catch {}
+
+  try {
+    const path = window.location.pathname || "/";
+    const m = path.match(/^\/([^/]+)\//);
+    if (m && m[1] && m[1] !== "src") return `/${m[1]}/`;
+  } catch {}
+
+  return "/";
+}
+
+function setAssetCssVars() {
+  const base = runtimeBasePath();
 
   const root = document.documentElement;
   const setUrl = (cssVar: string, relPath: string) => {
@@ -30,11 +55,14 @@ function setAssetCssVars() {
   setUrl("--cardBgSpecial", "assets/ui/cards/card_special.png");
   setUrl("--cardBgRare", "assets/ui/cards/card_rare.png");
   setUrl("--cardBgMadness", "assets/ui/cards/card_madness.png");
+  setUrl("--cardUrl", "assets/ui/cards/card_parchment.png");
+  setUrl("--bgUrl", "assets/ui/background/dungeon_bg.png");
+  setUrl("--boardUrl", "assets/ui/boards/battle_board.png");
+  setUrl("--mapBgUrl", "assets/ui/background/map_bg.png");
 }
 
 function injectFontFaces() {
-  let base = import.meta.env.BASE_URL || "/";
-  if (!base.endsWith("/")) base += "/";
+  const base = runtimeBasePath();
 
   const css = `
 @font-face{
@@ -74,15 +102,15 @@ function installHandDockVarSync() {
     r.style.setProperty("--handDockLeftPx", `${rect.left}px`);
   };
 
-  const request = () => {
+  const request = (_ev?: Event) => {
     if (raf) return;
     raf = requestAnimationFrame(sync);
   };
 
-  window.addEventListener("deckrogue:layout", request as any, { passive: true } as any);
+  window.addEventListener("deckrogue:layout", request, { passive: true });
   window.addEventListener("resize", request, { passive: true });
-  window.visualViewport?.addEventListener("resize", request as any, { passive: true } as any);
-  window.visualViewport?.addEventListener("scroll", request as any, { passive: true } as any);
+  window.visualViewport?.addEventListener("resize", request, { passive: true });
+  window.visualViewport?.addEventListener("scroll", request, { passive: true });
 
   request();
 }
@@ -106,7 +134,7 @@ function installRerenderOnLayoutChange() {
     render(g, actions);
   };
 
-  const request = () => {
+  const request = (_ev?: Event) => {
     if (raf) return;
     raf = requestAnimationFrame(() => requestAnimationFrame(doRender));
   };
@@ -115,10 +143,10 @@ function installRerenderOnLayoutChange() {
     window.dispatchEvent(new CustomEvent("deckrogue:uiFit"));
   };
 
-  window.addEventListener("deckrogue:layout", request as any, { passive: true } as any);
+  window.addEventListener("deckrogue:layout", request, { passive: true });
   window.addEventListener("resize", request, { passive: true });
-  window.visualViewport?.addEventListener("resize", request as any, { passive: true } as any);
-  window.visualViewport?.addEventListener("scroll", request as any, { passive: true } as any);
+  window.visualViewport?.addEventListener("resize", request, { passive: true });
+  window.visualViewport?.addEventListener("scroll", request, { passive: true });
 
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) request();
@@ -143,6 +171,7 @@ function installRerenderOnLayoutChange() {
 setAssetCssVars();
 injectFontFaces();
 
+applyAssetVarsOnce();
 installUiFit();
 installLayoutMode();
 
@@ -151,9 +180,8 @@ installRerenderOnLayoutChange();
 
 render(g, actions);
 
-document.documentElement.style.setProperty("--base", import.meta.env.BASE_URL);
+document.documentElement.style.setProperty("--base", runtimeBasePath());
 
-// 모바일 감지 및 orientation 클래스 적용
 const { vw, vh } = (() => {
   const vv = window.visualViewport;
   return {

@@ -1,5 +1,6 @@
 import type { GameState } from "./types";
 import type { EnemyIntentData, IntentPreview, IntentApply, IntentCategory } from "./types";
+import { previewDamagePlayerFormula } from "../content/enemyFormulas";
 
 type PreviewOptions = { includeBlock?: boolean };
 
@@ -43,50 +44,12 @@ function catFromPreview(p: IntentPreview): IntentCategory {
   return "OTHER";
 }
 
-type FormulaKind = "goblin_raider" | "watching_statue" | "gloved_hunter" | "goblin_assassin" | "old_monster_corpse" | "punishing_one";
-
-function previewFormula(kind: FormulaKind, g: GameState, e: any): { raw: number; hits?: number } {
-  const used = g.usedThisTurn ?? 0;
-
-  if (kind === "goblin_raider") {
-    const raw = Math.max(0, 12 - used);
-    return { raw, hits: 1 };
-  }
-  if (kind === "watching_statue") {
-    const raw = 4 + used;
-    return { raw, hits: 1 };
-  }
-  if (kind === "gloved_hunter") {
-    const blk = Number(g.player.block ?? 0);
-    const raw = blk >= 4 ? 12 : 6;
-    return { raw, hits: 1 };
-  }
-  if (kind === "goblin_assassin") {
-    const aimed = Math.max(0, Number((e as any).assassinAim ?? 0) || 0);
-    const raw = 8 + 4 * aimed;
-    return { raw, hits: 1 };
-  }
-  if (kind === "old_monster_corpse") {
-    const rage = Math.max(0, Number((e as any).corpseRage ?? 0) || 0);
-    const raw = 9 + 4 * rage;
-    return { raw, hits: 1 };
-  }
-  if (kind === "punishing_one") {
-    const hand = Math.max(0, Number(g.hand?.length ?? 0) || 0);
-    const raw = Math.min(30, 6 + 2 * hand);
-    return { raw, hits: 1 };
-  }
-
-  return { raw: 0, hits: 1 };
-}
-
 function previewDeckSizeDamage(g: GameState, act: any): number {
   const base = Number(act.base ?? 0);
   const per = Number(act.per ?? 0);
   const div = Math.max(1, Number(act.div ?? 1));
   const cap = act.cap == null ? Infinity : Number(act.cap);
 
-  // phases.ts(getCombatDeckSize)와 동일한 정의로 통일
   const deckSize =
     (g.deck?.length ?? 0) +
     (g.hand?.length ?? 0) +
@@ -129,7 +92,7 @@ export function buildIntentPreview(
       }
 
       case "damagePlayerFormula": {
-        const { raw, hits } = previewFormula(act.kind as any, g, e);
+        const { raw, hits } = previewDamagePlayerFormula(g, e, act.kind);
         const hh = Math.max(1, Number(hits ?? 1) || 1);
         const r = Math.max(0, (Number(raw) || 0) + atkRamp);
         for (let i = 0; i < hh; i++) hitRaws.push(r);

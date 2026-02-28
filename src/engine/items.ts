@@ -88,6 +88,9 @@ export function discardItemAt(g: GameState, idx: number, source: string = ""): b
 
   removeItemAt(g, idx);
 
+  const up: any = ((g.run as any).unlock ??= {});
+  up.itemDiscards = Math.max(0, Number(up.itemDiscards ?? 0) + 1);
+
   logMsg(g, `아이템 버림${source ? `(${source})` : ""}: ${def?.name ?? id}`);
   pushUiToast(g, "WARN", `${def?.name ?? id} 버림`, 1400);
 
@@ -129,7 +132,7 @@ export function useItemAt(g: GameState, idx: number): boolean {
 export function rollBattleItemDrop(g: GameState, ctx: { elite: boolean; boss: boolean }): string | null {
   const runAny = g.run as any;
   if (runAny.itemOfferedThisBattle) return null;
-  if (ctx.boss) return null; // 기본: 보스는 아이템 드랍 없음(원하시면 바꿔드릴 수 있음)
+  if (ctx.boss) return null;
 
   const p = ctx.elite ? 0.4 : 0.30;
   if (Math.random() >= p) return null;

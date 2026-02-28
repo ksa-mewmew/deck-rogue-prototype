@@ -22,10 +22,11 @@ export function enemyStateFromId(g: GameState, enemyId: string): EnemyState {
     immuneNextTurn: false,
     lastIntentKey: null,
     lastIntentStreak: 0,
-    soulWarnCount: enemyId === "boss_soul_stealer" ? 0 : undefined,
-    soulArmed: enemyId === "boss_soul_stealer" ? false : undefined,
-    soulWillNukeThisTurn: enemyId === "boss_soul_stealer" ? false : undefined,
   };
+
+  if (def.special?.kind === "SOUL_STEALER") {
+    e.special = { kind: "SOUL_STEALER", warnCount: 0, armed: false, willNukeThisTurn: false };
+  }
 
   // 광기(적대) 1: 모든 적 HP +10
   if (getMadnessBane(g) === 1) {

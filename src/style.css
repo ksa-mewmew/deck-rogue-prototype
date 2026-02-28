@@ -1,7 +1,3 @@
-
-
-
-
 :root{
   
   --uiScale: 1;
@@ -41,7 +37,6 @@
   --zSettings: 80000;
   --zDevConsole: 100000;
 
-  
   --bg0:#060708;
   --bg1:#0b0d10;
   --panel:#0f1216cc;
@@ -110,19 +105,19 @@
   --logBg: rgba(0,0,0,.75);
 
   
-  --bgUrl: url("assets/ui/background/dungeon_bg.png");
-  --boardUrl: url("assets/ui/boards/battle_board.png");
-  --mapBgUrl: url("assets/ui/background/map_bg.png");
+  --bgUrl: none;
+  --boardUrl: none;
+  --mapBgUrl: none;
 
   
-  --cardBgBasic:   url("assets/ui/cards/card_basic.png");
-  --cardBgCommon:  url("assets/ui/cards/card_common.png");
-  --cardBgSpecial: url("assets/ui/cards/card_special.png");
-  --cardBgRare:    url("assets/ui/cards/card_rare.png");
-  --cardBgMadness: url("assets/ui/cards/card_madness.png");
+  --cardBgBasic:   none;
+  --cardBgCommon:  none;
+  --cardBgSpecial: none;
+  --cardBgRare:    none;
+  --cardBgMadness: none;
 
   
-  --cardUrl: var(--cardBgCommon, url("assets/ui/cards/card_parchment.png"));
+  --cardUrl: var(--cardBgCommon, none);
 
   
   --enemyBannerW: calc(360 * var(--u));
@@ -299,14 +294,6 @@ html{ font-size: calc(16 * var(--u)); }
 
 
 
-@font-face{
-  font-family: "Mulmaru";
-  src: url("assets/fonts/Mulmaru.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
 html, body, #app, button, input, textarea, select, .choice-panel{
   font-family: "Mulmaru", ui-sans-serif, system-ui, -apple-system,
                "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif !important;
@@ -363,8 +350,11 @@ html, body, #app,
 .bgLayer{
   position: fixed;
   inset: 0;
-  background: var(--bgUrl) center / cover no-repeat;
-  image-rendering: pixelated;
+  background-image: var(--bgUrl);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-color: #000;  image-rendering: pixelated;
   z-index: var(--zBg) !important;
   pointer-events:none !important;
 }
@@ -646,12 +636,63 @@ html, body, #app,
 }
 .slot > *{ position: relative;}
 
+.slot.installed::before{
+  opacity: 1;
+  box-shadow:
+    inset 0 calc(12 * var(--u)) calc(18 * var(--u)) rgba(0,0,0,.65),
+    inset 0 calc(-10 * var(--u)) calc(16 * var(--u)) rgba(255,255,255,.06),
+    inset 0 0 0 calc(1 * var(--u)) rgba(255,255,255,.08),
+    inset 0 0 0 calc(3 * var(--u)) rgba(255, 70, 70, .40),
+    0 0 0 calc(3 * var(--u)) rgba(255, 60, 60, .50),
+    0 0 calc(26 * var(--u)) rgba(255, 50, 50, .45),
+    inset 0 0 calc(22 * var(--u)) rgba(255, 90, 90, .18);
+  animation: installedPulse 1.45s ease-in-out infinite;
+}
+
 
 .slot.placeable::before{
   box-shadow:
     inset 0 calc(10 * var(--u)) calc(18 * var(--u)) rgba(0,0,0,.52),
     inset 0 0 0 calc(1 * var(--u)) rgba(255,255,255,.16),
     0 0 0 calc(1 * var(--u)) rgba(255,255,255,.10);
+}
+
+.slot.installed.placeable::before{
+  opacity: 1;
+  box-shadow:
+    inset 0 calc(10 * var(--u)) calc(18 * var(--u)) rgba(0,0,0,.52),
+    inset 0 0 0 calc(1 * var(--u)) rgba(255,255,255,.16),
+    0 0 0 calc(1 * var(--u)) rgba(255,255,255,.10),
+    inset 0 0 0 calc(3 * var(--u)) rgba(255, 70, 70, .40),
+    0 0 0 calc(3 * var(--u)) rgba(255, 60, 60, .50),
+    0 0 calc(26 * var(--u)) rgba(255, 50, 50, .45),
+    inset 0 0 calc(22 * var(--u)) rgba(255, 90, 90, .18);
+  animation: installedPulse 1.45s ease-in-out infinite;
+}
+
+.slot.installed.dropHover::before{
+  opacity: 1;
+  box-shadow:
+    inset 0 calc(10 * var(--u)) calc(18 * var(--u)) rgba(0,0,0,.52),
+    inset 0 0 0 calc(1 * var(--u)) rgba(255,255,255,.22),
+    0 0 0 calc(2 * var(--u)) rgba(255,255,255,.18),
+    inset 0 0 0 calc(3 * var(--u)) rgba(255, 70, 70, .50),
+    0 0 0 calc(3 * var(--u)) rgba(255, 70, 70, .60),
+    0 0 calc(30 * var(--u)) rgba(255, 60, 60, .55),
+    inset 0 0 calc(24 * var(--u)) rgba(255, 110, 110, .22);
+  animation: installedPulse 1.45s ease-in-out infinite;
+}
+
+@keyframes installedPulse{
+  0%{ filter: saturate(1) brightness(1); }
+  50%{ filter: saturate(1.3) brightness(1.12); }
+  100%{ filter: saturate(1) brightness(1); }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .slot.installed::before,
+  .slot.installed.placeable::before,
+  .slot.installed.dropHover::before{ animation: none; }
 }
 .slot.dropHover::before{
   box-shadow:
@@ -1631,7 +1672,7 @@ pre.choice-detail,
   position: fixed;
   inset: 0;
   z-index: var(--zChoiceBackdrop) !important;
-  pointer-events: auto !important;
+  pointer-events: none !important;
 
   
   background: rgba(0,0,0,0) !important;
@@ -1646,7 +1687,7 @@ pre.choice-detail,
 
 
 .choice-backdrop{
-  pointer-events: auto !important;
+  pointer-events: none !important;
   background: rgba(0, 0, 0, 0) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -3264,6 +3305,18 @@ body.mobile.portrait .mobileRunButtons{
   gap: calc(8 * var(--u));
 }
 body.mobile.portrait .mobileActionPanel .mobileRunButtons button{ grid-column: auto !important; }
+
+body.mobile.portrait.shopChoiceOpen .mobilePileButtons{
+  position: fixed;
+  top: calc(var(--hudRowTop) + var(--hudRowH) + calc(8 * var(--u)));
+  left: calc(var(--safeL) + var(--edgePad));
+  right: calc(var(--safeR) + var(--edgePad));
+  z-index: calc(var(--zChoicePanel) + 2);
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: calc(8 * var(--u));
+  pointer-events: auto !important;
+}
 
 body.mobile.portrait .mobileEnemyLeftBtn,
 body.mobile.portrait .mobileEnemyRightChrome{

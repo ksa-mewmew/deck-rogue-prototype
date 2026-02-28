@@ -2,19 +2,9 @@ import type { GameState } from "../types";
 import { aliveEnemies, logMsg, pickOne } from "../rules";
 import { runRelicHook } from "../relics";
 import { buildIntentPreview } from "../intentPreview";
-const NO_REPEAT_INTENT_INDEXES: Record<string, ReadonlySet<number>> = {
-  other_adventurer: new Set([1]),
-  slime: new Set([0, 1]),
-  pebble_golem: new Set([1]),
-  rock_golem: new Set([1]),
-  poison_spider: new Set([0, 2]),
-  boss_cursed_wall: new Set([0]),
-  boss_giant_orc: new Set([1]),
-};
-
-function shouldBlockRepeatByIndex(enemyId: string, intentIndex: number) {
-  const s = NO_REPEAT_INTENT_INDEXES[enemyId];
-  return !!s && s.has(intentIndex);
+function shouldBlockRepeatByIndex(def: any, intentIndex: number) {
+  const arr = def?.intentRules?.noRepeatIntentIndexes;
+  return Array.isArray(arr) && arr.includes(intentIndex);
 }
 
 function stableStringify(v: any): string {
@@ -61,13 +51,13 @@ function commitIntentHistory(e: any, key: string) {
   }
 }
 
-function pickNextIntentIndex(intents: any[], lastIndex: number, enemyId: string, lastKey: string | null, streak: number) {
+function pickNextIntentIndex(intents: any[], lastIndex: number, def: any, lastKey: string | null, streak: number) {
   const n = intents.length;
   if (n <= 1) return 0;
 
   const candidates = Array.from({ length: n }, (_, i) => i);
 
-  const block2 = (ix: number) => ix === lastIndex && shouldBlockRepeatByIndex(enemyId, ix);
+  const block2 = (ix: number) => ix === lastIndex && shouldBlockRepeatByIndex(def, ix);
   const block3 = (ix: number) => !!lastKey && streak >= 2 && intentActionKey(intents[ix]) === lastKey;
 
   const both = candidates.filter((ix) => !block2(ix) && !block3(ix));
@@ -100,8 +90,6 @@ function calcDeckSizeDamage(act: { base: number; per: number; div: number; cap?:
   return { dmg, scale };
 }
 
-const SOUL_WARN_INTENT_INDEX = 2;
-const SOUL_NUKE_CHANCE = 0.6;
 
 export function revealIntentsAndDisrupt(g: GameState) {
   if (g.intentsRevealedThisTurn) return;
@@ -119,7 +107,6 @@ export function revealIntentsAndDisrupt(g: GameState) {
 
   g.disruptIndexThisTurn = null;
 
-  // 슬롯 수(보스 보상) 반영: backSlots 길이에 맞춰 교란 무효 슬롯을 선택
   {
     const cols = Math.max(1, g.backSlots?.length ?? 3);
     g.backSlotDisabled = Array.from({ length: cols }, () => false);
@@ -148,9 +135,9 @@ export function revealIntentsAndDisrupt(g: GameState) {
     if (!intents || intents.length === 0) continue;
 
     const nextIx = pickNextIntentIndex(
-     intents,
+      intents,
       e.intentIndex ?? 0,
-      e.id,
+      def,
       e.lastIntentKey ?? null,
       e.lastIntentStreak ?? 0
     );
@@ -160,15 +147,18 @@ export function revealIntentsAndDisrupt(g: GameState) {
     const picked = intents[nextIx % intents.length];
     commitIntentHistory(e, intentActionKey(picked));
 
-    if (e.id === "boss_soul_stealer") {
-      e.soulWillNukeThisTurn = false;
-      const warn = e.soulWarnCount ?? 0;
-      const armed = !!e.soulArmed;
-
+    const sp = def.special;
+    if (sp?.kind === "SOUL_STEALER") {
+      const st = (e.special && e.special.kind === "SOUL_STEALER")
+        ? e.special
+        : (e.special = { kind: "SOUL_STEALER", warnCount: 0, armed: false, willNukeThisTurn: false });
+      st.willNukeThisTurn = false;
+      const warn = Math.max(0, Number(st.warnCount ?? 0) || 0);
+      const armed = !!st.armed;
       if (armed) {
-        if (Math.random() < SOUL_NUKE_CHANCE) {
-          e.soulWillNukeThisTurn = true;
-          e.intentLabelOverride = "종말: 50 피해";
+        if (Math.random() < sp.nukeChance) {
+          st.willNukeThisTurn = true;
+          e.intentLabelOverride = sp.nukeLabel ?? `종말: ${sp.nukeDamage} 피해`;
           logMsg(g, `적 의도: ${e.name} → ${e.intentLabelOverride}`);
           continue;
         }
@@ -177,12 +167,13 @@ export function revealIntentsAndDisrupt(g: GameState) {
         logMsg(g, `적 의도: ${e.name} → ${e.intentLabelOverride}`);
         continue;
       }
-
       const it = intents[e.intentIndex % intents.length];
-      e.intentLabelOverride = `${it.label} (경고 ${warn}/3)`;
+      e.intentLabelOverride = `${it.label} (경고 ${warn}/${sp.warnCap})`;
       logMsg(g, `적 의도: ${e.name} → ${e.intentLabelOverride}`);
       continue;
     }
+
+
 
     const intent = intents[e.intentIndex % intents.length];
 
@@ -209,5 +200,3 @@ export function revealIntentsAndDisrupt(g: GameState) {
 
   g.phase = "PLACE";
 }
-
-export const __SOUL_WARN_INTENT_INDEX = SOUL_WARN_INTENT_INDEX;

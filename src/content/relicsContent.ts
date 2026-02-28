@@ -1,6 +1,7 @@
 import type { RelicDef } from "../engine/relics";
 import { healPlayer, applyDamageToEnemy, addBlock, addSupplies } from "../engine/effects";
 import { logMsg, aliveEnemies, applyStatusTo, pickOne } from "../engine/rules";
+import { addItemCap } from "../engine/items";
 
 
 export function listAllRelicIds(): string[] {
@@ -11,11 +12,20 @@ export const EVENT_RELIC_POOL: RelicDef[] = [
   {
     id: "relic_ratskin_charm",
     name: "쥐가죽 부적",
-    text: "취약을 받을 때 1 덜 받습니다.",
+    text: "취약을 받을 때 1 덜 받음",
     unlockFlavor: "살가죽. 얇게, 아주 얇게.",
     tags: ["EVENT_ONLY"],
 
     art: "assets/relics/relic_ratskin_charm.png",
+  },
+  {
+    id: "relic_wrong_dice",
+    name: "잘못된 주사위",
+    text: "카드에 적힌 모든 수가 1 증가",
+    unlockFlavor: "눈금이 하나씩 어긋나 있다.",
+    tags: ["EVENT_ONLY"],
+
+    art: "assets/relics/relic_wrong_dice.png",
   },
 ]
 
@@ -28,26 +38,27 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
 
     art: "assets/relics/relic_unknown_square.png",
 
-    unlock: (g, base) => (g.run as any).unlock?.rest >= (base.unlock.rest + 1),
+    unlock: (g, base) => (g.run.unlock?.rest ?? 0) >= ((base.unlock?.rest ?? 0) + 1),
 
     name: "먹을 수 있는 사각형",
     text: "전투 시작 시 🍞 S +2",
     unlockFlavor: "먹을 수는 있다. 일단은.",
     onCombatStart(g) {
       g.player.supplies += 2;
-      logMsg(g, "유물[먹을 수 있는 사각형]: S +2");
+      logMsg(g, "유물[먹을 수 있는 사각형]: 🍞 S +2");
     },
   },
 
-    relic_wrong_dice: {
+  relic_wrong_dice: {
     id: "relic_wrong_dice",
     name: "잘못된 주사위",
-    text: "카드의 모든 숫자가 1 증가합니다.",
+    text: "카드에 적힌 모든 수가 1 증가",
     unlockFlavor: "눈금이 하나씩 어긋나 있다.",
-    art: "assets/relics/relic_unknown_square.png",
+    tags: ["EVENT_ONLY"],
+    art: "assets/relics/relic_wrong_dice.png",
   },
 
-relic_monster_leather_helm: {
+  relic_monster_leather_helm: {
     id: "relic_monster_leather_helm",
     dormantName: "들러붙는 가죽",
     dormantText: "털과 피가 뒤섞인 가죽이 손에 들러붙는다.",
@@ -55,14 +66,14 @@ relic_monster_leather_helm: {
 
     art: "assets/relics/relic_monster_leather_helm.png",
 
-    unlock: (g, base) => (g.run as any).unlock?.eliteWins >= (base.unlock.eliteWins + 1),
+    unlock: (g, base) => (g.run.unlock?.eliteWins ?? 0) >= ((base.unlock?.eliteWins ?? 0) + 1),
 
     name: "몬스터 가죽 투구",
     text: "첫 턴에 🛡️ 방어 +4",
     unlockFlavor: "머리에 들러붙어 떨어지지 않지만 당장의 문제는 아니다.",
     onCombatStart(g) {
       g.player.block += 4;
-      logMsg(g, "유물[몬스터 가죽 투구]: 방어 +4");
+      logMsg(g, "유물[몬스터 가죽 투구]: 🛡️ 방어 +4");
     },
   },
 
@@ -74,7 +85,7 @@ relic_monster_leather_helm: {
 
     art: "assets/relics/relic_smoke_bomb.png",
 
-    unlock: (g, base) => ((g.run as any).unlock?.tookBigHit10 ?? 0) >= (base.unlock.tookBigHit10 + 1),
+    unlock: (g, base) => (g.run.unlock?.tookBigHit10 ?? 0) >= (base.unlock.tookBigHit10 + 1),
 
     name: "연막탄",
     text: "활성화 시 연막 카드(소실) 1장 획득",
@@ -109,7 +120,7 @@ relic_monster_leather_helm: {
     onCombatStart(g) {
 
       (g as any)._combatStartExtraDraw = ((g as any)._combatStartExtraDraw ?? 0) + 1;
-      logMsg(g, "유물[뼈가 만든 나침반]: 전투 시작 드로우 +1");
+      logMsg(g, "유물[뼈가 만든 나침반]: 전투 시작 🃏 드로우 +1");
     },
   },
 
@@ -121,7 +132,7 @@ relic_monster_leather_helm: {
 
     art: "assets/relics/relic_flesh_whetstone.png",
 
-    unlock: (g, base) => ((g.run as any).unlock?.kills ?? 0) >= (base.unlock.kills + 3),
+    unlock: (g, base) => (g.run.unlock?.kills ?? 0) >= (base.unlock.kills + 3),
 
     name: "속살을 찾는 숫돌",
     text: "전투에서 첫 공격이 주는 🗡️ 피해 +3",
@@ -150,7 +161,7 @@ relic_monster_leather_helm: {
 
     art: "assets/relics/relic_weak_bell.png",
 
-    unlock: (g, base) => ((g.run as any).unlock?.endedTurnWeak ?? 0) >= (base.unlock.endedTurnWeak + 1),
+    unlock: (g, base) => (g.run.unlock?.endedTurnWeak ?? 0) >= (base.unlock.endedTurnWeak + 1),
 
     name: "허약의 종소리",
     text: "전투 시작 시 모든 적에게 🥀 약화 +2",
@@ -171,14 +182,14 @@ relic_monster_leather_helm: {
 
     art: "assets/relics/relic_return_path_memory.png",
 
-    unlock: (g, base) => ((g.run as any).unlock?.eventPicks ?? 0) >= (base.unlock.eventPicks + 2),
+    unlock: (g, base) => (g.run.unlock?.eventPicks ?? 0) >= (base.unlock.eventPicks + 2),
 
     name: "돌아온 길의 기억",
     text: "전투 승리 시 HP +3",
     unlockFlavor: "왔기에 갈 수 없다.",
     onVictory(g) {
       healPlayer(g, 3);
-      logMsg(g, "유물[돌아온 길의 기억]: 승리 회복 +3");
+      logMsg(g, "유물[돌아온 길의 기억]: 승리 시 HP +3");
     },
   },
 
@@ -190,14 +201,14 @@ relic_monster_leather_helm: {
 
     art: "assets/relics/relic_wound_vial.png",
 
-    unlock: (g, base) => ((g.run as any).unlock?.hpLeq15 ?? 0) >= (base.unlock.hpLeq15 + 1),
+    unlock: (g, base) => (g.run.unlock?.hpLeq15 ?? 0) >= (base.unlock.hpLeq15 + 1),
 
     name: "상처로 기어가는 약병",
     text: "전투 시작 시 HP +3",
     unlockFlavor: "씨앗이 있었나?",
     onCombatStart(g) {
       healPlayer(g, 3);
-      logMsg(g, "유물[상처로 기어가는 약병]: 전투 시작 회복 +3");
+      logMsg(g, "유물[상처로 기어가는 약병]: 전투 시작 시 HP +3");
     },
   },
 
@@ -209,14 +220,14 @@ relic_monster_leather_helm: {
 
     art: "assets/relics/relic_counting_needle.png",
 
-    unlock: (g, base) => ((g.run as any).unlock?.skippedTurn ?? 0) >= (base.unlock.skippedTurn + 1),
+    unlock: (g, base) => (g.run.unlock?.skippedTurn ?? 0) >= (base.unlock.skippedTurn + 1),
 
     name: "숨을 세는 바늘",
     text: "턴 종료 시 다음 턴 🃏 드로우 +1",
     unlockFlavor: "바늘이 돈다. 아무것도 없이.",
     onUpkeepEnd(g) {
       (g as any)._extraDrawNextTurn = Number((g as any)._extraDrawNextTurn ?? 0) + 1;
-      logMsg(g, "유물[숨을 세는 바늘]: 다음 턴 드로우 +1");
+      logMsg(g, "유물[숨을 세는 바늘]: 다음 턴 🃏 드로우 +1");
     },
   },
 
@@ -228,7 +239,7 @@ relic_monster_leather_helm: {
 
     art: "assets/relics/relic_deeper_needle.png",
 
-    unlock: (g, base) => ((g.run as any).unlock?.bleedApplied ?? 0) >= (base.unlock.bleedApplied + 3),
+    unlock: (g, base) => (g.run.unlock?.bleedApplied ?? 0) >= (base.unlock.bleedApplied + 3),
 
     name: "더 깊은 바늘",
     text: "🩸 출혈을 부여할 때마다 +1 추가",
@@ -281,6 +292,24 @@ relic_monster_leather_helm: {
       logMsg(g, "유물[깨진 맷돌]: 모든 적에게 2 피해");
     },
   },
+
+  relic_torn_pouch: {
+    id: "relic_torn_pouch",
+    dormantName: "찢어진 주머니",
+    dormantText: "비우는 것이 채우는 것.",
+    unlockHint: "조건: 아이템 버리기 1회",
+
+    name: "수선한 주머니",
+    text: "활성화 시 아이템 보유 한도 +2",
+    unlockFlavor: "비워낸 자리에 더 많이 들어간다.",
+
+    unlock: (g, base) => (g.run.unlock?.itemDiscards ?? 0) >= ((base.unlock?.itemDiscards ?? 0) + 1),
+
+    onActivate(g) {
+      addItemCap(g, 2, "수선한 주머니");
+      logMsg(g, "유물[수선한 주머니]: 아이템 보유 한도 +2");
+    },
+  },
   
   relic_bloody_spoon: {
     id: "relic_bloody_spoon",
@@ -296,7 +325,7 @@ relic_monster_leather_helm: {
     },
 
     name: "피 묻은 숟가락",
-    text: "회복 시 1 추가 회복",
+    text: "회복량 +1",
     unlockFlavor: "이런, 피였다.",
 
   },
@@ -305,16 +334,16 @@ relic_monster_leather_helm: {
     id: "relic_black_ledger_shard",
     dormantName: "검댕 묻은 종이",
     dormantText: "검은 종이다. 타고 남은 조각일지도 모르겠다.",
-    unlockHint: "조건: 🍞S = 0으로 턴 종료 1회",
+    unlockHint: "조건: 🍞 S = 0으로 턴 종료 1회",
 
     art: "assets/relics/relic_black_ledger_shard.png",
     unlock: (g, base) => {
-      const cur = (g.run as any).unlock?.endedTurnSupplyZero ?? 0;
+      const cur = g.run.unlock?.endedTurnSupplyZero ?? 0;
       return cur >= (base.unlock.endedTurnSupplyZero + 1);
     },
 
     name: "검은 장부 조각",
-    text: "🍞S = 0으로 턴을 종료하면, 🍞S +2, 💤 F +1",
+    text: "🍞 S = 0으로 턴을 종료하면, 🍞 S +2, 💤 F +1",
     unlockFlavor: "장부. 무엇의?",
     onUpkeepEnd(g) {
       const targets: any[] = aliveEnemies(g) as any;
@@ -334,7 +363,7 @@ relic_monster_leather_helm: {
         }
       }
 
-      logMsg(g, "유물[검은 장부 조각]: S +2, F +1");
+      logMsg(g, "유물[검은 장부 조각]: 🍞 S +2, 💤 F +1");
     },
   },
 
@@ -342,12 +371,12 @@ relic_monster_leather_helm: {
     id: "relic_ink_bottle",
     dormantName: "검은 잉크 얼룩",
     dormantText: "손가락 끝이 검게 물든다. 씻어도 지워지지 않는다.",
-    unlockHint: "조건: 🍞S = 0으로 턴 종료 1회",
+    unlockHint: "조건: 🍞 S = 0으로 턴 종료 1회",
 
     art: "assets/relics/relic_ink_bottle.png",
 
     unlock: (g, base) => {
-      const cur = (g.run as any).unlock?.endedTurnSupplyZero ?? 0;
+      const cur = g.run.unlock?.endedTurnSupplyZero ?? 0;
       return cur >= (base.unlock.endedTurnSupplyZero + 1);
     },
 
@@ -377,7 +406,7 @@ relic_monster_leather_helm: {
     art: "assets/relics/relic_moon_scroll_chisel.png",
 
     unlock: (g, base) => {
-      const cur = (g.run as any).unlock?.moonScrollUses ?? 0;
+      const cur = g.run.unlock?.moonScrollUses ?? 0;
       const prev = base.unlock.moonScrollUses ?? 0;
       return cur >= (prev + 3);
     },
@@ -406,14 +435,13 @@ relic_monster_leather_helm: {
 
     art: "assets/relics/relic_order_whistle.png",
 
-    unlock: (g, base) => ((g.run as any).unlock?.threeEnemyWins ?? 0) >= (base.unlock.threeEnemyWins + 1),
+    unlock: (g, base) => (g.run.unlock?.threeEnemyWins ?? 0) >= (base.unlock.threeEnemyWins + 1),
 
     name: "대열 정리의 호루라기",
     text: "적이 죽을 때마다 🛡️ 방어 +6",
     unlockFlavor: "호루라기 소리는 대열을 다시 세운다.",
 
     onCombatStart(g) {
-      // per-combat kill guard (중복 발동 방지)
       (g as any)._orderWhistleKillSet = new Set<string>();
     },
 
@@ -433,7 +461,7 @@ relic_monster_leather_helm: {
       (g as any)._orderWhistleKillSet = set;
 
       addBlock(g, 6);
-      logMsg(g, "유물[대열 정리의 호루라기]: 적 처치 → 방어 +6");
+      logMsg(g, "유물[대열 정리의 호루라기]: 적 처치 → 🛡️ 방어 +6");
     },
   },
 
@@ -445,7 +473,7 @@ relic_monster_leather_helm: {
 
     art: "assets/relics/relic_field_mechanic_glove.png",
 
-    unlock: (g, base) => ((g.run as any).unlock?.endedTurnWith3Installs ?? 0) >= (base.unlock.endedTurnWith3Installs + 1),
+    unlock: (g, base) => (g.run.unlock?.endedTurnWith3Installs ?? 0) >= (base.unlock.endedTurnWith3Installs + 1),
 
     name: "현장 정비공의 장갑",
     text: "턴 종료 시 설치물이 있으면 🍞 S +1",
@@ -455,7 +483,7 @@ relic_monster_leather_helm: {
       const installs = (g.frontSlots.filter(Boolean).length + g.backSlots.filter(Boolean).length) | 0;
       if (installs <= 0) return;
       addSupplies(g, 1);
-      logMsg(g, "유물[현장 정비공의 장갑]: 턴 종료 설치물 보유 → S +1");
+      logMsg(g, "유물[현장 정비공의 장갑]: 턴 종료 설치물 보유 → 🍞 S +1");
     },
   },
 
@@ -467,7 +495,7 @@ relic_monster_leather_helm: {
 
     art: "assets/relics/relic_castle_sight.png",
 
-    unlock: (g, base) => ((g.run as any).unlock?.installDamageDealt ?? 0) >= (base.unlock.installDamageDealt + 15),
+    unlock: (g, base) => (g.run.unlock?.installDamageDealt ?? 0) >= (base.unlock.installDamageDealt + 15),
 
     name: "성곽 조준기",
     text: "설치물이 주는 🗡️ 피해 +1",
@@ -486,7 +514,7 @@ relic_monster_leather_helm: {
   relic_ratskin_charm: {
     id: "relic_ratskin_charm",
     name: "쥐가죽 부적",
-    text: "취약을 받을 때 1 덜 받습니다.",
+    text: "취약을 받을 때 1 덜 받음",
     unlockFlavor: "살가죽. 얇게, 아주 얇게.",
     tags: ["EVENT_ONLY"],
 

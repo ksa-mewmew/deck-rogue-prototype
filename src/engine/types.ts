@@ -1,35 +1,56 @@
-// engine/types.ts
-
 export type Zone = "deck" | "hand" | "discard" | "front" | "back" | "exhausted" | "vanished";
 export type Side = "front" | "back";
 
 export type StatusKey = "vuln" | "weak" | "bleed" | "disrupt" | "slash";
-export type CardTag = "EXHAUST" | "VANISH" | "INSTALL" | "TOKEN" | "INNATE" | "LOCKED";
+export type CardTag = "EXHAUST" | "VANISH" | "INSTALL" | "TOKEN" | "INNATE" | "LOCKED" | "FORGE_START" | "ARROW";
 export type CardRarity = "BASIC" | "COMMON" | "SPECIAL" | "RARE" | "MADNESS";
 export type RelicId = string;
 export type ItemId = string;
+
+export const DAMAGE_ENEMY_FORMULA_KINDS = [
+  "prey_mark",
+  "prey_mark_u1",
+  "triple_bounty",
+  "triple_bounty_u1",
+  "hand_blade",
+  "hand_blade_u1",
+  "lone_blow_20",
+  "lone_blow_26",
+  "castle_ballista_age",
+  "castle_ballista_age_u1",
+] as const;
+export type DamageEnemyFormulaKind = (typeof DAMAGE_ENEMY_FORMULA_KINDS)[number];
+
+export const BLOCK_FORMULA_KINDS = [
+  "hand_blade_back",
+  "hand_blade_back_u1",
+  "lone_blow_block_10",
+  "lone_blow_block_14",
+] as const;
+export type BlockFormulaKind = (typeof BLOCK_FORMULA_KINDS)[number];
 
 export type UiToastKind = "INFO" | "WARN" | "GOLD" | "RELIC";
 export type UiToast = {
   kind: UiToastKind;
   text: string;
-  ms?: number; // 표시 시간(ms). UI 쪽에서 animMul을 곱해 늘려줌
+  ms?: number;
 };
 
-
-// =========================
-// Faith
-// =========================
 export type GodId =
   | "dream_shadow"
   | "wing_artery"
-  | "forge_master"
+  | "master_spear"
+  | "retort_fusion"
+  | "nameless_vow"
   | "bright_darkness"
+  | "twin_heart"
   | "indifferent_one"
   | "armored_tiger"
   | "first_human"
   | "card_dealer"
   | "rabbit_hunt"
+  | "wave_breath"
+  | "forge_master"
   | "madness";
 export type TemptGodId = Exclude<GodId, "madness">;
 export type FaithState = {
@@ -38,27 +59,21 @@ export type FaithState = {
   focus: GodId;
   lastFocus: GodId;
   chosen: boolean;
-  // 적대(배교) 상태. true면 해당 신의 패시브는 적대 효과로 대체되고, 유혹 후보에서도 제외.
   hostile?: Partial<Record<GodId, boolean>>;
-  // 유혹 연속 방지용
   lastTempter?: GodId;
 
-  // 광기(0)
   madnessAwakened?: boolean; // 보물 이후 각성
   madnessTemptUsed?: boolean; // 보물 즉시 1회 선택 소진
   madnessAccepted?: boolean; // 광기 수락 여부
   madnessBoon?: 1 | 2 | 3; // 수락 시 적용되는 긍정
   madnessBane?: 1 | 2 | 3; // 거부 시(적대) 적용되는 부정
-  // 확장용 플래그(나중에 쓰기 편하게)
   forgeIntroShown?: boolean;
 };
 
 
 export type NodeType = "BATTLE" | "ELITE" | "REST" | "TREASURE" | "EVENT" | "SHOP";
 
-// =========================
-// Map / Dungeon graph
-// =========================
+
 export type MapNodeId = string;
 export type MapNodeKind = "START" | NodeType | "EMPTY";
 
@@ -81,8 +96,6 @@ export type DungeonMap = {
   treasureId: MapNodeId | null;
   visionNonce: number;
 };
-
-export type PursuitState = { heat: number };
 
 export type VisionMode = "NORMAL" | "FOCUS" | "WIDE";
 
@@ -151,6 +164,7 @@ export type CardData = {
   name: string;
   rarity?: CardRarity;
   tags?: CardTag[];
+  passives?: CardPassive[];
   frontText: string;
   backText: string;
   front: PlayerEffect[];
@@ -163,12 +177,19 @@ export type CardData = {
     Partial<
       Pick<
         CardData,
-        "name" | "frontText" | "backText" | "front" | "back" | "tags" | "onWinWhileInBack" | "exhaustWhen" | "vanishWhen" | "installWhen"
+        "name" | "frontText" | "backText" | "front" | "back" | "tags" | "passives" | "onWinWhileInBack" | "exhaustWhen" | "vanishWhen" | "installWhen"
       >
     >
   >;
   onWinWhileInBack?: PlayerEffect[];
 };
+
+
+export type CardPassive =
+  | { kind: "onDrawGainBlock"; side: Side; block: number; perTurnCap?: number }
+  | { kind: "retainBlockBetweenTurns"; side: Side }
+  | { kind: "bonusDamageToEnemyIndex"; side: Side; enemyIndex: number; bonus: number }
+  | { kind: "onPlaceIncrementUnlockProgress"; counter: string; n?: number; side?: Side };
 
 
 export type IntentCategory =
@@ -226,10 +247,30 @@ export type IntentMeta = {
 
 export type EnemyPassive = {
   id: string;
-  icon: string; // HUD 아이콘(짧게)
+  icon: string;
   name: string;
   text: string;
 };
+
+
+export type EnemySpecialRule =
+  | {
+      kind: "SOUL_STEALER";
+      warnIntentIndex: number;
+      warnCap: number;
+      nukeChance: number;
+      nukeDamage: number;
+      nukeLabel?: string;
+    };
+
+
+export type EnemySpecialState =
+  | {
+      kind: "SOUL_STEALER";
+      warnCount: number;
+      armed: boolean;
+      willNukeThisTurn: boolean;
+    };
 
 
 export type EnemyData = {
@@ -237,9 +278,17 @@ export type EnemyData = {
   name: string;
   omen?: string;
   maxHp: number;
+  isBoss?: boolean;
   intents: EnemyIntentData[];
   passives?: EnemyPassive[];
+  special?: EnemySpecialRule;
   rule?: string;
+  intentRules?: {
+    noRepeatIntentIndexes?: number[];
+  };
+  targeting?: {
+    forbidTargetedAttackWhenNotLeftmost?: boolean;
+  };
 };
 
 export type EnemyIntentData = {
@@ -254,6 +303,13 @@ export type CardInstance = {
   zone: Zone;
   upgrade: number;
   flipped?: boolean;
+  synth?: {
+    done?: boolean;
+    overrun?: boolean;
+    autoFlip?: boolean;
+    removeExhaust?: boolean;
+    addTags?: CardTag[];
+  };
 };
 
 export type EnemyState = {
@@ -267,10 +323,7 @@ export type EnemyState = {
   immuneNextTurn: boolean;
   immuneThisTurn: boolean;
 
-  soulCastCount?: number;
-  soulWarnCount?: number;
-  soulArmed?: boolean;
-  soulWillNukeThisTurn?: boolean;
+  special?: EnemySpecialState;
 
   intentLabelOverride?: string;
 
@@ -297,29 +350,35 @@ export type PlayerEffect =
   | { op: "ifDrewThisTurn"; then: PlayerEffect[] }
   | { op: "triggerFrontOfBackSlot"; index: number }
   | { op: "damageEnemyByPlayerFatigue"; target: "random" | "select"; mult: number }
+  | { op: "damageEnemyByPlayerBlock"; target: "random" | "select" | "all"; mult?: number }
   | { op: "statusEnemy"; target: "select" | "random" | "all"; key: StatusKey; n: number }
   | { op: "setSupplies"; n: number }
+  | { op: "setFatigue"; n: number }
   | { op: "statusEnemiesAttackingThisTurn"; key: StatusKey; n: number }
   | { op: "maxHp"; n: number }
   | { op: "hp"; n: number }
   | { op: "clearStatusSelf"; key: StatusKey }
-  | { op: "damageEnemyFormula"; target: "select" | "random" | "all"; kind: string }
-  | { op: "damageEnemyFormula"; target: "select" | "random" | "all"; kind: string }
+  | { op: "damageEnemyFormula"; target: "select" | "random" | "all"; kind: DamageEnemyFormulaKind }
   | { op: "addCardToHand"; defId: string; n?: number; upgrade?: number }
-  | { op: "blockFormula"; kind: string }
+  | { op: "blockFormula"; kind: BlockFormulaKind }
   | { op: "discardHandAllDraw"; extraDraw?: number }
   | { op: "discardHandRandom"; n: number }
   | { op: "repeat"; times: number; effects: PlayerEffect[] }
+  | { op: "repeatByOtherInstall"; effects: PlayerEffect[]; includeSelf?: boolean }
   | { op: "ifPlacedThisTurn"; then: PlayerEffect[] }
+  | { op: "ifPlayerBlockAtLeast"; n: number; then: PlayerEffect[] }
   | { op: "ifOtherRowHasDefId"; defId: string; then: PlayerEffect[] }
   | { op: "triggerRandomVanished"; side: Side; times: number }
   | { op: "exhaustSlot"; side: Side; index: number; then?: PlayerEffect[] }
   | { op: "flipSelf" }
   | { op: "ifPlaced"; side: Side; then: PlayerEffect[] }
+  | { op: "blockByPlayerBlock"; mult?: number }
   | { op: "damageEnemyLowestHp"; n: number }
+  | { op: "repeatBySupplies"; timesBase?: number; effects: PlayerEffect[]; reset?: boolean }
   | { op: "damageEnemyRepeatByStatus"; target: "random"; n: number; key: StatusKey; reset?: boolean }
+  | { op: "increaseCardDamageByDefId"; defId: string; n: number }
+  | { op: "increaseCardDamageByTag"; tag: CardTag; n: number }
   | { op: "halveEnemyHpAtIndex"; index: number }
-  | { op: "ifPlaced"; side: Side; then: PlayerEffect[] }
   | { op: "flipAllPlayerCardsUntilCombatEnd" }
   | { op: "pickVanishedToHand"; title?: string; prompt?: string };
 
@@ -340,7 +399,7 @@ export type PendingTarget =
   | {
       kind: "damageSelect";
       amount: number;
-      formulaKind?: string
+      formulaKind?: DamageEnemyFormulaKind;
       sourceCardUid?: string;
       sourceLabel?: string;
       reason?: "FRONT" | "BACK" | "ENEMY" | "EVENT" | "RELIC" | "OTHER";
@@ -357,6 +416,14 @@ export type PendingTarget =
 export type DamagePhase = "PRE_STATUS" | "POST_STATUS" | "PRE_BLOCK" | "POST_BLOCK" | "FINAL";
 export type DamageSource = "PLAYER_ATTACK" | "ENEMY_ATTACK" | "CARD_EFFECT" | "DOT" | "ENV" | "FATIGUE" | "OTHER";
 export type DamageTarget = "PLAYER" | "ENEMY";
+
+export type DamagePlayerFormulaKind =
+  | "goblin_raider"
+  | "watching_statue"
+  | "gloved_hunter"
+  | "goblin_assassin"
+  | "old_monster_corpse"
+  | "punishing_one";
 
 export type DamageContext = {
   phase: DamagePhase;
@@ -376,7 +443,7 @@ export type DamageContext = {
 
 export type EnemyEffect =
   | { op: "damagePlayer"; n: number }
-  | { op: "damagePlayerFormula"; kind: "goblin_raider" | "watching_statue" | "gloved_hunter" | "goblin_assassin" | "old_monster_corpse" | "punishing_one" }
+  | { op: "damagePlayerFormula"; kind: DamagePlayerFormulaKind }
   | { op: "supplies"; n: number }
   | { op: "statusPlayer"; key: StatusKey; n: number }
   | { op: "enemyHealSelf"; n: number }
@@ -407,11 +474,31 @@ export type UnlockProgress = {
   skippedTurn: number;           // 아무 행동도 안 하고 턴 종료한 횟수
   bleedApplied: number;          // 출혈 부여 횟수
   endedTurnSupplyZero: number;   // S=0으로 턴 종료한 횟수
+
+  moonScrollUses: number;        // 달의 두루마리 사용 횟수
+  threeEnemyWins: number;        // 적 3마리 전투 승리 횟수
+  endedTurnWith3Installs: number;// 설치물 3개 이상인 채로 턴 종료한 횟수
+  installDamageDealt: number;    // 설치물로 준 피해 누적
+  itemDiscards: number;          // 아이템 버린 횟수
 };
+
+
+export type RelicUnlockBaseline = {
+  unlock: UnlockProgress;
+  moves: number;
+  timeTotal: number;
+  fatigue: number;
+  supplies: number;
+};
+
 
 export type RelicRuntime = {
   active: boolean;      // 효과 적용 중
   pending: boolean;     // 조건 달성했지만 다음 노드부터라 대기
+
+  obtainedAtNode?: number;
+  activatedAtNode?: number;
+  unlockBase?: RelicUnlockBaseline;
 };
 
 
@@ -447,9 +534,7 @@ export type ShopState = {
   items?: ShopItemOffer[];
   usedUpgrade: boolean;
   usedRemove: boolean;
-  // 선택 화면 오른쪽 칸(illuBox)에 표시할 이미지 경로(assets/..). 필요하면 설정.
   art?: string;
-  // 디버그/추적용
   createdAtMove?: number;
 };
 
@@ -458,15 +543,12 @@ export type RunState = {
 
   timeMove: number;
 
-  // 슬롯 확장(보스 보상)
-  slotCapFront?: number; // 기본 3, 최대 4
-  slotCapBack?: number;  // 기본 3, 최대 4
+  slotCapFront?: number;
+  slotCapBack?: number;
   bossKillCount?: number;
   bossSlotFirstPick?: "front" | "back" | null;
 
   map: DungeonMap;
-
-  pursuit: PursuitState;
 
   vision: VisionState;
 
@@ -495,7 +577,6 @@ export type RunState = {
 
   ominousProphecySeen: boolean;
 
-  // 이벤트/토스트 관련(런 상태)
   eventsSeen?: Record<string, number>;
   pendingEventWinRelicId?: string | null;
   pendingEventWinGold?: number;
@@ -503,10 +584,8 @@ export type RunState = {
 
   relics: RelicId[];
 
-  // 아이템(소모품)
   items?: ItemId[];
 
-  // 아이템 보유 한도(기본 2, 유물 등으로 확장 가능)
   itemCap?: number;
 
 
@@ -517,19 +596,20 @@ export type RunState = {
 
   itemOfferedThisBattle?: boolean;
 
-  // 카드 보상 희귀도 가중치(pity) — 일반 전투(비정예)에서 특별/희귀가 안 뜬 횟수
   rewardPityNonElite?: number;
 
   relicRuntime?: Record<RelicId, RelicRuntime>;
   pendingRelicActivations?: RelicId[];
+  relicUnlocked?: Record<RelicId, boolean>;
   unlock?: UnlockProgress;
 
-  // 상점 재고/서비스 상태(노드별로 유지, 재진입해도 리필되지 않음)
   shops?: Record<MapNodeId, ShopState>;
 
   gold?: number;
 
-  // 신앙
+  cardDamageBonusByDefId?: Record<string, number>;
+  cardDamageBonusByTag?: Partial<Record<CardTag, number>>;
+
   faith?: FaithState;
 };
 
@@ -578,7 +658,6 @@ export type GameState = {
   phase: CombatPhase;
   log: string[];
 
-  // UI 전용 토스트(로그 아님). 저장에는 포함되지 않도록 persist에서 제거함.
   uiToasts?: UiToast[];
 
   run: RunState;
@@ -614,8 +693,7 @@ export type GameState = {
   backUidsThisTurn: string[];
   placedUidsThisTurn: string[];
 
-  // 설치(장비) 카드가 슬롯에 남아있는 턴 수(연속)
-  // key = cardUid
+
   installAgeByUid: Record<string, number>;
 
   time: number;

@@ -32,6 +32,7 @@ export type EventDef = {
 const RUN_ONCE_EVENT_IDS = new Set<string>([
   "goblin_ambush_low_supplies",
   "rat_circle",
+  "tilted_dice_table",
 ]);
 
 export function pickRandomEvent(): EventDef {
@@ -95,10 +96,10 @@ export const MAD_EVENTS: EventDef[] = [
       {
         key: "mad_mirror:take",
         label: "손을 넣는다",
-        detail: "카드 보상. F +2.",
+        detail: "카드 보상. 💤 F +2.",
         apply: (gg) => {
           addFatigue(gg, 2);
-          logMsg(gg, "거울: 무언가를 건져 올렸다. (F +2)");
+          logMsg(gg, "거울: 무언가를 건져 올렸다. (💤 F +2)");
           return "REWARD";
         },
       },
@@ -133,10 +134,10 @@ export const MAD_EVENTS: EventDef[] = [
       {
         key: "mad_contract:burn",
         label: "찢어버린다",
-        detail: "F +1",
+        detail: "💤 F +1",
         apply: (gg) => {
           addFatigue(gg, 1);
-          logMsg(gg, "불길함: F +1");
+          logMsg(gg, "불길함: 💤 F +1");
           return "NONE";
         },
       },
@@ -163,10 +164,10 @@ export const MAD_EVENTS: EventDef[] = [
       {
         key: "mad_lullaby:stay",
         label: "버틴다",
-        detail: "F -1",
+        detail: "💤 F -1",
         apply: (gg) => {
           addFatigue(gg, -1);
-          logMsg(gg, "버팀: F -1");
+          logMsg(gg, "버팀: 💤 F -1");
           return "NONE";
         },
       },
@@ -190,7 +191,7 @@ export const EVENTS: EventDef[] = [
     options: () => [
       {
         key: "drop",
-        label: "카드 1장 제거, F -1",
+        label: "카드 1장 제거, 💤 F -1",
         apply: (g) => {
           addFatigue(g, -1);
           logMsg(g, "이벤트: 짐 버리기 → 제거할 카드를 선택하세요.");
@@ -224,10 +225,10 @@ export const EVENTS: EventDef[] = [
       },
       {
         key: "remove_and_fatigue",
-        label: "카드 1장 제거 후 F +1",
+        label: "카드 1장 제거 후 💤 F +1",
         apply: (g) => {
           addFatigue(g, 1);
-          logMsg(g, "이벤트: 몬스터로부터 숨기 → 카드 제거 후 F+1");
+          logMsg(g, "이벤트: 몬스터로부터 숨기 → 카드 제거 후 💤 F +1");
             return { kind: "REMOVE_PICK", title: "숨기", prompt: "제거할 카드 1장을 선택하세요.", then: "NONE" };
           }
       },
@@ -324,10 +325,10 @@ export const EVENTS: EventDef[] = [
       {
         key: "omen:listen",
         label: "예언을 듣는다",
-        detail: "F +1. 다음 보스를 확정하고 공개합니다.",
+        detail: "💤 F +1. 다음 보스를 확정하고 공개합니다.",
         apply: (g2) => {
           addFatigue(g2, 1);
-          logMsg(g2, "불길한 예언: F +1");
+          logMsg(g2, "불길한 예언: 💤 F +1");
 
           if (!g2.run.nextBossId) {
             if (g2.run.bossPool.length > 0) {
@@ -360,6 +361,56 @@ export const EVENTS: EventDef[] = [
         },
       },
     ],
+  },
+
+  {
+    id: "tilted_dice_table",
+    name: "기울어진 주사위 판",
+    prompt:
+      "금이 간 돌탁자 위, 눈금이 어긋난 주사위가 덜컥거린다.\n" +
+      "한 번만 굴릴 수 있다.",
+    art: `assets/events/event_tilted_dice_table.png`,
+    options: (g) => {
+      const alreadyHasWrongDice = hasRelic(g, "relic_wrong_dice");
+      if (alreadyHasWrongDice) {
+        return [
+          {
+            key: "tilted_dice_table:leave",
+            label: "지나친다",
+            detail: "이미 잘못된 주사위를 가지고 있습니다.",
+            apply: (gg) => {
+              logMsg(gg, "이벤트: 기울어진 주사위 판(이미 보유, 생략)");
+              return "NONE";
+            },
+          },
+        ];
+      }
+
+      return [
+        {
+          key: "tilted_dice_table:challenge",
+          label: "판에 선다",
+          detail: "이벤트 전투(다른 모험가). 승리 시 [잘못된 주사위] 획득",
+          apply: (gg) => {
+            logMsg(gg, "이벤트: 기울어진 주사위 판 → 다른 모험가와 대결 (승리 시 잘못된 주사위)");
+            return {
+              kind: "BATTLE_SPECIAL",
+              title: "기울어진 주사위 판",
+              enemyIds: ["other_adventurer"],
+              onWinGrantRelicId: "relic_wrong_dice",
+            };
+          },
+        },
+        {
+          key: "tilted_dice_table:leave",
+          label: "지나친다",
+          apply: (gg) => {
+            logMsg(gg, "이벤트: 기울어진 주사위 판(생략)");
+            return "NONE";
+          },
+        },
+      ];
+    },
   },
 
   {
@@ -435,7 +486,7 @@ export function applyWhisperDeal(g: GameState) {
 
   // 대가
   const costs = [
-    () => { addFatigue(g, 1); logMsg(g, "대가: F +1"); },
+    () => { addFatigue(g, 1); logMsg(g, "대가: 💤 F +1"); },
     () => { g.player.hp = Math.max(0, g.player.hp - 6); logMsg(g, "대가: HP -6"); },
     () => { removeRandomCardFromDeck(g); logMsg(g, "대가: 덱에서 카드 1장 소실"); },
   ];
@@ -449,6 +500,6 @@ export function applyWhisperDeal(g: GameState) {
   if (t >= 2 && rollMad(g, 0.10)) {
     addCardToDeck(g, "mad_bargain", { upgrade: 0 });
     addFatigue(g, 1);
-    logMsg(g, "속삭임: 거래가 확대되었다… (추가 카드, 추가 F)");
+    logMsg(g, "속삭임: 거래가 확대되었다… (추가 카드, 추가 💤 F)");
   }
 }

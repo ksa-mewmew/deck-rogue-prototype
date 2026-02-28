@@ -63,13 +63,10 @@ export function drawNineSlice(
   ctx.drawImage(imgs.br, x + w - R, y + h - B, R, B);
 
   if (mode === "stretch") {
-    // 상/하
     ctx.drawImage(imgs.t,  cx, y,          cw, T);
     ctx.drawImage(imgs.b,  cx, y + h - B,  cw, B);
-    // 좌/우
     ctx.drawImage(imgs.l,  x,  cy,         L,  ch);
     ctx.drawImage(imgs.r,  x + w - R, cy,  R,  ch);
-    // 중앙
     if (drawCenter) ctx.drawImage(imgs.c, cx, cy, cw, ch);
   } else {
     const patT = ctx.createPattern(imgs.t, "repeat")!;
@@ -78,35 +75,30 @@ export function drawNineSlice(
     const patR = ctx.createPattern(imgs.r, "repeat")!;
     const patC = drawCenter ? ctx.createPattern(imgs.c, "repeat")! : null;
 
-    // 상
     ctx.save();
     ctx.translate(cx, y);
     ctx.fillStyle = patT;
     ctx.fillRect(0, 0, cw, T);
     ctx.restore();
 
-    // 하
     ctx.save();
     ctx.translate(cx, y + h - B);
     ctx.fillStyle = patB;
     ctx.fillRect(0, 0, cw, B);
     ctx.restore();
 
-    // 좌
     ctx.save();
     ctx.translate(x, cy);
     ctx.fillStyle = patL;
     ctx.fillRect(0, 0, L, ch);
     ctx.restore();
 
-    // 우
     ctx.save();
     ctx.translate(x + w - R, cy);
     ctx.fillStyle = patR;
     ctx.fillRect(0, 0, R, ch);
     ctx.restore();
 
-    // 중앙
     if (patC) {
       ctx.save();
       ctx.translate(cx, cy);

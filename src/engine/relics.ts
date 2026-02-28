@@ -1,18 +1,16 @@
-// engine/relics.ts
-import type { GameState, Side, StatusKey } from "./types";
+import type { GameState, Side, UnlockProgress, RelicUnlockBaseline, RelicRuntime } from "./types";
 import { RELICS_BY_ID, EVENT_RELIC_POOL } from "../content/relicsContent";
 import { logMsg, pushUiToast } from "./rules";
 
 export function hasRelic(g: GameState, id: string) {
-  const rs = g.run as any;
-  const relics: string[] = rs?.relics ?? [];
-  return relics.includes(id);
+  ensureRelicSystem(g);
+  return (g.run.relics ?? []).includes(id);
 }
 
 export function gainRelic(g: GameState, id: string) {
-  const rs = g.run as any;
-  rs.relics ??= [];
-  if (!rs.relics.includes(id)) rs.relics.push(id);
+  ensureRelicSystem(g);
+  g.run.relics ??= [];
+  if (!g.run.relics.includes(id)) g.run.relics.push(id);
 }
 
 export const EVENT_RELIC_IDS = new Set<string>(EVENT_RELIC_POOL.map((r) => r.id));
@@ -22,14 +20,14 @@ export function isEventRelicId(id: string) {
 }
 
 export function rollEventRelicId(g: GameState): string | null {
-  const owned = new Set<string>(((g.run as any)?.relics ?? []) as string[]);
+  const owned = new Set<string>(((g.run.relics ?? []) as string[]));
   const candidates = EVENT_RELIC_POOL.map((r) => r.id).filter((id) => !owned.has(id));
   if (candidates.length === 0) return null;
   return candidates[(Math.random() * candidates.length) | 0];
 }
 
 export function rollNormalRelicId(g: GameState): string | null {
-  const owned = new Set<string>((g.run as any)?.relics ?? []);
+  const owned = new Set<string>(g.run.relics ?? []);
   const candidates = Object.keys(RELICS_BY_ID)
     .filter(id => !owned.has(id))
     .filter(id => !isEventRelicId(id));
@@ -37,8 +35,6 @@ export function rollNormalRelicId(g: GameState): string | null {
   if (!candidates.length) return null;
   return candidates[(Math.random() * candidates.length) | 0];
 }
-
-/* ---------------- Hook(런렐릭훅) 타입 ---------------- */
 
 export type RelicPlaceCardCtx = { side: Side; idx: number; cardUid: string };
 
@@ -52,7 +48,6 @@ export type RelicHookMap = {
 
 export type RelicHookName = keyof RelicHookMap;
 
-/* ---------------- Damage 타입 ---------------- */
 
 export type DamageTarget = "PLAYER" | "ENEMY";
 export type DamageSource = "PLAYER_ATTACK" | "ENEMY_ATTACK" | "FATIGUE" | "OTHER";
@@ -108,42 +103,6 @@ export type RelicDef = {
   onDamageApplied?: (g: GameState, ctx: DamageContext, applied: number) => void;
 } & RelicHooks;
 
-/* ---------------- 런타임 상태 ---------------- */
-
-export type RelicRuntimeState = {
-  active: boolean;
-  pending: boolean;
-  obtainedAtNode?: number;
-  activatedAtNode?: number;
-  unlockBase?: RelicUnlockBaseline;
-};
-
-type UnlockProgress = {
-  rest: number;
-  eliteWins: number;
-  tookBigHit10: number;
-  kills: number;
-  endedTurnWeak: number;
-  eventPicks: number;
-  hpLeq15: number;
-  skippedTurn: number;
-  bleedApplied: number;
-  endedTurnSupplyZero: number;
-  moonScrollUses: number;
-
-  // --- custom unlock counters (new relics) ---
-  threeEnemyWins: number;
-  endedTurnWith3Installs: number;
-  installDamageDealt: number;
-};
-
-export type RelicUnlockBaseline = {
-  unlock: UnlockProgress;
-  moves: number;
-  timeTotal: number;
-  fatigue: number;
-  supplies: number;
-};
 
 const DEFAULT_UNLOCK: UnlockProgress = {
   rest: 0,
@@ -161,39 +120,37 @@ const DEFAULT_UNLOCK: UnlockProgress = {
   threeEnemyWins: 0,
   endedTurnWith3Installs: 0,
   installDamageDealt: 0,
+  itemDiscards: 0,
 };
 
 function ensureRelicSystem(g: GameState) {
   g.run.relics ??= [];
-
-  const runAny = g.run as any;
-  runAny.relicRuntime ??= {};
-  runAny.pendingRelicActivations ??= [];
-  runAny.unlock = { ...DEFAULT_UNLOCK, ...(runAny.unlock ?? {}) };
-  runAny.relicUnlocked ??= {};
+  g.run.relicRuntime ??= {};
+  g.run.pendingRelicActivations ??= [];
+  g.run.unlock = { ...DEFAULT_UNLOCK, ...(g.run.unlock ?? {}) };
+  g.run.relicUnlocked ??= {};
 }
 
-function runtimeMap(g: GameState): Record<string, RelicRuntimeState> {
+function runtimeMap(g: GameState): Record<string, RelicRuntime> {
   ensureRelicSystem(g);
-  return (g.run as any).relicRuntime as Record<string, RelicRuntimeState>;
+  return g.run.relicRuntime as Record<string, RelicRuntime>;
 }
 
 function pendingQueue(g: GameState): string[] {
   ensureRelicSystem(g);
-  return (g.run as any).pendingRelicActivations as string[];
+  return g.run.pendingRelicActivations as string[];
 }
 
 export function getUnlockProgress(g: GameState): UnlockProgress {
   ensureRelicSystem(g);
-  return (g.run as any).unlock as UnlockProgress;
+  return g.run.unlock as UnlockProgress;
 }
 
 function snapshotRelicUnlockBaseline(g: GameState): RelicUnlockBaseline {
   const up = getUnlockProgress(g);
-  const runAny = g.run as any;
 
-  const moves = Number(runAny.timeMove ?? g.run?.nodePickCount ?? 0) || 0;
-  const timeTotal = (Number(runAny.timeMove ?? 0) || 0) + (Number((g as any).time ?? 0) || 0);
+  const moves = Number(g.run.timeMove ?? g.run.nodePickCount ?? 0) || 0;
+  const timeTotal = (Number(g.run.timeMove ?? 0) || 0) + (Number(g.time ?? 0) || 0);
 
   return {
     unlock: { ...up },
@@ -204,7 +161,7 @@ function snapshotRelicUnlockBaseline(g: GameState): RelicUnlockBaseline {
   };
 }
 
-function ensureRuntimeEntry(g: GameState, id: string): RelicRuntimeState {
+function ensureRuntimeEntry(g: GameState, id: string): RelicRuntime {
   const map = runtimeMap(g);
   if (map[id]) return map[id];
 
@@ -238,7 +195,7 @@ function isRelicUnlocked(g: GameState, id: string): boolean {
   if (runAny.forceLockedRelics?.[id] === true) return false;
   if (runAny.forceUnlockedRelics?.[id] === true) return true;
 
-  if (runAny.relicUnlocked?.[id] === true) return true;
+  if (g.run.relicUnlocked?.[id] === true) return true;
   if (Array.isArray(runAny.unlockedRelics) && runAny.unlockedRelics.includes(id)) return true;
 
   if (runAny.unlockProgress?.relics?.[id] === true) return true;
@@ -256,10 +213,7 @@ export function getRelicDisplay(g: GameState, id: string) {
   const baseText = def?.text ?? "";
   const art = def?.art;
 
-  const runAny = g.run as any;
-  const st = (runAny.relicRuntime?.[id] ?? null) as
-    | { active: boolean; pending: boolean }
-    | null;
+    const st = (g.run.relicRuntime?.[id] ?? null) as RelicRuntime | null;
 
   const hasUnlock = !!def?.unlock;
   const unlocked = isRelicUnlocked(g, id);
@@ -321,22 +275,20 @@ export function grantRelic(g: GameState, id: string, source: RelicGrantSource = 
   if (!def?.unlock) {
     st.active = true;
     st.pending = false;
-    (g.run as any).relicUnlocked[id] = true;
+    g.run.relicUnlocked[id] = true;
     logMsg(g, `유물 획득: ${def?.name ?? id}`);
     pushUiToast(g, "RELIC", `유물 획득: ${def?.name ?? id}`, 2000);
     return;
   }
 
   st.active = false;
-  // Capture baseline on obtain so we don't instantly unlock from past progress
   if (!st.unlockBase) st.unlockBase = snapshotRelicUnlockBaseline(g);
 
   const disp = getRelicDisplay(g, id);
   logMsg(g, `유물 획득: ${disp.name}`);
   pushUiToast(g, "RELIC", `유물 획득: ${disp.name}`, 2000);
 
-  // NOTE: 획득 직후 즉시 해금 체크를 하지 않습니다.
-  // (직전 전투/이전 진행도가 즉시 반영되어 다음 노드에서 활성되는 문제 방지)
+
 }
 
 function queuePendingActivation(g: GameState, id: string) {
@@ -362,7 +314,6 @@ export function checkRelicUnlocks(g: GameState) {
     if (st.active || st.pending) continue;
 
     if (!st.unlockBase) {
-      // Back-compat for old saves: set baseline first, then wait for future progress
       st.unlockBase = snapshotRelicUnlockBaseline(g);
       continue;
     }
@@ -377,7 +328,7 @@ export function applyPendingRelicActivations(g: GameState) {
   const q = pendingQueue(g);
   if (!q.length) return;
 
-  (g.run as any).pendingRelicActivations = [];
+  g.run.pendingRelicActivations = [];
   const map = runtimeMap(g);
 
   for (const id of q) {
@@ -388,7 +339,7 @@ export function applyPendingRelicActivations(g: GameState) {
     st.active = true;
     st.activatedAtNode = g.run.nodePickCount;
 
-    (g.run as any).relicUnlocked[id] = true;
+    g.run.relicUnlocked[id] = true;
 
     const def = RELICS_BY_ID[id] as RelicDef | undefined;
     def?.onActivate?.(g);

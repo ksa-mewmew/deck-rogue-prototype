@@ -7,6 +7,7 @@ import { offerRelicSingleContent } from "../content/relicRewards";
 import { ITEMS, getItemDefById } from "../content/items";
 import { RELICS_BY_ID } from "../content/relicsContent";
 import { grantRelic } from "./relics";
+import { displayCardTextPair, displayCardNameWithUpgrade } from "./cardText";
 import { addItemToInventory } from "./items";
 import { GOD_LINES, faithCardRewardCount, getPatronGodOrNull, isHostile, shopPriceGold } from "./faith";
 
@@ -27,11 +28,12 @@ export function openBattleCardRewardChoice(g: GameState, opts?: { itemOfferId?: 
 
   const options: ChoiceOption[] = offers.map((o) => {
     const def = getCardDefByIdWithUpgrade(g.content, o.defId, o.upgrade);
-    const label = `${def.name}${o.upgrade > 0 ? ` +${o.upgrade}` : ""}`;
+    const t = displayCardTextPair(g, def.frontText, def.backText);
+    const label = displayCardNameWithUpgrade(g, def.name, o.upgrade);
     return {
       key: `pick:${o.defId}:${o.upgrade}`,
       label,
-      detail: `전열: ${def.frontText} / 후열: ${def.backText}`,
+      detail: `전열: ${t.frontText} / 후열: ${t.backText}`,
     };
   });
   options.push({ key: "skip", label: "생략", detail: "" });
@@ -122,7 +124,6 @@ export function applyRewardChoiceKey(g: GameState, key: string): boolean {
   const choice = g.choice;
   if (!choice) return false;
 
-  // Combined battle reward: allow taking/skipping item without closing the choice.
   {
     const ctx: any = g.choiceCtx as any;
     if (ctx?.kind === "BATTLE_REWARD" || ctx?.kind === "BATTLE_CARD_REWARD") {
@@ -238,7 +239,7 @@ export function applyRewardChoiceKey(g: GameState, key: string): boolean {
 
     card.upgrade = curU + 1;
     const defNow = getCardDefByIdWithUpgrade(g.content, card.defId, card.upgrade);
-    logMsg(g, `카드 강화: ${defNow.name} +${card.upgrade}`);
+    logMsg(g, `카드 강화: ${displayCardNameWithUpgrade(g, defNow.name, card.upgrade)}`);
     closeChoice(g);
     return true;
   }
@@ -345,7 +346,6 @@ export function openRelicOfferChoice(
     options,
   };
 
-  // 선택 화면 일러스트 (예: 보스 유물 선택)
   if (opt.artKeyOrPath) {
     const k = String(opt.artKeyOrPath);
     const art = (k.includes("/") || k.includes("\\") || k.includes(".")) ? k : `assets/ui/${k}.png`;
@@ -384,6 +384,7 @@ export function openBossSlotUpgradeChoice(g: GameState) {
     prompt: "전열 또는 후열 슬롯을 1칸 확장합니다.",
     options,
   };
+  (choice as any).art = "assets/ui/choice/slot_pick.png";
 
   enqueueChoice(g, choice, { kind: "BOSS_SLOT_UPGRADE" });
 }
@@ -397,10 +398,6 @@ export function openBossRelicOfferChoice(g: GameState) {
     artKeyOrPath: "what_to_do",
   });
 }
-
-// =========================
-// Shop
-// =========================
 
 const randInt = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1));
 
@@ -419,7 +416,7 @@ function ensureShopState(g: GameState, nodeId: string): ShopState {
   const existing = runAny.shops[nodeId] as ShopState | undefined;
   if (existing) return existing;
 
-    // 상점 카드 풀: REWARD_POOL에서 weight>0인 카드만 (저주/미사용 카드 방지)
+    // 상점 카드 풀: REWARD_POOL에서 weight>0인 카드만
   const weightedIds = REWARD_POOL.filter((e) => (e.weight ?? 0) > 0).map((e) => e.id);
 
   const allCardIds = (weightedIds.length > 0 ? weightedIds : Object.keys(g.content.cardsById))
@@ -483,7 +480,6 @@ function ensureShopState(g: GameState, nodeId: string): ShopState {
 export function openShopChoice(g: GameState, nodeId: string) {
   const shop = ensureShopState(g, nodeId);
 
-  // shop visit toasts (1회)
   if (getPatronGodOrNull(g) === "first_human" && !(shop as any)._firstHumanShopToastShown) {
     (shop as any)._firstHumanShopToastShown = true;
     pushUiToast(g, "WARN", GOD_LINES.first_human.shop, 2200);
@@ -503,20 +499,20 @@ export function openShopChoice(g: GameState, nodeId: string) {
     const o = shop.cards[i];
     const base = g.content.cardsById[o.defId];
     const name = base?.name ?? o.defId;
-    const upTxt = (o.upgrade ?? 0) > 0 ? ` +${o.upgrade}` : "";
 
     if (o.sold) {
-      options.push({ key: `shop:card:${i}`, label: `${name}${upTxt} (품절)`, detail: "" });
+      options.push({ key: `shop:card:${i}`, label: `${displayCardNameWithUpgrade(g, name, o.upgrade ?? 0)} (품절)`, detail: "" });
       continue;
     }
 
     const priceGold = shopPriceGold(g, o.priceGold);
     const def = getCardDefByIdWithUpgrade(g.content, o.defId, o.upgrade ?? 0);
+    const t = displayCardTextPair(g, def.frontText, def.backText);
     const detail = `가격: 🪙${priceGold}
 
-전열: ${def.frontText}
-후열: ${def.backText}`;
-    options.push({ key: `shop:card:${i}`, label: `${name}${upTxt} (🪙${priceGold})`, detail });
+  전열: ${t.frontText}
+  후열: ${t.backText}`;
+    options.push({ key: `shop:card:${i}`, label: `${displayCardNameWithUpgrade(g, name, o.upgrade ?? 0)} (🪙${priceGold})`, detail });
   }
 
   options.push({ key: `shop:sep:${sep++}`, label: "—", detail: "" });

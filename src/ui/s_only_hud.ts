@@ -5,7 +5,7 @@ export function initSOnlyHud() {
 
   el = document.createElement("div");
   el.id = "hudSOnly";
-  el.style.display = "none"; // 기본은 숨김
+  el.style.display = "none";
   document.body.appendChild(el);
 }
 
