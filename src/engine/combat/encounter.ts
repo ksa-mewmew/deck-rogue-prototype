@@ -125,9 +125,11 @@ export function spawnEncounter(
       ["goblin_commander", "goblin_assassin"], // 지휘관이 왼쪽이면 암살자 장막이 켜져 “바디가드 전투”
       ["goblin_raider", "watching_statue"],  // 많이 써도/적게 써도 한쪽이 아픈 딜레마 + 램프
       ["archive_censor"],                   // 교란/보급/약화로 행동 방해 단독
+      ["living_chain", "living_chain"],                    // 전열 2번 봉인 + 후열 3장 제약
       ["poison_spider"],                    // 출혈 압박 단독
       ["goblin_archer", "goblin_raider"],   // 연타 + 보급/출혈로 잔딜 누적
       ["pebble_golem", "slime"],            // 회복+램프 + 디버프(길어지면 위험)
+      ["living_chain", "watching_statue"],     // 전열 봉인 + 램프(시간 압박)
       
     ],
     [
@@ -139,7 +141,7 @@ export function spawnEncounter(
       ["archive_censor", "debt_collector"],  // (핵심) 교란/보급-2 + 보급락 조건딜 → 전열 많이 깔면 터짐
       ["archive_censor", "slime"],           // 교란+약화 + 출혈/약화 = 운영 붕괴형
       ["poison_spider", "slime"],            // 출혈+약화 누적
-      ["old_monster_corpse", "rat_swarm"],   // 킬 순서 퍼즐: 쥐부터 죽이면 사체 분노↑
+      ["old_monster_corpse", "rat_swarm", "rat_swarm"], // 킬 순서 퍼즐: 쥐부터 죽이면 사체 분노↑
       ["punishing_one"],                     // 손패 크기 자체가 위험(드로우/토큰 덱 견제)
     ],
   ];
@@ -147,9 +149,8 @@ export function spawnEncounter(
   const postTreasurePatterns: string[][] = [
     ["gravity_echo", "poison_spider"],
     ["poison_spider", "poison_spider", "slime"],      // (교체) 디버프 폭주
-    ["goblin_raider", "watching_statue"],             // (교체) 딜레마+램프
-    ["watching_statue", "watching_statue"],
-    ["poison_spider", "poison_spider"],
+    ["goblin_raider", "watching_statue", "watching_statue"],             // (교체) 딜레마+램프
+    ["poison_spider", "poison_spider", "goblin_raider"],      // (교체) 출혈 폭주
     ["rock_golem", "gravity_echo"],
     ["goblin_raider", "goblin_raider", "watching_statue"],
     ["rat_swarm", "rat_swarm", "rat_swarm"],
@@ -163,9 +164,9 @@ export function spawnEncounter(
       ["pebble_golem", "goblin_archer"],      // 램프(+1) + 연타 = ‘빨리 죽이기’ 강제
     ],
     [
-        ["goblin_commander", "goblin_archer", "goblin_archer"], // 취약 + 6연타(턴1부터)
-        ["archive_censor", "goblin_archer", "goblin_raider"],   // 교란/보급 + 연타 + 카드사용딜레마
-        ["poison_spider", "poison_spider", "slime"],            // 출혈 스택 + 약화 = 회복/방어 시험
+      ["goblin_commander", "goblin_archer", "goblin_archer"], // 취약 + 6연타(턴1부터)
+      ["archive_censor", "goblin_archer", "goblin_raider"],   // 교란/보급 + 연타 + 카드사용딜레마
+      ["poison_spider", "poison_spider", "slime"],            // 출혈 스택 + 약화 = 회복/방어 시험
     ],
     [
       ["rock_golem", "gravity_echo"],                          // 램프+2 + 덱사이즈 고딜
@@ -175,9 +176,9 @@ export function spawnEncounter(
  ];
 
   const elitePostTreasurePatterns: string[][] = [
-    ["gravity_echo", "gravity_echo"],
+    ["gravity_echo", "gravity_echo", "living_chain"],   // 램프+3 + 전열봉인 = 시간 압박
     ["watching_statue", "gravity_echo", "rock_golem"],
-    ["debt_collector", "supply_hound", "supply_hound"],
+    ["debt_collector", "supply_hound", "punishing_one"],
   ];
 
   const T = Number((g.run as any).timeMove ?? 0) + (g.time ?? 0);

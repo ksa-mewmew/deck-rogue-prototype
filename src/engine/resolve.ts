@@ -1,5 +1,5 @@
 import type { GameState, Side, PlayerEffect, EnemyState, DamageEnemyFormulaKind } from "./types";
-import { aliveEnemies, logMsg, applyStatusTo, pickOne } from "./rules";
+import { aliveEnemies, logMsg, applyStatusTo, pickOne, getCardInstalledPosition } from "./rules";
 import { addBlock, addFatigue, addSupplies, applyDamageToEnemy, healPlayer, applyDamageToPlayer } from "./effects";
 import { drawCards } from "./combat";
 import { enqueueChoice } from "./choice";
@@ -14,6 +14,7 @@ export type ResolveCtx = {
   cardUid: string;
   sourceLabel?: string;
   reason?: "FRONT" | "BACK" | "ENEMY" | "EVENT" | "RELIC" | "OTHER";
+  applyNumberBonus?: boolean;
 };
 
 function isCardPlacedOnSide(g: GameState, cardUid: string, side: Side): boolean {
@@ -190,6 +191,8 @@ function getBackInstalledImprovArrowBonus(g: GameState): number {
 
 export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
   const g = ctx.game;
+  const prevLogSourceCardUid = (g as any)._logSourceCardUid;
+  (g as any)._logSourceCardUid = ctx.cardUid;
 
   const fromInstall = (() => {
     try {
@@ -216,7 +219,8 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
     }
   };
 
-  const relicNumBonus = isRelicActive(g, "relic_wrong_dice") ? 1 : 0;
+  const applyNumberBonus = ctx.applyNumberBonus !== false;
+  const relicNumBonus = applyNumberBonus && isRelicActive(g, "relic_wrong_dice") ? 1 : 0;
   const overrunNumBonus = (g.cards[ctx.cardUid] as any)?.synth?.overrun ? 1 : 0;
   const numBonus = relicNumBonus + overrunNumBonus;
   const withNumBonus = (n: number) => {
@@ -247,8 +251,9 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
     return n + cardDamageBonus;
   };
 
-  for (const e of effects) {
-    switch (e.op) {
+  try {
+    for (const e of effects) {
+      switch (e.op) {
       case "block":
         addBlock(g, withNumBonus(e.n));
         break;
@@ -347,6 +352,36 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
         break;
       }
 
+      case "discardHandRandomDraw": {
+        let n = withNumBonus(e.n);
+        n = Math.max(0, Math.min(n, g.hand.length));
+        if (n <= 0) {
+          logMsg(g, `손패 무작위 버림: 0장`);
+          break;
+        }
+
+        const pool = g.hand.slice();
+        const picked: string[] = [];
+        for (let i = 0; i < n; i++) {
+          const uid = pickOne(pool);
+          const ix = pool.indexOf(uid);
+          if (ix >= 0) pool.splice(ix, 1);
+          picked.push(uid);
+        }
+
+        g.hand = g.hand.filter((u) => !picked.includes(u));
+        for (const uid of picked) {
+          g.discard.push(uid);
+          g.cards[uid].zone = "discard";
+        }
+
+        logMsg(g, `손패 무작위 버림: ${picked.length}장`);
+
+        const drawn = drawCards(g, picked.length);
+        g.drawCountThisTurn += drawn;
+        break;
+      }
+
       case "ifPlaced": {
         if (isCardPlacedOnSide(g, ctx.cardUid, e.side)) {
         resolvePlayerEffects(ctx, e.then);
@@ -387,6 +422,13 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
         if (g.drawCountThisTurn > 0) {
           resolvePlayerEffects(ctx, e.then);
         }
+        break;
+      }
+
+      case "ifPlayerSuppliesAtMost": {
+        const limit = Math.max(0, withNumBonus(e.n));
+        if (g.player.supplies <= limit) resolvePlayerEffects(ctx, e.then ?? []);
+        else resolvePlayerEffects(ctx, e.else ?? []);
         break;
       }
 
@@ -582,6 +624,17 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
         logMsg(g, "이번 턴 적 공격 피해 무효");
         break;
 
+      case "reduceIncomingDamageThisTurn": {
+        const amount = Math.max(0, withNumBonus(e.n));
+        if (amount <= 0) break;
+        g.player.incomingDamageReductionThisTurn = Math.max(
+          0,
+          (g.player.incomingDamageReductionThisTurn ?? 0) + amount
+        );
+        logMsg(g, `이번 턴 받는 피해 감소 +${amount}`);
+        break;
+      }
+
       case "triggerFrontOfBackSlot": {
         const idx = withNumBonus((e.index ?? 0) | 0);
         const uid0 = g.backSlots[idx];
@@ -684,6 +737,38 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
         break;
       }
 
+      case "exhaustRelativeSlotByCurrentPosition": {
+        const pos = getCardInstalledPosition(g, ctx.cardUid);
+        if (!pos) {
+          logMsg(g, `상대 슬롯 소모 실패: 현재 위치를 찾지 못함 (${ctx.cardUid})`);
+          break;
+        }
+
+        const offset = pos.side === "front"
+          ? (Number(e.frontOffset ?? 0) || 0)
+          : (Number(e.backOffset ?? 0) || 0);
+        const targetIdx = pos.index + offset;
+        const slots = pos.side === "front" ? g.frontSlots : g.backSlots;
+        if (targetIdx < 0 || targetIdx >= slots.length) {
+          logMsg(g, `소모 실패: ${pos.side}${targetIdx + 1}번 슬롯 범위를 벗어남`);
+          break;
+        }
+
+        const uid0 = slots[targetIdx];
+        if (!uid0) {
+          logMsg(g, `소모 실패: ${pos.side}${targetIdx + 1}번 슬롯이 비어 있음`);
+          break;
+        }
+
+        exhaustCardNow(g, uid0, `${pos.side}${targetIdx + 1} 슬롯`);
+        slots[targetIdx] = null;
+
+        if (e.then && e.then.length > 0) {
+          resolvePlayerEffects({ ...ctx, applyNumberBonus: false }, e.then);
+        }
+        break;
+      }
+
       case "flipSelf": {
         const inst = g.cards[ctx.cardUid];
         if (inst) {
@@ -777,6 +862,9 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
         const _exhaustive: never = e;
         return _exhaustive;
       }
+      }
     }
+  } finally {
+    (g as any)._logSourceCardUid = prevLogSourceCardUid;
   }
 }

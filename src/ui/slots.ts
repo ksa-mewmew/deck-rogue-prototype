@@ -14,6 +14,11 @@ export type RenderSlotsGridDeps = {
   beginDrag: (ev: PointerEvent, init: { kind: "hand" | "slot"; cardUid: string; fromHandIndex?: number; fromSide?: Side; fromIdx?: number }) => void;
 };
 
+function isFrontSlotLockedByLivingChain(g: GameState, idx: number): boolean {
+  if (idx !== 1) return false;
+  return (g.enemies ?? []).some((e: any) => e && e.hp > 0 && e.id === "living_chain");
+}
+
 export function applySlotCardScale(slotEl: HTMLElement, scalerEl: HTMLElement) {
   const css = getComputedStyle(document.documentElement);
 
@@ -68,10 +73,13 @@ export function renderSlotsGrid(g: GameState, actions: any, side: Side, deps: Re
   const cap = Math.max(3, Math.min(4, Math.floor(Number.isFinite(capRaw) ? capRaw : 3)));
 
   for (let i = 0; i < cap; i++) {
-    const disabled = side === "back" ? !!(g as any).backSlotDisabled?.[i] : false;
+    const disabledBack = side === "back" ? !!(g as any).backSlotDisabled?.[i] : false;
+    const disabledFrontChain = side === "front" ? isFrontSlotLockedByLivingChain(g, i) : false;
+    const disabled = disabledBack || disabledFrontChain;
 
     const s = document.createElement("div");
     s.className = "slot" + (disabled ? " disabled" : "");
+    if (disabledFrontChain) s.classList.add("chainLocked");
     (s as any).dataset.slotSide = side;
     (s as any).dataset.slotIndex = String(i);
 

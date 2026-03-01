@@ -117,7 +117,7 @@ export function useItemAt(g: GameState, idx: number): boolean {
   }
 
   // 효과 적용
-  resolvePlayerEffects({ game: g, side: "front", cardUid: "", sourceLabel: `아이템: ${def.name}`, reason: "OTHER" }, def.effects ?? []);
+  resolvePlayerEffects({ game: g, side: "front", cardUid: "", sourceLabel: `아이템: ${def.name}`, reason: "OTHER", applyNumberBonus: false }, def.effects ?? []);
 
   // 소모(쿨다운/턴 제한 없음)
   const consumed = removeItemAt(g, idx);

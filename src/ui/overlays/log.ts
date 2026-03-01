@@ -10,6 +10,9 @@ const LOG_COLLAPSED_KEY = "deckrogue_logCollapsed";
 
 function logBox(text: string) {
   const pre = el("pre", "log", text);
+  requestAnimationFrame(() => {
+    pre.scrollTop = pre.scrollHeight;
+  });
   return pre;
 }
 
@@ -104,6 +107,9 @@ export function renderLogOverlay(g: GameState, deps: { onClose: () => void; mkBu
   const pre = el("pre", "log", (g.log ?? []).join("\n"));
   pre.style.maxHeight = "60vh";
   pre.style.overflow = "auto";
+  requestAnimationFrame(() => {
+    pre.scrollTop = pre.scrollHeight;
+  });
   sheet.appendChild(pre);
 
   layer.onclick = () => deps.onClose();

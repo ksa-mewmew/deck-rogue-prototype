@@ -99,6 +99,7 @@ function hitTestSlot(x: number, y: number, g: GameState): SlotDrop | null {
   if (idx < 0 || idx >= cap) return null;
 
   if (side === "back" && g.backSlotDisabled?.[idx]) return null;
+  if (side === "front" && idx === 1 && (g.enemies ?? []).some((e: any) => e && e.hp > 0 && e.id === "living_chain")) return null;
   return { side, idx };
 }
 
@@ -124,6 +125,7 @@ export function initDragManager(p: {
   }
 
   function clear() {
+    setHandScrollLocked(false);
     if (drag?.sourceEl) drag.sourceEl.classList.remove("isDraggingSource");
     drag = null;
     hoverSlot = null;
@@ -279,6 +281,13 @@ export function initDragManager(p: {
     if (bound) return;
     bound = true;
 
+    const cancelActiveDrag = () => {
+      if (!drag) return;
+      const g = getG();
+      clear();
+      renderAll(g);
+    };
+
     window.addEventListener(
       "pointermove",
       (ev) => {
@@ -402,6 +411,19 @@ export function initDragManager(p: {
       hoverSlot = null;
       renderAll(g);
     });
+
+    window.addEventListener("pointercancel", (ev) => {
+      if (!drag || ev.pointerId !== drag.pointerId) return;
+      cancelActiveDrag();
+    }, { passive: true });
+
+    window.addEventListener("blur", () => {
+      cancelActiveDrag();
+    }, { passive: true });
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible") cancelActiveDrag();
+    }, { passive: true });
   }
 
   return {

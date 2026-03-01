@@ -135,6 +135,7 @@ export const REWARD_POOL: RewardEntry[] = [
   { id: "vital_shot", weight: 12 },
   { id: "taunt", weight: 12 },
   { id: "cloth_scrap_armor", weight: 12 },
+  { id: "hide_on_floor", weight: 12 },
   { id: "prey_mark", weight: 12 },
   { id: "hand_blade", weight: 12 },
   { id: "lone_blow", weight: 12 },
@@ -151,6 +152,7 @@ export const REWARD_POOL: RewardEntry[] = [
   { id: "arrow_rain", weight: 20 },
   { id: "camp_prep", weight: 20 },
   { id: "rapid_fire", weight: 20 },
+  { id: "quiet_ambush", weight: 20 },
   { id: "blood_contract", weight: 20 },
   { id: "brawl_cleaver", weight: 20 },
   { id: "gambler_glove", weight: 20 },
@@ -162,6 +164,7 @@ export const REWARD_POOL: RewardEntry[] = [
   { id: "heavy_shield", weight: 20 },
   { id: "reinforced_bastion", weight: 20 },
   { id: "improv_arrow", weight: 20 },
+  { id: "low_body_temperature", weight: 20 },
 
 ];
 

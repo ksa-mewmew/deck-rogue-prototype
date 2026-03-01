@@ -348,6 +348,7 @@ export type PlayerEffect =
   | { op: "immuneDisruptThisTurn" }
   | { op: "nullifyDamageThisTurn" }
   | { op: "ifDrewThisTurn"; then: PlayerEffect[] }
+  | { op: "ifPlayerSuppliesAtMost"; n: number; then: PlayerEffect[]; else?: PlayerEffect[] }
   | { op: "triggerFrontOfBackSlot"; index: number }
   | { op: "damageEnemyByPlayerFatigue"; target: "random" | "select"; mult: number }
   | { op: "damageEnemyByPlayerBlock"; target: "random" | "select" | "all"; mult?: number }
@@ -363,6 +364,7 @@ export type PlayerEffect =
   | { op: "blockFormula"; kind: BlockFormulaKind }
   | { op: "discardHandAllDraw"; extraDraw?: number }
   | { op: "discardHandRandom"; n: number }
+  | { op: "discardHandRandomDraw"; n: number }
   | { op: "repeat"; times: number; effects: PlayerEffect[] }
   | { op: "repeatByOtherInstall"; effects: PlayerEffect[]; includeSelf?: boolean }
   | { op: "ifPlacedThisTurn"; then: PlayerEffect[] }
@@ -370,6 +372,7 @@ export type PlayerEffect =
   | { op: "ifOtherRowHasDefId"; defId: string; then: PlayerEffect[] }
   | { op: "triggerRandomVanished"; side: Side; times: number }
   | { op: "exhaustSlot"; side: Side; index: number; then?: PlayerEffect[] }
+  | { op: "exhaustRelativeSlotByCurrentPosition"; frontOffset: number; backOffset: number; then?: PlayerEffect[] }
   | { op: "flipSelf" }
   | { op: "ifPlaced"; side: Side; then: PlayerEffect[] }
   | { op: "blockByPlayerBlock"; mult?: number }
@@ -380,7 +383,8 @@ export type PlayerEffect =
   | { op: "increaseCardDamageByTag"; tag: CardTag; n: number }
   | { op: "halveEnemyHpAtIndex"; index: number }
   | { op: "flipAllPlayerCardsUntilCombatEnd" }
-  | { op: "pickVanishedToHand"; title?: string; prompt?: string };
+  | { op: "pickVanishedToHand"; title?: string; prompt?: string }
+  | { op: "reduceIncomingDamageThisTurn"; n: number };
 
 
 export type ItemData = {
@@ -460,7 +464,8 @@ export type EnemyEffect =
       capHits?: number;     // 최대 타수(선택)
     }
   | { op: "damagePlayerIfSuppliesPositive"; n: number }
-  | { op: "damagePlayerIfSuppliesZero"; n: number };
+  | { op: "damagePlayerIfSuppliesZero"; n: number }
+  | { op: "suppliesIfPlayerBackFull"; n: number };
 
 
 export type UnlockProgress = {
@@ -512,6 +517,7 @@ export type PlayerState = {
   status: Record<StatusKey, number>;
   immuneToDisruptThisTurn: boolean;
   nullifyDamageThisTurn: boolean;
+  incomingDamageReductionThisTurn: number;
 };
 
 

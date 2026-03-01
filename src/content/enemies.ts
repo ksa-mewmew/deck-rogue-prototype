@@ -10,7 +10,7 @@ export const ENEMIES = [
     intents: [
       { label: "창 찌르기: 5 피해, 3번 발동", acts:
         [{ op: "damagePlayer", n: 5 }, { op: "damagePlayer", n: 5 }, { op: "damagePlayer", n: 5 }] },
-      { label: "독약 뿌리기: 출혈 +4, 취약 +4, 약화 +4 부여", acts: [
+      { label: "독약 뿌리기: 출혈 +4, 취약 +4, 약화 +4", acts: [
           { op: "statusPlayer", key: "bleed", n: 4 },
           { op: "statusPlayer", key: "vuln", n: 4 },
           { op: "statusPlayer", key: "weak", n: 4 },
@@ -29,7 +29,7 @@ export const ENEMIES = [
         acts: [{ op: "damagePlayerFormula", kind: "goblin_raider" }],
       },
       {
-        label: "훔치기: 출혈 +2 부여, S -3",
+        label: "훔치기: 출혈 +2, S -3",
         acts: [{ op: "supplies", n: -3 }, { op: "statusPlayer", key: "bleed", n: 2 }],
       },
     ],
@@ -39,7 +39,7 @@ export const ENEMIES = [
     name: "감시하는 석상",
     maxHp: 25,
     passives: [
-      { id: "ramp_atk_1", icon: "👁️", name: "감시의 축적", text: "매 턴 공격력이 +1 증가합니다." },
+      { id: "ramp_atk_1", icon: "👁️", name: "몰리는 시선", text: "매 턴 공격력이 +1 증가합니다." },
     ],
     intents: [
       {
@@ -54,11 +54,11 @@ export const ENEMIES = [
     maxHp: 30,
     intentRules: { noRepeatIntentIndexes: [1] },
     passives: [
-      { id: "ramp_atk_1", icon: "🪨", name: "돌의 경화", text: "매 턴 공격력이 +1 증가합니다." },
+      { id: "ramp_atk_1", icon: "🪨", name: "경화", text: "매 턴 공격력이 +1 증가합니다." },
     ],
     intents: [
       { label: "조약돌 던지기: 8 피해", acts: [{ op: "damagePlayer", n: 8 }] },
-      { label: "모래 모으기: 자신 HP 6 회복", acts: [{ op: "enemyHealSelf", n: 6 }] },
+      { label: "모래 모으기: HP 6 회복", acts: [{ op: "enemyHealSelf", n: 6 }] },
     ],
   },
 
@@ -72,7 +72,7 @@ export const ENEMIES = [
     ],
     intents: [
       { label: "바위 던지기: 10 피해", acts: [{ op: "damagePlayer", n: 10 }] },
-      { label: "땅 모으기: 자신 HP 8 회복", acts: [{ op: "enemyHealSelf", n: 8 }] },
+      { label: "땅 모으기: HP 8 회복", acts: [{ op: "enemyHealSelf", n: 8 }] },
     ],
   },
   {
@@ -81,10 +81,10 @@ export const ENEMIES = [
     maxHp: 30,
     intentRules: { noRepeatIntentIndexes: [0, 1] },
     intents: [
-      {label: "산성액: 출혈 +3 부여",
+      {label: "산성액: 출혈 +3",
         acts: [{ op: "statusPlayer", key: "bleed", n: 3 }]},
       {
-        label: "점액: 약화 +3 부여 후 자신 HP 3 회복",
+        label: "점액: 약화 +3, HP 3 회복",
         acts: [{ op: "statusPlayer", key: "weak", n: 3 }, { op: "enemyHealSelf", n: 3 }],
       },
       { label: "때리기: 6 피해", acts: [{ op: "damagePlayer", n: 6 }] },
@@ -98,7 +98,7 @@ export const ENEMIES = [
     intentRules: { noRepeatIntentIndexes: [0, 2] },
     intents: [
       {
-        label: "독니로 물기: 출혈 +4 부여",
+        label: "독니로 물기: 출혈 +4",
         acts: [{ op: "statusPlayer", key: "bleed", n: 4 }],
       },
       {
@@ -106,7 +106,7 @@ export const ENEMIES = [
         acts: [{ op: "damagePlayer", n: 7 }],
       },
       {
-        label: "단번에 물기: 출혈 +2 부여, 6 피해",
+        label: "단번에 물기: 출혈 +2, 6 피해",
         acts: [
           { op: "statusPlayer", key: "bleed", n: 2 },
           { op: "damagePlayer", n: 6 },
@@ -145,7 +145,7 @@ export const ENEMIES = [
         acts: [{ op: "damagePlayer", n: 4 }, { op: "damagePlayer", n: 4 }],
       },
       {
-        label: "기습하기: 취약 +2 부여",
+        label: "기습하기: 취약 +2",
         acts: [{ op: "statusPlayer", key: "vuln", n: 2 }],
       },
       {
@@ -160,7 +160,7 @@ export const ENEMIES = [
     maxHp: 30,
     intents: [
       {
-        label: "호령: 취약 +2 부여",
+        label: "호령: 취약 +2",
         acts: [{ op: "statusPlayer", key: "vuln", n: 2 }],
       },
       {
@@ -168,7 +168,7 @@ export const ENEMIES = [
         acts: [{ op: "damagePlayer", n: 7 }],
       },
       {
-        label: "전술 지시: 약화 +2 부여",
+        label: "전술 지시: 약화 +2",
         acts: [{ op: "statusPlayer", key: "weak", n: 2 }],
       },
     ],
@@ -208,7 +208,7 @@ export const ENEMIES = [
         id: "shadow_veil",
         icon: "👥",
         name: "그림자 장막",
-        text: "왼쪽에 적이 있을 때, 공격(대상 지정)으로 때릴 수 없습니다.",
+        text: "왼쪽에 적이 있을 때, 지정 공격으로 때릴 수 없습니다.",
       },
     ],
     intents: [
@@ -217,11 +217,11 @@ export const ENEMIES = [
         acts: [{ op: "enemySetAssassinAim", n: 1 }],
       },
       {
-        label: "암살: 8 + 암살 수치×2 피해",
+        label: "암살: 8 + 암살 수치×4 피해",
         acts: [{ op: "damagePlayerFormula", kind: "goblin_assassin" }],
       },
       {
-        label: "재정비: 자신 HP 5 회복",
+        label: "재정비: HP 5 회복",
         acts: [{ op: "enemyHealSelf", n: 5 }],
       },
     ],
@@ -235,7 +235,7 @@ export const ENEMIES = [
       {
         id: "rotten_rage",
         icon: "☠️",
-        name: "썩은 분노",
+        name: "썩어버린 분노",
         text: "다른 적이 죽을 때마다 분노 +1 (분노당 공격 +4).",
       },
     ],
@@ -245,7 +245,7 @@ export const ENEMIES = [
         acts: [{ op: "damagePlayerFormula", kind: "old_monster_corpse" }],
       },
       {
-        label: "질척임: 자신 HP 6 회복",
+        label: "질척임: HP 6 회복",
         acts: [{ op: "enemyHealSelf", n: 6 }],
       },
     ],
@@ -269,7 +269,7 @@ export const ENEMIES = [
         acts: [{ op: "damagePlayerFormula", kind: "punishing_one" }],
       },
       {
-        label: "추궁: 약화 +2 부여",
+        label: "추궁: 약화 +2",
         acts: [{ op: "statusPlayer", key: "weak", n: 2 }],
       },
     ],
@@ -281,7 +281,7 @@ export const ENEMIES = [
     maxHp: 52,
     intents: [
       {
-        label: "가늠: 취약 +3 부여",
+        label: "가늠: 취약 +3",
         acts: [{ op: "statusPlayer", key: "vuln", n: 3 }],
       },
       {
@@ -289,8 +289,8 @@ export const ENEMIES = [
         acts: [{ op: "damagePlayerFormula", kind: "gloved_hunter" }],
       },
       {
-        label: "사살: 9 피해",
-        acts: [{ op: "damagePlayer", n: 9 }],
+        label: "사살: 10 피해",
+        acts: [{ op: "damagePlayer", n: 10 }],
       },
     ],
   },
@@ -300,7 +300,7 @@ export const ENEMIES = [
     name: "장부 수금관",
     maxHp: 55,
     intents: [
-      { label: "수금: S -3", acts: [{ op: "supplies", n: -4 }] },
+      { label: "수금: S -3", acts: [{ op: "supplies", n: -3 }] },
       { label: "압류: (S가 0이면) 15 피해", acts: [{ op: "damagePlayerIfSuppliesZero", n: 15 }] },
       { label: "재점검: 아무 행동도 하지 않음", acts: [] },
     ],
@@ -311,7 +311,7 @@ export const ENEMIES = [
     name: "보급 사냥개",
     maxHp: 26,
     intents: [
-      { label: "냄새 맡기: 취약 +2 부여", acts: [{ op: "statusPlayer", key: "vuln", n: 2 }] },
+      { label: "냄새 맡기: 취약 +2", acts: [{ op: "statusPlayer", key: "vuln", n: 2 }] },
       { label: "덮치기: (S가 0이 아니면) 7 피해", acts: [{ op: "damagePlayerIfSuppliesPositive", n: 7 }] },
       { label: "뜯어내기: S -2", acts: [{ op: "supplies", n: -2 }] },
     ],
@@ -323,7 +323,7 @@ export const ENEMIES = [
     maxHp: 34,
     intents: [
       {
-        label: "검열 주문: 교란 +2 부여",
+        label: "검열 주문: 교란 +2",
         acts: [{ op: "statusPlayer", key: "disrupt", n: 2 }],
       },
       {
@@ -331,9 +331,31 @@ export const ENEMIES = [
         acts: [{ op: "supplies", n: -2 }],
       },
       {
-        label: "깃펜 찌르기: 7 피해, 약화 +2 부여",
+        label: "깃펜 찌르기: 7 피해, 약화 +2",
         acts: [{ op: "damagePlayer", n: 7 }, { op: "statusPlayer", key: "weak", n: 2 }],
       },
+    ],
+  },
+
+  {
+    id: "living_chain",
+    name: "살아있는 사슬",
+    maxHp: 42,
+    passives: [
+      {
+        id: "bind_front_mid",
+        icon: "⛓️",
+        name: "꽁꽁 묶기",
+        text: "이 적이 살아있는 동안, 전열 2번 칸을 사용할 수 없습니다.",
+      },
+    ],
+    intents: [
+      { label: "휘두르기: 12 피해", acts: [{ op: "damagePlayer", n: 12 }] },
+      {
+        label: "체포: 상대의 후열이 세 장이면 S -4",
+        acts: [{ op: "suppliesIfPlayerBackFull", n: -4 }],
+      },
+      { label: "사슬 엮기: 8 피해, HP 5 회복", acts: [{ op: "damagePlayer", n: 8 }, { op: "enemyHealSelf", n: 5 }] },
     ],
   },
 
@@ -346,7 +368,7 @@ export const ENEMIES = [
     maxHp: 90,
     isBoss: true,
     intents: [
-      { label: "중력 수축: 약화 +3 부여", acts: [{ op: "statusPlayer", key: "weak", n: 3 }] },
+      { label: "중력 수축: 약화 +3", acts: [{ op: "statusPlayer", key: "weak", n: 3 }] },
       { label: "특이점 생성", acts: [{ op: "damagePlayerByDeckSize", base: 8, per: 3, div: 5, cap: 30 }] },
       { label: "천장 붕괴: 11 피해", acts: [{ op: "damagePlayer", n: 11 },] },
     ],
@@ -361,7 +383,7 @@ export const ENEMIES = [
     isBoss: true,
     intentRules: { noRepeatIntentIndexes: [0] },
     intents: [
-      { label: "저주의 기운: 출혈 +3 부여", acts: [{ op: "statusPlayer", key: "bleed", n: 3 }] },
+      { label: "저주의 기운: 출혈 +3", acts: [{ op: "statusPlayer", key: "bleed", n: 3 }] },
       { label: "저주의 기운: F +1", acts: [{ op: "fatiguePlayer", n: 1 }] },
       { label: "아무 행동도 하지 않음", acts: [] },
     ],
@@ -375,7 +397,7 @@ export const ENEMIES = [
     isBoss: true,
     intentRules: { noRepeatIntentIndexes: [1] },
     intents: [
-      { label: "내려치기: 취약 +2 부여, 10 피해", acts: [{ op: "statusPlayer", key: "vuln", n: 2 }, { op: "damagePlayer", n: 15 }] },
+      { label: "내려치기: 취약 +2, 10 피해", acts: [{ op: "statusPlayer", key: "vuln", n: 2 }, { op: "damagePlayer", n: 15 }] },
       { label: "단단한 피부: 다음 턴 동안 피해를 입지 않음", acts: [{ op: "enemyImmuneNextTurn" }] },
       { label: "타고난 회복: 자신 HP 15 회복", acts: [{ op: "enemyHealSelf", n: 15 }]},
       {
@@ -395,7 +417,7 @@ export const ENEMIES = [
     maxHp: 80,
     isBoss: true,
     passives: [
-      { id: "soul_apocalypse", icon: "☄️", name: "예언된 종말", text: "예언(카운트)이 3회 누적되면 폭발 가능 상태가 됩니다. 폭발하면 50 피해를 줍니다." },
+      { id: "soul_apocalypse", icon: "☄️", name: "예언된 종말", text: "예언이 3회 누적되면 폭발 가능 상태가 됩니다. 폭발하면 50 피해를 줍니다." },
     ],
     special: { kind: "SOUL_STEALER", warnIntentIndex: 2, warnCap: 3, nukeChance: 0.6, nukeDamage: 50, nukeLabel: "종말: 50 피해" },
     intents: [

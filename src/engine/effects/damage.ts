@@ -67,7 +67,7 @@ export function applyDamageToEnemy(g: GameState, enemy: EnemyState, raw: number)
   if (getPatronGodOrNull(g) === "master_spear") {
     const front = aliveEnemies(g)[0];
     if (front && g.enemies.indexOf(front) === idx) {
-      const extra = Math.floor(raw * 0.5);
+      const extra = Math.floor(raw * 0.25);
       if (extra > 0) raw += extra;
     }
   }
@@ -81,7 +81,7 @@ export function applyDamageToEnemy(g: GameState, enemy: EnemyState, raw: number)
     enemyId: enemy.id,
   };
 
-  let dmg = modifyDamageByRelics(g, {
+  const preStatus = modifyDamageByRelics(g, {
     ...ctxBase,
     phase: "PRE_STATUS",
     current: raw,
@@ -91,40 +91,41 @@ export function applyDamageToEnemy(g: GameState, enemy: EnemyState, raw: number)
 
   const attackerWeak = g.player.status.weak ?? 0;
   const targetVuln = enemy.status.vuln ?? 0;
-  dmg = dmg - attackerWeak + targetVuln;
-  if (dmg < 0) dmg = 0;
+  const afterStatus = Math.max(0, preStatus - attackerWeak + targetVuln);
 
-  dmg = modifyDamageByRelics(g, {
+  const postStatus = modifyDamageByRelics(g, {
     ...ctxBase,
     phase: "POST_STATUS",
-    current: dmg,
-    afterStatus: dmg,
+    current: afterStatus,
+    afterStatus,
     targetVuln,
     attackerWeak,
   });
 
-  dmg = modifyDamageByRelics(g, {
+  const finalDamage = modifyDamageByRelics(g, {
     ...ctxBase,
     phase: "FINAL",
-    current: dmg,
-    afterStatus: dmg,
+    current: postStatus,
+    afterStatus: postStatus,
     targetVuln,
     attackerWeak,
   });
 
-  if (dmg <= 0) {
-    logMsg(g, `적(${enemy.name})에게 피해 0 (유물/상태로 상쇄)`);
+  const formula = `식: ${raw}(기본) → ${preStatus}(사전보정) → max(0, ${preStatus} - ${attackerWeak}(약화) + ${targetVuln}(취약)) = ${afterStatus} → ${postStatus}(상태후) → ${finalDamage}(최종)`;
+
+  if (finalDamage <= 0) {
+    logMsg(g, `적(${enemy.name})에게 피해 0 (유물/상태로 상쇄). ${formula}`);
     cleanupPendingTargetsIfNoEnemies(g);
     return;
   }
 
   const beforeHp = enemy.hp;
-  enemy.hp = Math.max(0, enemy.hp - dmg);
-  logMsg(g, `적(${enemy.name})에게 ${dmg} 피해. (HP ${enemy.hp}/${enemy.maxHp})`);
+  enemy.hp = Math.max(0, enemy.hp - finalDamage);
+  logMsg(g, `적(${enemy.name})에게 ${finalDamage} 피해. ${formula}. (HP ${enemy.hp}/${enemy.maxHp})`);
 
-  if (fromInstall && dmg > 0) {
+  if (fromInstall && finalDamage > 0) {
     const up = getUnlockProgress(g);
-    up.installDamageDealt += dmg;
+    up.installDamageDealt += finalDamage;
     checkRelicUnlocks(g);
   }
 
@@ -146,11 +147,11 @@ export function applyDamageToEnemy(g: GameState, enemy: EnemyState, raw: number)
   notifyDamageAppliedByRelics(g, {
     ...ctxBase,
     phase: "FINAL",
-    current: dmg,
-    afterStatus: dmg,
+    current: finalDamage,
+    afterStatus: finalDamage,
     targetVuln,
     attackerWeak,
-  }, dmg);
+  }, finalDamage);
 
   cleanupPendingTargetsIfNoEnemies(g);
   if (aliveEnemies(g).length === 0) {
@@ -184,7 +185,7 @@ export function applyDamageToPlayer(
     reason,
   };
 
-  let dmg = modifyDamageByRelics(g, {
+  const preStatus = modifyDamageByRelics(g, {
     ...base,
     phase: "PRE_STATUS",
     current: raw,
@@ -192,62 +193,73 @@ export function applyDamageToPlayer(
     targetVuln: g.player.status.vuln ?? 0,
   });
 
+  const incomingReduction = Math.max(0, Number(g.player.incomingDamageReductionThisTurn ?? 0) || 0);
+  const afterIncomingReduction = Math.max(0, preStatus - incomingReduction);
+
+  let finalDamage = afterIncomingReduction;
+  let formula = `식: ${raw}(기본) → ${preStatus}(보정) → max(0, ${preStatus} - ${incomingReduction}(받은 피해 감소)) = ${afterIncomingReduction} → ${afterIncomingReduction}(최종)`;
+
   if (kind === "ENEMY_ATTACK") {
     const weak = attackerWeak ?? 0;
     const pv = g.player.status.vuln ?? 0;
 
-    dmg = dmg - weak + pv;
-    if (dmg < 0) dmg = 0;
+    const afterStatus = Math.max(0, afterIncomingReduction - weak + pv);
 
-    dmg = modifyDamageByRelics(g, {
+    const postStatus = modifyDamageByRelics(g, {
       ...base,
       phase: "POST_STATUS",
-      current: dmg,
-      afterStatus: dmg,
+      current: afterStatus,
+      afterStatus,
       attackerWeak: weak,
       targetVuln: pv,
     });
 
-    dmg = modifyDamageByRelics(g, {
+    const preBlock = modifyDamageByRelics(g, {
       ...base,
       phase: "PRE_BLOCK",
-      current: dmg,
-      afterStatus: dmg,
+      current: postStatus,
+      afterStatus: postStatus,
       attackerWeak: weak,
       targetVuln: pv,
     });
+
+    let afterBlock = preBlock;
+    let blockUsed = 0;
 
     if (g.player.block > 0) {
-      const used = Math.min(g.player.block, dmg);
-      g.player.block -= used;
-      dmg -= used;
+      blockUsed = Math.min(g.player.block, preBlock);
+      g.player.block -= blockUsed;
+      afterBlock = preBlock - blockUsed;
     }
 
-    dmg = modifyDamageByRelics(g, {
+    const postBlock = modifyDamageByRelics(g, {
       ...base,
       phase: "POST_BLOCK",
-      current: dmg,
-      afterStatus: dmg,
-      afterBlock: dmg,
+      current: afterBlock,
+      afterStatus: postStatus,
+      afterBlock,
       attackerWeak: weak,
       targetVuln: pv,
     });
+
+    finalDamage = modifyDamageByRelics(g, { ...base, phase: "FINAL", current: postBlock });
+    formula = `식: ${raw}(기본) → ${preStatus}(보정) → max(0, ${preStatus} - ${incomingReduction}(받은 피해 감소)) = ${afterIncomingReduction} → max(0, ${afterIncomingReduction} - ${weak}(약화) + ${pv}(취약)) = ${afterStatus} → ${postStatus}(상태후) → ${preBlock}(방어전) - ${blockUsed}(방어) = ${afterBlock} → ${postBlock}(방어후) → ${finalDamage}(최종)`;
   } else {
-    dmg = modifyDamageByRelics(g, { ...base, phase: "POST_STATUS", current: dmg, afterStatus: dmg });
+    const postStatus = modifyDamageByRelics(g, { ...base, phase: "POST_STATUS", current: afterIncomingReduction, afterStatus: afterIncomingReduction });
+    finalDamage = modifyDamageByRelics(g, { ...base, phase: "FINAL", current: postStatus });
+    formula = `식: ${raw}(기본) → ${preStatus}(보정) → max(0, ${preStatus} - ${incomingReduction}(받은 피해 감소)) = ${afterIncomingReduction} → ${postStatus}(상태후) → ${finalDamage}(최종)`;
   }
 
-  dmg = modifyDamageByRelics(g, { ...base, phase: "FINAL", current: dmg });
+  if (finalDamage <= 0) return 0;
 
-  if (dmg <= 0) return 0;
-
-  g.player.hp = Math.max(0, g.player.hp - dmg);
-  logMsg(g, `플레이어 ${dmg} 피해 (${reason ?? kind}). (HP ${g.player.hp}/${g.player.maxHp})`);
+  g.player.hp = Math.max(0, g.player.hp - finalDamage);
+  logMsg(g, `플레이어 ${finalDamage} 피해 (${reason ?? kind}). ${formula}. (HP ${g.player.hp}/${g.player.maxHp})`);
 
   {
     const up = getUnlockProgress(g);
     let changed = false;
 
-    if (dmg >= 10) {
+    if (finalDamage >= 10) {
       up.tookBigHit10 += 1;
       changed = true;
     }
@@ -259,6 +271,6 @@ export function applyDamageToPlayer(
     if (changed) checkRelicUnlocks(g);
   }
 
-  notifyDamageAppliedByRelics(g, { ...base, phase: "FINAL", current: dmg }, dmg);
-  return dmg;
+  notifyDamageAppliedByRelics(g, { ...base, phase: "FINAL", current: finalDamage }, finalDamage);
+  return finalDamage;
 }

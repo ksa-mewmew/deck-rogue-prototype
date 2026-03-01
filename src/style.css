@@ -225,6 +225,7 @@
   --shopSvcGap:    calc(8 * var(--u));
   --shopItemSize:  calc(76 * var(--u));
   --shopItemIcon:  calc(50 * var(--u));
+  --shopRelicIconZoom: 1.22;
 
   
   --toastGap:   calc(8 * var(--u));
@@ -754,6 +755,20 @@ html, body, #app,
     rgba(0,0,0,0) calc(12 * var(--u))
   );
   opacity: .85;
+}
+
+.slot.chainLocked::before{
+  background: rgba(65, 0, 20, .58);
+  box-shadow:
+    inset 0 calc(12 * var(--u)) calc(18 * var(--u)) rgba(0,0,0,.70),
+    inset 0 calc(-10 * var(--u)) calc(16 * var(--u)) rgba(255,255,255,.05),
+    inset 0 0 0 calc(1 * var(--u)) rgba(255,120,120,.20);
+}
+
+.slot.chainLocked::after{
+  content: "⛓";
+  color: rgba(255, 210, 210, .92);
+  text-shadow: 0 0 calc(10 * var(--u)) rgba(255, 90, 90, .45);
 }
 
 
@@ -2616,7 +2631,7 @@ body.mobile .enemyBanner.enemyCardWrap .enemyHoverDetail{
   width: var(--shopItemIcon);
   height: var(--shopItemIcon);
   object-fit: contain;
-  transform: scale(1.1);
+  transform: scale(var(--shopTileIconScale, 1.1));
   image-rendering: pixelated;
 }
 

@@ -1305,10 +1305,17 @@ function renderMapNodeSelect(root: HTMLElement, g: GameState, actions: any) {
 
   if (remainingBoss <= 3) {
     const runAnyBoss = g.run as any;
-    const stamp = Number(runAnyBoss.bossApproachToastBossTime ?? -1) || -1;
-    if (stamp !== nextBossTime) {
-      runAnyBoss.bossApproachToastBossTime = nextBossTime;
-      pushUiToast(g, "WARN", `보스가 다가옵니다 (남은 이동 ${remainingBoss})`, 2200);
+    const step = Math.max(0, Math.floor(remainingBoss));
+    const stamp = String(runAnyBoss.bossApproachToastBossTime ?? "");
+    const nowStamp = `${nextBossTime}:${step}`;
+
+    if (stamp !== nowStamp) {
+      runAnyBoss.bossApproachToastBossTime = nowStamp;
+      if (step > 0) {
+        pushUiToast(g, "WARN", `보스 카운트다운: ${step} (총 시간 ${tNow}/${nextBossTime})`, 2400);
+      } else {
+        pushUiToast(g, "WARN", `보스 임계 도달! 다음 이동에서 보스 전투가 시작됩니다. (총 시간 ${tNow}/${nextBossTime})`, 2600);
+      }
     }
   }
 

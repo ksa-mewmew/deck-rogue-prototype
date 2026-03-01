@@ -29,6 +29,7 @@ export function createInitialRunState(): RunState {
       threeEnemyWins: 0,
       endedTurnWith3Installs: 0,
       installDamageDealt: 0,
+      itemDiscards: 0,
     },
 
     timeMove: 0,
@@ -100,8 +101,8 @@ export function createInitialState(content: Content): GameState {
     run: createInitialRunState(),
 
     player: {
-      hp: 60,
-      maxHp: 60,
+      hp: 40,
+      maxHp: 40,
       block: 0,
       supplies: 7,
       fatigue: 0,
@@ -109,6 +110,7 @@ export function createInitialState(content: Content): GameState {
       status: { vuln: 0, weak: 0, bleed: 0, disrupt: 0, slash: 0 },
       immuneToDisruptThisTurn: false,
       nullifyDamageThisTurn: false,
+      incomingDamageReductionThisTurn: 0,
     },
 
     content,

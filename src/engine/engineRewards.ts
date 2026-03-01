@@ -416,25 +416,76 @@ function ensureShopState(g: GameState, nodeId: string): ShopState {
   const existing = runAny.shops[nodeId] as ShopState | undefined;
   if (existing) return existing;
 
-    // 상점 카드 풀: REWARD_POOL에서 weight>0인 카드만
-  const weightedIds = REWARD_POOL.filter((e) => (e.weight ?? 0) > 0).map((e) => e.id);
+  // 상점 카드 풀: REWARD_POOL에서 weight>0 && 실제 카드 정의가 있는 항목만
+  const weightedIds = REWARD_POOL
+    .filter((e) => (e.weight ?? 0) > 0)
+    .map((e) => e.id)
+    .filter((id) => !!g.content.cardsById[id]);
 
-  const allCardIds = (weightedIds.length > 0 ? weightedIds : Object.keys(g.content.cardsById))
-    .filter((id) => {
-      const base = g.content.cardsById[id];
-      const r = (base?.rarity ?? "COMMON");
-      return r !== "BASIC" && r !== "MADNESS";
-    });
-  const picks: string[] = [];
+  const byRarity = {
+    COMMON: [] as string[],
+    SPECIAL: [] as string[],
+    RARE: [] as string[],
+  };
 
-  const want = 6;
-  let tries = 0;
-  while (picks.length < want && tries++ < 200) {
-    const id = allCardIds[Math.floor(Math.random() * allCardIds.length)];
-    if (!id) continue;
-    if (picks.includes(id) && Math.random() < 0.8) continue;
-    picks.push(id);
+  for (const id of weightedIds) {
+    const base = g.content.cardsById[id];
+    const r = String(base?.rarity ?? "");
+    if (r === "COMMON") byRarity.COMMON.push(id);
+    else if (r === "SPECIAL") byRarity.SPECIAL.push(id);
+    else if (r === "RARE") byRarity.RARE.push(id);
   }
+
+  const picks: string[] = [];
+  const used = new Set<string>();
+  const fallbackAny = weightedIds.slice();
+
+  const pickFrom = (pool: string[], count: number) => {
+    const available = pool.filter((id) => !used.has(id));
+    for (let i = available.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = available[i];
+      available[i] = available[j];
+      available[j] = t;
+    }
+
+    // 1) 우선 중복 없이 채움
+    const take = Math.min(count, available.length);
+    for (let i = 0; i < take; i++) {
+      const id = available[i];
+      used.add(id);
+      picks.push(id);
+    }
+
+    // 2) 부족분은 대체 규칙: 중복 허용으로 채움
+    let remain = count - take;
+    while (remain > 0) {
+      if (pool.length > 0) {
+        const id = pool[Math.floor(Math.random() * pool.length)];
+        if (id) {
+          picks.push(id);
+          remain -= 1;
+          continue;
+        }
+      }
+
+      if (fallbackAny.length > 0) {
+        const id = fallbackAny[Math.floor(Math.random() * fallbackAny.length)];
+        if (id) {
+          picks.push(id);
+          remain -= 1;
+          continue;
+        }
+      }
+
+      break;
+    }
+  };
+
+  // 고정 구성: 일반 2장 / 특별 2장 / 희귀 2장 (중복 없음)
+  pickFrom(byRarity.COMMON, 2);
+  pickFrom(byRarity.SPECIAL, 2);
+  pickFrom(byRarity.RARE, 2);
 
   const cards: ShopCardOffer[] = picks.map((defId) => {
     const base = g.content.cardsById[defId];
@@ -476,10 +527,16 @@ function ensureShopState(g: GameState, nodeId: string): ShopState {
 
     if (pool.length <= 0) return [] as ShopRelicOffer[];
 
-    const id = pool[Math.floor(Math.random() * pool.length)];
-    if (!id) return [] as ShopRelicOffer[];
+    const picks: string[] = [];
+    const want = Math.min(2, pool.length);
+    let tries = 0;
+    while (picks.length < want && tries++ < 80) {
+      const id = pool[Math.floor(Math.random() * pool.length)];
+      if (!id || picks.includes(id)) continue;
+      picks.push(id);
+    }
 
-    return [{ relicId: id, priceGold: 60 + randInt(-10, 10), sold: false }];
+    return picks.map((relicId) => ({ relicId, priceGold: 60 + randInt(-10, 10), sold: false }));
   })();
 
   const st: ShopState = {

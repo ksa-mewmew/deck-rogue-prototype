@@ -104,6 +104,7 @@ export function revealIntentsAndDisrupt(g: GameState) {
 
   g.player.immuneToDisruptThisTurn = false;
   g.player.nullifyDamageThisTurn = false;
+  g.player.incomingDamageReductionThisTurn = 0;
 
   g.disruptIndexThisTurn = null;
 

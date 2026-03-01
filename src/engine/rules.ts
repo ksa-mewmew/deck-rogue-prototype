@@ -1,4 +1,4 @@
-import type { GameState, NodeType, StatusKey, NodeOffer, BranchOffer, UiToastKind, UiToast } from "./types";
+import type { GameState, Side, NodeType, StatusKey, NodeOffer, BranchOffer, UiToastKind, UiToast } from "./types";
 
 function makePair(types: NodeType[]): [NodeOffer, NodeOffer] {
   return [
@@ -10,6 +10,16 @@ function makePair(types: NodeType[]): [NodeOffer, NodeOffer] {
 export type HasStatus = { status: Record<StatusKey, number> };
 
 export type StatusSource = "PLAYER" | "ENEMY" | "SYSTEM";
+
+export function getCardInstalledPosition(g: GameState, cardUid: string): { side: Side; index: number } | null {
+  const fi = g.frontSlots.indexOf(cardUid);
+  if (fi >= 0) return { side: "front", index: fi };
+
+  const bi = g.backSlots.indexOf(cardUid);
+  if (bi >= 0) return { side: "back", index: bi };
+
+  return null;
+}
 
 export function pushUiToast(g: GameState, kind: UiToastKind, text: string, ms = 1600) {
   g.uiToasts ??= [];
@@ -81,8 +91,17 @@ export function pickOne<T>(arr: readonly T[], why = "pickOne"): T {
 }
 
 export function logMsg(g: GameState, msg: string) {
-  g.log.unshift(msg);
-  g.log = g.log.slice(0, 250);
+  const sourceCardUid = String((g as any)._logSourceCardUid ?? "");
+  if (sourceCardUid) {
+    const inst = g.cards?.[sourceCardUid] as any;
+    const baseName = inst?.defId ? (g.content.cardsById as any)?.[inst.defId]?.name : null;
+    const up = Number(inst?.upgrade ?? 0) || 0;
+    const sourceName = baseName ? (up > 0 ? `${baseName} +${up}` : baseName) : sourceCardUid;
+    msg = `[원인:${sourceName}] ${msg}`;
+  }
+
+  g.log.push(msg);
+  if (g.log.length > 250) g.log = g.log.slice(-250);
 }
 
 export function aliveEnemies(g: GameState) {

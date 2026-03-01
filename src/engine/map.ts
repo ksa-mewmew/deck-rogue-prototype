@@ -282,10 +282,57 @@ export function generateDungeonMap(opt?: Partial<MapGenOptions>): DungeonMap {
     if (d === treasureDepth) continue;
     restCandidates.push(d);
   }
-  shuffleInPlace(restCandidates);
-  for (const d of restCandidates) {
-    if (forcedRestDepths.size >= Math.min(FORCE_REST_COLS, restCandidates.length)) break;
-    forcedRestDepths.add(d);
+
+  const restCandidatesAsc = [...restCandidates].sort((a, b) => a - b);
+  const maxDepth = Math.max(1, layers.length - 1);
+  const earlyBound = Math.max(2, Math.floor(maxDepth * 0.45));
+  const lateBound = Math.max(2, Math.ceil(maxDepth * 0.60));
+  const minGap = Math.max(3, Math.floor(maxDepth * 0.35));
+
+  const earlyPool = restCandidatesAsc.filter((d) => d <= earlyBound);
+  const latePool = restCandidatesAsc.filter((d) => d >= lateBound);
+
+  const pickFarthest = (pool: number[], pivot: number): number | null => {
+    if (pool.length === 0) return null;
+    let best = pool[0];
+    let bestDist = Math.abs(best - pivot);
+    for (const d of pool) {
+      const dist = Math.abs(d - pivot);
+      if (dist > bestDist) {
+        best = d;
+        bestDist = dist;
+      }
+    }
+    return best;
+  };
+
+  const earlyDepth = earlyPool.length > 0 ? pickOne(earlyPool) : (restCandidatesAsc[0] ?? null);
+  if (earlyDepth != null) forcedRestDepths.add(earlyDepth);
+
+  if (forcedRestDepths.size < FORCE_REST_COLS && restCandidatesAsc.length > 0) {
+    const early = [...forcedRestDepths][0] ?? null;
+    const lateByGap = latePool.filter((d) => early == null || Math.abs(d - early) >= minGap);
+    const lateDepth =
+      lateByGap.length > 0
+        ? pickOne(lateByGap)
+        : pickFarthest(restCandidatesAsc.filter((d) => d !== early), early ?? 0);
+    if (lateDepth != null) forcedRestDepths.add(lateDepth);
+  }
+
+  if (forcedRestDepths.size < Math.min(FORCE_REST_COLS, restCandidatesAsc.length)) {
+    const remain = [...restCandidatesAsc].filter((d) => !forcedRestDepths.has(d));
+    shuffleInPlace(remain);
+    for (const d of remain) {
+      if (forcedRestDepths.size >= Math.min(FORCE_REST_COLS, restCandidatesAsc.length)) break;
+      forcedRestDepths.add(d);
+    }
+  }
+
+  const forcedRestNodeIds = new Set<string>();
+  for (const d of forcedRestDepths) {
+    const ids = [...(layers[d] ?? [])].filter((id) => id !== map.startId && id !== treasureId);
+    shuffleInPlace(ids);
+    for (const id of ids.slice(0, 2)) forcedRestNodeIds.add(id);
   }
 
 
@@ -331,7 +378,7 @@ export function generateDungeonMap(opt?: Partial<MapGenOptions>): DungeonMap {
   for (const id of others) {
     const d = nodes[id]?.depth ?? 0;
 
-    if (forcedRestDepths.has(d)) {
+    if (forcedRestNodeIds.has(id)) {
       nodes[id].kind = "REST";
       continue;
     }
@@ -349,6 +396,63 @@ export function generateDungeonMap(opt?: Partial<MapGenOptions>): DungeonMap {
     nodes[id].kind = rollKind(d, deadEnds.has(id));
   }
 
+
+  {
+    const rollNonRestKind = (d: number, isDeadEnd: boolean): Exclude<MapNode["kind"], "REST" | "START" | "TREASURE"> => {
+      let wB = 0.5, wE = 0.25, wS = 0.05;
+      if (d <= 1) { wB = 0.8; wE = 0.14; wS = 0.02; }
+      else if (d <= 3) { wB = 0.6; wE = 0.2; wS = 0.05; }
+      else { wB = 0.5; wE = 0.25; wS = 0.1; }
+
+      if (isDeadEnd) {
+        wB *= (deadEndBias.battleMul ?? 0.25);
+        wE *= (deadEndBias.eventMul ?? 1.35);
+        wS *= 0.8;
+      }
+
+      const sum = wB + wE + wS;
+      const r = Math.random() * sum;
+      if (r < wB) return "BATTLE";
+      if (r < wB + wE) return "EVENT";
+      return "SHOP";
+    };
+
+    const byDepthIds = new Map<number, string[]>();
+    for (const id of Object.keys(nodes)) {
+      const d = nodes[id]?.depth ?? 0;
+      if (!byDepthIds.has(d)) byDepthIds.set(d, []);
+      byDepthIds.get(d)!.push(id);
+    }
+
+    for (const [d, ids] of byDepthIds) {
+      const restIds = ids.filter((id) => nodes[id].kind === "REST");
+      if (restIds.length <= 2) continue;
+
+      const keep = new Set<string>();
+      for (const id of restIds) {
+        if (forcedRestNodeIds.has(id)) keep.add(id);
+      }
+
+      if (keep.size > 2) {
+        const arr = [...keep];
+        shuffleInPlace(arr);
+        keep.clear();
+        for (const id of arr.slice(0, 2)) keep.add(id);
+      }
+
+      const need = Math.max(0, 2 - keep.size);
+      if (need > 0) {
+        const pool = restIds.filter((id) => !keep.has(id));
+        shuffleInPlace(pool);
+        for (const id of pool.slice(0, need)) keep.add(id);
+      }
+
+      for (const id of restIds) {
+        if (keep.has(id)) continue;
+        nodes[id].kind = rollNonRestKind(d, deadEnds.has(id));
+      }
+    }
+  }
 
   {
     const anyShop = Object.values(nodes).some((n) => n.kind === "SHOP");

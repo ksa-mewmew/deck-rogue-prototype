@@ -1,4 +1,5 @@
 import { getItemDefById } from "../content/items";
+import { RELICS_BY_ID } from "../content/relicsContent";
 import { getPatronGodOrNull, godAbilityBlock, godName, ensureFaith } from "../engine/faith";
 import type { GameState, GodId } from "../engine/types";
 import { ensureBgLayer } from "./background/bgLayer";
@@ -6,6 +7,7 @@ import { ensureBgLayer } from "./background/bgLayer";
 let _ASSET_BASE: string | null = null;
 
 let _itemTip: HTMLDivElement | null = null;
+let _relicTip: HTMLDivElement | null = null;
 let _faithTip: HTMLDivElement | null = null;
 
 export function ensureItemTip(): HTMLDivElement {
@@ -95,6 +97,170 @@ export function showItemTip(itemId: string, e: MouseEvent) {
 export function hideItemTip() {
   const tip = ensureItemTip();
   tip.classList.remove("show");
+}
+
+export function ensureRelicTip(): HTMLDivElement {
+  if (_relicTip) return _relicTip;
+  const tip = document.createElement("div");
+  tip.id = "relicHoverTip";
+  tip.className = "itemHoverTip relicHoverTip";
+  tip.style.pointerEvents = "none";
+  tip.style.position = "fixed";
+  tip.style.left = "0";
+  tip.style.top = "0";
+  tip.style.zIndex = "70000";
+  document.body.appendChild(tip);
+  _relicTip = tip;
+  return tip;
+}
+
+export function setRelicTipContent(relicId: string) {
+  const tip = ensureRelicTip();
+  const def: any = (RELICS_BY_ID as any)?.[relicId] ?? {};
+
+  tip.innerHTML = "";
+  const t = document.createElement("div");
+  t.className = "relicTipTitle";
+  t.textContent = def?.name ?? relicId;
+
+  const b = document.createElement("div");
+  b.className = "relicTipBody";
+  b.textContent = def?.text ?? "";
+
+  tip.appendChild(t);
+  tip.appendChild(b);
+}
+
+export function moveRelicTip(clientX: number, clientY: number) {
+  const tip = ensureRelicTip();
+
+  const u = unitLenDev();
+  const padU = 12;
+  const offU = 14;
+
+  const pad = padU * u;
+  const off = offU * u;
+
+  let x = clientX + off;
+  let y = clientY + off;
+
+  tip.style.left = lenFromDev(x);
+  tip.style.top = lenFromDev(y);
+
+  const r = tip.getBoundingClientRect();
+
+  if (x + r.width + pad > window.innerWidth) x = window.innerWidth - r.width - pad;
+  if (y + r.height + pad > window.innerHeight) y = window.innerHeight - r.height - pad;
+  if (x < pad) x = pad;
+  if (y < pad) y = pad;
+
+  tip.style.left = lenFromDev(Math.round(x));
+  tip.style.top = lenFromDev(Math.round(y));
+}
+
+export function showRelicTipAt(relicId: string, clientX: number, clientY: number) {
+  setRelicTipContent(relicId);
+  const tip = ensureRelicTip();
+  tip.classList.add("show");
+  moveRelicTip(clientX, clientY);
+  requestAnimationFrame(() => moveRelicTip(clientX, clientY));
+}
+
+export function hideRelicTip() {
+  const tip = ensureRelicTip();
+  tip.classList.remove("show");
+}
+
+export function wireRelicHover(el: HTMLElement, relicId: string) {
+  el.addEventListener("pointerenter", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType === "touch") return;
+    showRelicTipAt(relicId, pe.clientX ?? 0, pe.clientY ?? 0);
+  });
+  el.addEventListener("pointermove", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType === "touch") return;
+    moveRelicTip(pe.clientX ?? 0, pe.clientY ?? 0);
+  }, { passive: true });
+  el.addEventListener("pointerleave", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType === "touch") return;
+    hideRelicTip();
+  });
+
+  let holdTimer: number | null = null;
+  let holdStartX = 0;
+  let holdStartY = 0;
+  let consumeClick = false;
+  let suppressActivateUntil = 0;
+
+  const clearHold = () => {
+    if (holdTimer != null) {
+      window.clearTimeout(holdTimer);
+      holdTimer = null;
+    }
+  };
+
+  el.addEventListener("pointerdown", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType !== "touch") return;
+
+    consumeClick = false;
+    holdStartX = pe.clientX;
+    holdStartY = pe.clientY;
+
+    clearHold();
+    holdTimer = window.setTimeout(() => {
+      consumeClick = true;
+      suppressActivateUntil = performance.now() + 700;
+      (el as any).__relicHoverSuppressClickUntil = suppressActivateUntil;
+      showRelicTipAt(relicId, holdStartX, holdStartY);
+    }, 320);
+  }, { passive: true });
+
+  el.addEventListener("pointermove", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType !== "touch") return;
+
+    const tipOpen = (ensureRelicTip().classList.contains("show"));
+    if (tipOpen) {
+      moveRelicTip(pe.clientX, pe.clientY);
+      return;
+    }
+
+    if (holdTimer == null) return;
+    const dx = pe.clientX - holdStartX;
+    const dy = pe.clientY - holdStartY;
+    if (dx * dx + dy * dy > 12 * 12) clearHold();
+  }, { passive: true });
+
+  const endTouchHover = () => {
+    clearHold();
+    if (ensureRelicTip().classList.contains("show")) {
+      suppressActivateUntil = Math.max(suppressActivateUntil, performance.now() + 420);
+      (el as any).__relicHoverSuppressClickUntil = suppressActivateUntil;
+      hideRelicTip();
+    }
+  };
+
+  el.addEventListener("pointerup", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType !== "touch") return;
+    endTouchHover();
+  }, { passive: true });
+
+  el.addEventListener("pointercancel", (ev) => {
+    const pe = ev as PointerEvent;
+    if (pe.pointerType !== "touch") return;
+    endTouchHover();
+  }, { passive: true });
+
+  el.addEventListener("click", (ev) => {
+    if (!consumeClick) return;
+    consumeClick = false;
+    ev.preventDefault();
+    ev.stopPropagation();
+  }, true);
 }
 
 export function wireItemHover(el: HTMLElement, itemId: string) {
@@ -357,7 +523,11 @@ function getAssetBase(): string {
 export function assetUrl(ref: string): string {
   if (!ref) return ref;
   if (/^(https?:|data:|blob:)/i.test(ref)) return ref;
-  const normalized = ref.replace(/^public\//, "");
+
+  const toWebpIfImage = (s: string) => s.replace(/\.(png|jpe?g)(?=([?#].*)?$)/i, ".webp");
+
+  const normalized0 = ref.replace(/^public\//, "");
+  const normalized = toWebpIfImage(normalized0);
   const base = getAssetBase();
   const clean = normalized.replace(/^\/+/, "");
   return new URL(clean, base).href;

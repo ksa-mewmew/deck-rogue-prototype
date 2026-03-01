@@ -271,6 +271,49 @@ export const CARDS: CardData[] = [
   },
 
   {
+    id: "quiet_ambush",
+    name: "조용한 급습",
+    rarity: "COMMON",
+    frontText: "지정 피해 8, S가 2 이하면 대신 취약 +2 후 지정 피해 13",
+    backText: "드로우 1, S가 2 이하면 대신 드로우 2",
+    front: [
+      {
+        op: "ifPlayerSuppliesAtMost",
+        n: 2,
+        then: [
+          { op: "statusEnemy", target: "select", key: "vuln", n: 2 },
+          { op: "damageEnemy", target: "select", n: 13 },
+        ],
+        else: [{ op: "damageEnemy", target: "select", n: 8 }],
+      },
+    ],
+    back: [
+      {
+        op: "ifPlayerSuppliesAtMost",
+        n: 2,
+        then: [{ op: "draw", n: 2 }],
+        else: [{ op: "draw", n: 1 }],
+      },
+    ],
+    upgrades: [
+      {
+        frontText: "지정 피해 8, S가 2 이하면 대신 취약 +3 후 지정 피해 14",
+        front: [
+          {
+            op: "ifPlayerSuppliesAtMost",
+            n: 2,
+            then: [
+              { op: "statusEnemy", target: "select", key: "vuln", n: 3 },
+              { op: "damageEnemy", target: "select", n: 14 },
+            ],
+            else: [{ op: "damageEnemy", target: "select", n: 8 }],
+          },
+        ],
+      },
+    ],
+  },
+
+  {
     id: "blood_contract",
     name: "피의 계약",
     rarity: "COMMON",
@@ -450,18 +493,18 @@ export const CARDS: CardData[] = [
     rarity: "COMMON",
     tags: ["LOCKED", "INSTALL"],
     installWhen: "BOTH",
-    frontText: "이번 턴에 설치 시, 체력이 가장 낮은 적 피해 20 (부동) (설치)",
-    backText: "이번 턴에 설치 시, 체력이 가장 낮은 적 피해 20 (부동) (설치)",
-    front: [{ op: "ifPlacedThisTurn", then: [{ op: "damageEnemyLowestHp", n: 20 }] }],
-    back: [{ op: "ifPlacedThisTurn", then: [{ op: "damageEnemyLowestHp", n: 20 }] }],
+    frontText: "이번 턴에 설치 시, 체력이 가장 낮은 적 피해 15 (부동) (설치)",
+    backText: "이번 턴에 설치 시, 체력이 가장 낮은 적 피해 15 (부동) (설치)",
+    front: [{ op: "ifPlacedThisTurn", then: [{ op: "damageEnemyLowestHp", n: 15 }] }],
+    back: [{ op: "ifPlacedThisTurn", then: [{ op: "damageEnemyLowestHp", n: 15 }] }],
     upgrades: [
       {
         tags: ["LOCKED", "INSTALL"],
         installWhen: "BOTH",
-        frontText: "이번 턴에 설치 시, 체력이 가장 낮은 적 피해 25 (부동) (설치)",
-        backText: "이번 턴에 설치 시, 체력이 가장 낮은 적 피해 25 (부동) (설치)",
-        front: [{ op: "ifPlacedThisTurn", then: [{ op: "damageEnemyLowestHp", n: 25 }] }],
-        back: [{ op: "ifPlacedThisTurn", then: [{ op: "damageEnemyLowestHp", n: 25 }] }],
+        frontText: "이번 턴에 설치 시, 체력이 가장 낮은 적 피해 20 (부동) (설치)",
+        backText: "이번 턴에 설치 시, 체력이 가장 낮은 적 피해 20 (부동) (설치)",
+        front: [{ op: "ifPlacedThisTurn", then: [{ op: "damageEnemyLowestHp", n: 20 }] }],
+        back: [{ op: "ifPlacedThisTurn", then: [{ op: "damageEnemyLowestHp", n: 20 }] }],
       },
     ],
   },
@@ -538,6 +581,66 @@ export const CARDS: CardData[] = [
         backText: "내 화살 카드의 공격력 +4 (설치)",
         front: [{ op: "damageEnemy", target: "random", n: 14 }, { op: "discardHandRandom", n: 1 }],
         back: [{ op: "increaseCardDamageByTag", tag: "ARROW", n: 4 }],
+      },
+    ],
+  },
+
+  {
+    id: "low_body_temperature",
+    name: "낮은 체온",
+    rarity: "COMMON",
+    frontText: "자신의 약화 1, 취약 1 제거, S가 2 이하면 대신 약화/취약/출혈 2 제거",
+    backText: "드로우 1, S가 2 이하면 대신 이번 턴 받는 피해 -2",
+    front: [
+      {
+        op: "ifPlayerSuppliesAtMost",
+        n: 2,
+        then: [
+          { op: "statusPlayer", key: "weak", n: -2 },
+          { op: "statusPlayer", key: "vuln", n: -2 },
+          { op: "statusPlayer", key: "bleed", n: -2 },
+        ],
+        else: [
+          { op: "statusPlayer", key: "weak", n: -1 },
+          { op: "statusPlayer", key: "vuln", n: -1 },
+        ],
+      },
+    ],
+    back: [
+      {
+        op: "ifPlayerSuppliesAtMost",
+        n: 2,
+        then: [{ op: "reduceIncomingDamageThisTurn", n: 2 }],
+        else: [{ op: "draw", n: 1 }],
+      },
+    ],
+    upgrades: [
+      {
+        frontText: "자신의 약화 1, 취약 1 제거, S가 2 이하면 대신 약화/취약/출혈 3 제거",
+        backText: "드로우 1, S가 2 이하면 대신 드로우 2, 이번 턴 받는 피해 -3",
+        front: [
+          {
+            op: "ifPlayerSuppliesAtMost",
+            n: 2,
+            then: [
+              { op: "statusPlayer", key: "weak", n: -3 },
+              { op: "statusPlayer", key: "vuln", n: -3 },
+              { op: "statusPlayer", key: "bleed", n: -3 },
+            ],
+            else: [
+              { op: "statusPlayer", key: "weak", n: -1 },
+              { op: "statusPlayer", key: "vuln", n: -1 },
+            ],
+          },
+        ],
+        back: [
+          {
+            op: "ifPlayerSuppliesAtMost",
+            n: 2,
+            then: [{ op: "draw", n: 2 }, { op: "reduceIncomingDamageThisTurn", n: 3 }],
+            else: [{ op: "draw", n: 1 }],
+          },
+        ],
       },
     ],
   },
@@ -674,6 +777,53 @@ export const CARDS: CardData[] = [
   },
 
   {
+    id: "hide_on_floor",
+    name: "바닥 숨기",
+    rarity: "SPECIAL",
+    frontText: "방어 +6, S가 2 이하면 대신 방어 +12, 교란 -1",
+    backText: "S +2, S가 2보다 낮으면 대신 S를 3으로 만듦",
+    front: [
+      {
+        op: "ifPlayerSuppliesAtMost",
+        n: 2,
+        then: [{ op: "block", n: 12 }, { op: "statusPlayer", key: "disrupt", n: -1 }],
+        else: [{ op: "block", n: 6 }],
+      },
+    ],
+    back: [
+      {
+        op: "ifPlayerSuppliesAtMost",
+        n: 1,
+        then: [{ op: "setSupplies", n: 3 }],
+        else: [{ op: "supplies", n: 2 }],
+      },
+    ],
+    upgrades: [
+      {
+        frontText: "방어 +6, S가 2 이하면 대신 방어 +14, 교란 -1",
+        backText: "S +2, S가 2보다 낮으면 대신 S를 3으로 만듦, 방어 +2",
+        front: [
+          {
+            op: "ifPlayerSuppliesAtMost",
+            n: 2,
+            then: [{ op: "block", n: 14 }, { op: "statusPlayer", key: "disrupt", n: -1 }],
+            else: [{ op: "block", n: 6 }],
+          },
+        ],
+        back: [
+          {
+            op: "ifPlayerSuppliesAtMost",
+            n: 1,
+            then: [{ op: "setSupplies", n: 3 }],
+            else: [{ op: "supplies", n: 2 }],
+          },
+          { op: "block", n: 2 },
+        ],
+      },
+    ],
+  },
+
+  {
     id: "prey_mark",
     name: "사냥감 표시",
     rarity: "SPECIAL",
@@ -751,23 +901,23 @@ export const CARDS: CardData[] = [
     id: "fuel_kindling",
     name: "땔감 삼기",
     rarity: "SPECIAL",
-    frontText: "전열 1번 슬롯 카드를 소모, 소모했다면 S +3",
-    backText: "후열 3번 슬롯 카드를 소모, 소모했다면 S +4",
+    frontText: "왼쪽에 있는 카드를 소모, 소모했다면 S +3",
+    backText: "오른쪽에 있는 카드를 소모, 소모했다면 S +4",
     front: [
-      { op: "exhaustSlot", side: "front", index: 0, then: [{ op: "supplies", n: 3 }] },
+      { op: "exhaustRelativeSlotByCurrentPosition", frontOffset: -1, backOffset: 1, then: [{ op: "supplies", n: 3 }] },
     ],
     back: [
-      { op: "exhaustSlot", side: "back", index: 2, then: [{ op: "supplies", n: 4 }] },
+      { op: "exhaustRelativeSlotByCurrentPosition", frontOffset: -1, backOffset: 1, then: [{ op: "supplies", n: 4 }] },
     ],
     upgrades: [
       {
-        frontText: "전열 1번 슬롯 카드를 소모, 소모했다면 S +4",
-        backText: "후열 3번 슬롯 카드를 소모, 소모했다면 S +5",
+        frontText: "왼쪽에 있는 카드를 소모, 소모했다면 S +4",
+        backText: "오른쪽에 있는 카드를 소모, 소모했다면 S +5",
         front: [
-          { op: "exhaustSlot", side: "front", index: 0, then: [{ op: "supplies", n: 4 }] },
+          { op: "exhaustRelativeSlotByCurrentPosition", frontOffset: -1, backOffset: 1, then: [{ op: "supplies", n: 4 }] },
         ],
         back: [
-          { op: "exhaustSlot", side: "back", index: 2, then: [{ op: "supplies", n: 5 }] },
+          { op: "exhaustRelativeSlotByCurrentPosition", frontOffset: -1, backOffset: 1, then: [{ op: "supplies", n: 5 }] },
         ],
       },
     ],

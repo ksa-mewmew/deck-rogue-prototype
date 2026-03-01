@@ -3,7 +3,7 @@ import type { UIActions } from "../ui";
 import { ensureFaith, godAbilityBlock, godArt, godName } from "../../engine/faith";
 import { getItemDefById } from "../../content/items";
 import { RELICS_BY_ID } from "../../content/relicsContent";
-import { assetUrl, wireItemHover } from "../assets";
+import { assetUrl, wireItemHover, wireRelicHover } from "../assets";
 
 function div(cls: string) {
   const e = document.createElement("div");
@@ -462,7 +462,8 @@ export function renderChoiceLayer(
       const img = document.createElement("img");
       img.src = assetUrl(art);
       img.alt = c.title ?? "illustration";
-      const ZOOM = 1.5;
+      const ctxKind = String((g.choiceCtx as any)?.kind ?? "");
+      const ZOOM = ctxKind === "ITEM_REWARD" ? 1.62 : 1.5;
       (img.style as any).imageRendering = "pixelated";
       img.style.cssText =
         "position:absolute; inset:0;" +
@@ -574,6 +575,8 @@ export function renderChoiceLayer(
 
         const tile = div("shopItemTile");
         if (offer.sold) tile.classList.add("sold");
+        wireRelicHover(tile, String(offer.relicId));
+        tile.style.setProperty("--shopTileIconScale", "var(--shopRelicIconZoom, 1.22)");
 
         const def: any = (RELICS_BY_ID as any)[String(offer.relicId)] ?? {};
         const img = document.createElement("img");
@@ -588,7 +591,11 @@ export function renderChoiceLayer(
         tile.appendChild(price);
 
         if (!offer.sold) {
-          tile.onclick = () => actions.onChooseChoice(`shop:relic:${i}`);
+          tile.onclick = () => {
+            const until = Number((tile as any).__relicHoverSuppressClickUntil ?? 0);
+            if (until > performance.now()) return;
+            actions.onChooseChoice(`shop:relic:${i}`);
+          };
         }
 
         itemsGrid.appendChild(tile);

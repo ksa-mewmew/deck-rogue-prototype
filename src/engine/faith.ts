@@ -46,7 +46,7 @@ export const GODS: GodDisplay[] = [
     id: "master_spear",
     name: "달인의 창",
     art: "assets/gods/master_spear.png",
-    patronPlus: "전투: 선두 적에게 피해를 줄 때 피해 +50%",
+    patronPlus: "전투: 선두 적에게 피해를 줄 때 피해 +25%",
     patronMinus: "대상 지정: 선두 적만 대상으로 지정 가능",
     temptation: "다음 정예/보스 전투 시작: 모든 적 취약 3",
     hostile: "정예/보스 전투 시작: 자신 취약/약화/교란 2",
@@ -58,7 +58,7 @@ export const GODS: GodDisplay[] = [
     patronPlus: "휴식: 합성 선택 가능",
     patronMinus: "휴식-합성: 효과별 비용 지불",
     temptation: "다음 휴식에서 합성 선택 가능",
-    hostile: "무작위 10장 소모 부여 / 카드가 소모될 때마다 HP -1",
+    hostile: "무작위 7장 소모 부여 / 카드가 소모될 때마다 HP -1",
   },
   {
     id: "nameless_vow",
@@ -118,7 +118,7 @@ export const GODS: GodDisplay[] = [
     id: "card_dealer",
     name: "카드 딜러",
     art: "assets/gods/card_dealer.png",
-    patronPlus: "전투 시작: 드로우 +1",
+    patronPlus: "전투 시작: 드로우 +2",
     patronMinus: "전투 종료: 50% 확률로 골드 10 잃음",
     temptation: "골드 +40, 덱에 빚 문서(저주) 1장 추가",
     hostile: "전투 골드 보상 없음",
@@ -136,7 +136,7 @@ export const GODS: GodDisplay[] = [
     id: "wave_breath",
     name: "파도의 숨결",
     art: "assets/gods/wave_breath.png",
-    patronPlus: "전투 당 1회, 대상을 선택하는 카드가 모든 적 대상",
+    patronPlus: "처음 사용하는 대상을 선택하는 카드가 모든 적 대상",
     patronMinus: "그 외 대상을 선택하는 카드는 무작위 적 대상",
     temptation: "다음 전투: 처음 사용하는 대상을 선택하는 카드가 모든 적 대상",
     hostile: "모든 대상 지정 카드가 무작위 적 대상",
@@ -394,7 +394,7 @@ function applyRetortFusionHostileOnce(g: GameState) {
 
   const picks: string[] = [];
   const src = [...pool];
-  while (picks.length < 10 && src.length > 0) {
+  while (picks.length < 7 && src.length > 0) {
     const i = (Math.random() * src.length) | 0;
     picks.push(src.splice(i, 1)[0]);
   }
@@ -1038,7 +1038,7 @@ export function shopPriceGold(g: GameState, basePrice: number): number {
 export function combatStartDrawDeltaFromFaith(g: GameState): number {
   let d = 0;
   const patron = getPatronGodOrNull(g);
-  if (patron === "card_dealer") d += 1;
+  if (patron === "card_dealer") d += 2;
   if (isHostile(g, "armored_tiger")) d -= 1;
   return d;
 }

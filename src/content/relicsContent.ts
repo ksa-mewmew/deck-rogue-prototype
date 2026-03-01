@@ -299,6 +299,8 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
     dormantText: "비우는 것이 채우는 것.",
     unlockHint: "조건: 아이템 버리기 1회",
 
+    art: "assets/relics/relic_torn_pouch.png",
+
     name: "수선한 주머니",
     text: "활성화 시 아이템 보유 한도 +2",
     unlockFlavor: "비워낸 자리에 더 많이 들어간다.",
@@ -508,8 +510,6 @@ export const RELICS_BY_ID: Record<string, RelicDef> = {
       return ctx.current + 1;
     },
   },
-
-  // 이하 이벤트 유물
 
   relic_ratskin_charm: {
     id: "relic_ratskin_charm",

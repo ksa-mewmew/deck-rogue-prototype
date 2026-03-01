@@ -42,9 +42,9 @@ export const ITEMS: ItemData[] = [
   {
     id: "item_triple_swap",
     name: "교환권",
-    text: "손패에서 무작위 세 장을 버림, 🃏 드로우 3. (소모)",
+    text: "손패에서 무작위 세 장을 버림, 버린 만큼 🃏 드로우. (소모)",
     art: "assets/items/item_triple_swap.png",
-    effects: [{ op: "discardHandRandom", n: 3 }, { op: "draw", n: 3 }],
+    effects: [{ op: "discardHandRandomDraw", n: 3 }],
     priceGold: 20,
     consumable: true,
   },

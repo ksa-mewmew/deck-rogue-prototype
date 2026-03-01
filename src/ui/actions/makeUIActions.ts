@@ -76,9 +76,19 @@ export function makeUIActionsImpl(
     g.frontPlacedThisTurn = frontPlaced;
   };
 
+  const isFrontSlotLockedByLivingChain = (g: GameState, idx: number) => {
+    if (idx !== 1) return false;
+    return (g.enemies ?? []).some((e: any) => e && e.hp > 0 && e.id === "living_chain");
+  };
+
 
 
   let choiceHandler: ((key: string) => void) | null = null;
+  type ChoiceHandlerSnapshot = {
+    id: "EVENT_BY_ID" | "REMOVE_PICK" | "REWARD_PICK" | "UPGRADE_PICK";
+    payload?: Record<string, any>;
+  };
+  let choiceHandlerSnapshot: ChoiceHandlerSnapshot | null = null;
   let nodePickLock = false;
 
 
@@ -87,19 +97,49 @@ export function makeUIActionsImpl(
   type ChoiceFrame = {
     choice: GameState["choice"];
     handler: ((key: string) => void) | null;
+    snapshot: ChoiceHandlerSnapshot | null;
   };
 
   const choiceStack: ChoiceFrame[] = [];
 
+  const normalizeRemoveThen = (thenRaw: string | undefined): "NONE" | "REWARD_PICK" | "BATTLE" => {
+    if (thenRaw === "REWARD" || thenRaw === "REWARD_PICK") return "REWARD_PICK";
+    if (thenRaw === "BATTLE") return "BATTLE";
+    return "NONE";
+  };
+
+  const clearChoiceMeta = (g: GameState) => {
+    const runAny = g.run as any;
+    runAny.pendingRemovePickThen = null;
+    runAny.activeEventId = null;
+    runAny.choiceHandlerSnapshot = null;
+  };
+
+  function setChoiceHandler(
+    g: GameState,
+    handler: ((key: string) => void) | null,
+    snapshot: ChoiceHandlerSnapshot | null = null
+  ) {
+    choiceHandler = handler;
+    choiceHandlerSnapshot = snapshot;
+    (g.run as any).choiceHandlerSnapshot = snapshot;
+  }
+
+  function getChoiceSnapshot(g: GameState): ChoiceHandlerSnapshot | null {
+    if (choiceHandlerSnapshot) return choiceHandlerSnapshot;
+    return ((g.run as any).choiceHandlerSnapshot as ChoiceHandlerSnapshot | null) ?? null;
+  };
+
   function clearChoiceStack(g: GameState) {
     choiceStack.length = 0;
     g.choice = null;
-    choiceHandler = null;
+    setChoiceHandler(g, null, null);
+    clearChoiceMeta(g);
     document.querySelector(".choice-overlay")?.remove();
   }
 
   function pushChoice(g: GameState) {
-    choiceStack.push({ choice: g.choice, handler: choiceHandler });
+    choiceStack.push({ choice: g.choice, handler: choiceHandler, snapshot: getChoiceSnapshot(g) });
   }
 
   function popChoice(g: GameState) {
@@ -109,7 +149,7 @@ export function makeUIActionsImpl(
       return;
     }
     g.choice = prev.choice;
-    choiceHandler = prev.handler;
+    setChoiceHandler(g, prev.handler, prev.snapshot);
   }
 
   function closeChoiceOrPop(g: GameState) {
@@ -118,18 +158,220 @@ export function makeUIActionsImpl(
       return;
     }
     g.choice = null;
-    choiceHandler = null;
+    setChoiceHandler(g, null, null);
+    clearChoiceMeta(g);
     document.querySelector(".choice-overlay")?.remove();
   }
 
   function openChoice(
     g: GameState,
     next: GameState["choice"],
-    handler: (key: string) => void
+    handler: (key: string) => void,
+    snapshot?: ChoiceHandlerSnapshot
   ) {
     if (g.choice) pushChoice(g);
     g.choice = next;
-    choiceHandler = handler;
+    setChoiceHandler(g, handler, snapshot ?? null);
+  }
+
+  function handleRemovePickChoice(g: GameState, key: string, forcedThen?: "NONE" | "REWARD_PICK" | "BATTLE"): boolean {
+    if (g.choice?.kind !== "PICK_CARD") return false;
+
+    const runAny = g.run as any;
+    const then = forcedThen ?? normalizeRemoveThen(String(runAny.pendingRemovePickThen ?? "NONE"));
+
+    if (key === "cancel") {
+      runAny.pendingRemovePickThen = null;
+      logMsg(g, "제거 취소");
+      closeChoiceOrPop(g);
+      renderUI(g, actions);
+      return true;
+    }
+
+    if (!key.startsWith("remove:")) return false;
+
+    const uid = key.slice("remove:".length);
+    removeCardByUid(g, uid);
+    runAny.pendingRemovePickThen = null;
+
+    if (then === "BATTLE") {
+      clearChoiceStack(g);
+      g.phase = "NODE";
+      spawnEncounter(g);
+      startCombat(g);
+      renderUI(g, actions);
+      return true;
+    }
+
+    if (then === "REWARD_PICK") {
+      clearChoiceStack(g);
+      openRewardPick(g, actions, "카드 보상", "두 장 중 한 장을 선택하거나 생략합니다.");
+      renderUI(g, actions);
+      return true;
+    }
+
+    clearChoiceStack(g);
+    g.phase = "NODE";
+    renderUI(g, actions);
+    return true;
+  }
+
+  function handleRewardPickChoice(g: GameState, key: string): boolean {
+    if (g.choice?.kind !== "REWARD") return false;
+
+    if (key.startsWith("pick:")) {
+      const payload = key.slice("pick:".length);
+      const [defId, upStr] = payload.split(":");
+      const upgrade = Number(upStr ?? "0") || 0;
+      addCardToDeck(g, defId, { upgrade });
+    } else {
+      logMsg(g, "카드 보상 생략");
+    }
+
+    closeChoiceOrPop(g);
+    g.choice = null;
+    if (!g.run.finished) g.phase = "NODE";
+    renderUI(g, actions);
+    return true;
+  }
+
+  function handleUpgradePickChoice(g: GameState, key: string): boolean {
+    if (g.choice?.kind !== "UPGRADE_PICK") return false;
+
+    if (key === "skip") {
+      logMsg(g, "강화 취소");
+      closeChoiceOrPop(g);
+      renderUI(g, actions);
+      return true;
+    }
+
+    if (key.startsWith("up:")) {
+      const uid = key.slice("up:".length);
+      const ok = upgradeCardByUid(g, uid);
+      logMsg(g, ok ? `강화: [${cardDisplayNameByUid(g, uid)}]` : "강화 실패");
+      closeChoiceOrPop(g);
+      renderUI(g, actions);
+      return true;
+    }
+
+    closeChoiceOrPop(g);
+    renderUI(g, actions);
+    return true;
+  }
+
+  function dispatchChoiceSnapshot(g: GameState, key: string, snap: ChoiceHandlerSnapshot): boolean {
+    if (snap.id === "REMOVE_PICK") {
+      const thenRaw = String(snap.payload?.then ?? "NONE");
+      const then = normalizeRemoveThen(thenRaw);
+      return handleRemovePickChoice(g, key, then);
+    }
+
+    if (snap.id === "REWARD_PICK") {
+      return handleRewardPickChoice(g, key);
+    }
+
+    if (snap.id === "UPGRADE_PICK") {
+      return handleUpgradePickChoice(g, key);
+    }
+
+    if (snap.id === "EVENT_BY_ID") {
+      const eventId = String(snap.payload?.eventId ?? "");
+      if (!eventId) return false;
+
+      const ev = getEventById(eventId);
+      const picked = ev?.options(g).find((o) => o.key === key);
+      if (!picked) return false;
+
+      const up = getUnlockProgress(g);
+      up.eventPicks += 1;
+      checkRelicUnlocks(g);
+
+      const outcome: EventOutcome = picked.apply(g);
+      handleEventOutcome(g, outcome);
+      return true;
+    }
+
+    return false;
+  }
+
+  function handleEventOutcome(g: GameState, outcome: EventOutcome) {
+    if (typeof outcome === "object" && outcome.kind === "UPGRADE_PICK") {
+      openUpgradePick(g, actions, outcome.title ?? "강화", outcome.prompt ?? "강화할 카드 1장을 선택하세요.");
+      return;
+    }
+
+    if (typeof outcome === "object" && outcome.kind === "REMOVE_PICK") {
+      const candidates = Object.values(g.cards)
+        .filter((c) => (c.zone === "deck" || c.zone === "hand" || c.zone === "discard") && c.defId !== "goal_treasure")
+        .map((c) => c.uid);
+
+      const then = normalizeRemoveThen((outcome as any).then as string | undefined);
+      (g.run as any).pendingRemovePickThen = then;
+
+      openChoice(g, {
+        kind: "PICK_CARD",
+        title: outcome.title,
+        prompt: outcome.prompt ?? "제거할 카드 1장을 선택하세요.",
+        options: [
+          ...candidates.map((uid) => {
+            const def = getCardDefByUid(g, uid);
+            const t = displayCardTextPair(g, def.frontText, def.backText);
+            return {
+              key: `remove:${uid}`,
+              label: cardDisplayNameByUid(g, uid),
+              detail: `전열: ${t.frontText} / 후열: ${t.backText}`,
+              cardUid: uid,
+            };
+          }),
+          { key: "cancel", label: "취소" },
+        ],
+      }, (k: string) => {
+        if (handleRemovePickChoice(g, k)) return;
+        renderUI(g, actions);
+      }, { id: "REMOVE_PICK", payload: { then } });
+
+      renderUI(g, actions);
+      return;
+    }
+
+    if (typeof outcome === "object" && outcome.kind === "BATTLE_SPECIAL") {
+      clearChoiceStack(g);
+
+      (g.run as any).onWinGrantRelicId = outcome.onWinGrantRelicId ?? null;
+
+      logMsg(g, outcome.title ? `이벤트 전투: ${outcome.title}` : "이벤트 전투 발생!");
+
+      const runAny = g.run as any;
+      runAny.pendingEventWinRelicId = outcome.onWinGrantRelicId ?? null;
+      runAny.pendingEventWinGold = Number(outcome.onWinGrantGold ?? 0) || 0;
+
+      g.phase = "NODE";
+      spawnEncounter(g, { forcePatternIds: outcome.enemyIds });
+      g._justStartedCombat = true;
+      startCombat(g);
+      renderUI(g, actions);
+      return;
+    }
+
+    if (outcome === "BATTLE") {
+      clearChoiceStack(g);
+      g.phase = "NODE";
+      spawnEncounter(g);
+      g._justStartedCombat = true;
+      startCombat(g);
+      renderUI(g, actions);
+      return;
+    }
+
+    if (outcome === "REWARD") {
+      clearChoiceStack(g);
+      openRewardPick(g, actions, "카드 보상", "두 장 중 한 장을 선택하거나 생략합니다.");
+      renderUI(g, actions);
+      return;
+    }
+
+    closeChoiceOrPop(g);
+    renderUI(g, actions);
   }
 
   
@@ -325,10 +567,28 @@ export function makeUIActionsImpl(
     onMoveToNode: (toId: string) => {
       const g = getG();
       if (g.run.finished) return;
-      if (g.choice) return;
-      if (g.phase !== "NODE") return;
 
-      if (nodePickLock) return;
+      if (g.choice) {
+        const choiceOverlayVisible = !!document.querySelector(".choice-overlay");
+        if (!choiceOverlayVisible) {
+          logMsg(g, "선택 상태 복구: 보이지 않는 선택창 데이터를 정리합니다.");
+          clearChoiceStack(g);
+        }
+      }
+
+      if (g.choice) {
+        logMsg(g, "이동 불가: 선택 창이 열려 있습니다.");
+        return;
+      }
+      if (g.phase !== "NODE") {
+        logMsg(g, `이동 불가: 현재 페이즈가 NODE가 아닙니다. (${g.phase})`);
+        return;
+      }
+
+      if (nodePickLock) {
+        logMsg(g, "이동 불가: 입력 잠금 중입니다. 잠시 후 다시 시도하세요.");
+        return;
+      }
       nodePickLock = true;
       setTimeout(() => (nodePickLock = false), 180);
 
@@ -337,7 +597,10 @@ export function makeUIActionsImpl(
 
       const from = map.pos;
       const neigh = map.edges[from] ?? [];
-      if (!neigh.includes(toId)) return;
+      if (!neigh.includes(toId)) {
+        logMsg(g, `이동 불가: 인접 노드가 아닙니다. (${from} → ${toId})`);
+        return;
+      }
 
 
       runAny.timeMove = Number(runAny.timeMove ?? 0) + wingArteryMoveDelta(g);
@@ -374,6 +637,8 @@ export function makeUIActionsImpl(
       ensureBossSchedule(g);
       const T = totalTimeOnMap(g);
       if (Number(runAny.nextBossTime ?? 0) > 0 && T >= Number(runAny.nextBossTime ?? 0)) {
+        const reachedAt = Number(runAny.nextBossTime ?? 0) || 0;
+        pushUiToast(g, "WARN", `보스 임계치 도달 (${T}/${reachedAt})`, 2200);
         runAny.forcedNext = null;
         runAny.nextBossTime = Number(runAny.nextBossTime ?? 0) + 40;
         g.run.bossOmenText = null;
@@ -451,6 +716,38 @@ export function makeUIActionsImpl(
         (node as any).noRespawn = true;
         (node as any).lastClearedMove = tmNow;
         obtainTreasure(g);
+        renderUI(g, actions);
+        return;
+      }
+
+      if (actualKind === "BATTLE" || actualKind === "ELITE") {
+        {
+          const boon = getMadnessBoon(g);
+          if (boon === 3 && Math.random() < 0.5) {
+            node.cleared = true;
+            node.kind = "EMPTY";
+            (node as any).lastClearedMove = tmNow;
+            if (actualKind === "ELITE") (node as any).noRespawn = true;
+            logMsg(g, "광기: 전투가 어딘가로 사라졌다...");
+            pushUiToast(g, "INFO", "전투가 일어나지 않았습니다.", 1600);
+            renderUI(g, actions);
+            return;
+          }
+        }
+
+        node.cleared = true;
+        node.kind = "EMPTY";
+        (node as any).lastClearedMove = tmNow;
+        if (actualKind === "ELITE") (node as any).noRespawn = true;
+
+        logMsg(g, "이동 후 전투 시작 (시간 +1)");
+
+        if (actualKind === "ELITE") {
+          spawnEncounter(g, { forceBoss: false, forceElite: true });
+        } else {
+          spawnEncounter(g, { forceBoss: false });
+        }
+        startCombat(g);
         renderUI(g, actions);
         return;
       }
@@ -619,7 +916,9 @@ export function makeUIActionsImpl(
           options: opts.map((o) => ({ key: o.key, label: o.label, detail: o.detail })),
         };
 
-        choiceHandler = (key: string) => {
+        (g.run as any).activeEventId = ev.id;
+
+        setChoiceHandler(g, (key: string) => {
           const picked = opts.find((o) => o.key === key);
           if (!picked) return;
 
@@ -629,164 +928,14 @@ export function makeUIActionsImpl(
           checkRelicUnlocks(g);
 
           const outcome: EventOutcome = picked.apply(g);
-
-          if (typeof outcome === "object" && outcome.kind === "UPGRADE_PICK") {
-            openUpgradePick(g, actions, outcome.title ?? "강화", outcome.prompt ?? "강화할 카드 1장을 선택하세요.");
-            return;
-          }
-
-          if (typeof outcome === "object" && outcome.kind === "REMOVE_PICK") {
-            const candidates = Object.values(g.cards)
-              .filter((c) => (c.zone === "deck" || c.zone === "hand" || c.zone === "discard") && c.defId !== "goal_treasure")
-              .map((c) => c.uid);
-
-            openChoice(g, {
-              kind: "PICK_CARD",
-              title: outcome.title,
-              prompt: outcome.prompt ?? "제거할 카드 1장을 선택하세요.",
-              options: [
-                ...candidates.map((uid) => {
-                  const def = getCardDefByUid(g, uid);
-                  const t = displayCardTextPair(g, def.frontText, def.backText);
-                  return {
-                    key: `remove:${uid}`,
-                    label: cardDisplayNameByUid(g, uid),
-                    detail: `전열: ${t.frontText} / 후열: ${t.backText}`,
-                    cardUid: uid,
-                  };
-                }),
-                { key: "cancel", label: "취소" },
-              ],
-            }, (k: string) => {
-              if (k === "cancel") {
-                logMsg(g, "제거 취소");
-                closeChoiceOrPop(g);
-                renderUI(g, actions);
-                return;
-              }
-
-              if (!k.startsWith("remove:")) {
-                renderUI(g, actions);
-                return;
-              }
-
-              const uid = k.slice("remove:".length);
-              removeCardByUid(g, uid);
-
-              const thenRaw = (outcome as any).then as string | undefined;
-              const then =
-                thenRaw === "REWARD" ? "REWARD_PICK" :
-                thenRaw === "REWARD_PICK" ? "REWARD_PICK" :
-                thenRaw === "BATTLE" ? "BATTLE" :
-                thenRaw === "NONE" ? "NONE" :
-                undefined;
-
-              if (then === "BATTLE") {
-                clearChoiceStack(g);
-                g.phase = "NODE";
-                spawnEncounter(g);
-                startCombat(g);
-                renderUI(g, actions);
-                return;
-              }
-
-              if (then === "REWARD_PICK") {
-                clearChoiceStack(g);
-                openRewardPick(g, actions, "카드 보상", "두 장 중 한 장을 선택하거나 생략합니다.");
-                renderUI(g, actions);
-                return;
-              }
-
-              clearChoiceStack(g);
-              g.phase = "NODE";
-              renderUI(g, actions);
-              return;
-            });
-
-            renderUI(g, actions);
-            return;
-          }
-
-          if (typeof outcome === "object" && outcome.kind === "BATTLE_SPECIAL") {
-            clearChoiceStack(g);
-
-            (g.run as any).onWinGrantRelicId = outcome.onWinGrantRelicId ?? null;
-
-            logMsg(g, outcome.title ? `이벤트 전투: ${outcome.title}` : "이벤트 전투 발생!");
-
-            const runAny = g.run as any;
-            runAny.pendingEventWinRelicId = outcome.onWinGrantRelicId ?? null;
-            runAny.pendingEventWinGold = Number(outcome.onWinGrantGold ?? 0) || 0;
-
-            g.phase = "NODE";
-            spawnEncounter(g, { forcePatternIds: outcome.enemyIds });
-            g._justStartedCombat = true;
-            startCombat(g);
-            renderUI(g, actions);
-            return;
-          }
-
-          if (outcome === "BATTLE") {
-            clearChoiceStack(g);
-            g.phase = "NODE";
-            spawnEncounter(g);
-            g._justStartedCombat = true;
-            startCombat(g);
-            renderUI(g, actions);
-            return;
-          }
-
-          if (outcome === "REWARD") {
-            clearChoiceStack(g);
-            openRewardPick(g, actions, "카드 보상", "두 장 중 한 장을 선택하거나 생략합니다.");
-            renderUI(g, actions);
-            return;
-          }
-
-          closeChoiceOrPop(g);
-          renderUI(g, actions);
+          handleEventOutcome(g, outcome);
           return;
-        };
+        }, { id: "EVENT_BY_ID", payload: { eventId: ev.id } });
 
         renderUI(g, actions);
         return;
       }
 
-
-      if (actualKind === "BATTLE" || actualKind === "ELITE") {
-        // 광기(수락) 3: 50% 확률로 전투 노드에서도 전투가 발생하지 않음 (보스 제외)
-        {
-          const boon = getMadnessBoon(g);
-          if (boon === 3 && Math.random() < 0.5) {
-            node.cleared = true;
-            node.kind = "EMPTY";
-            (node as any).lastClearedMove = tmNow;
-            if (actualKind === "ELITE") (node as any).noRespawn = true;
-            logMsg(g, "광기: 전투가 어딘가로 사라졌다...");
-            pushUiToast(g, "INFO", "전투가 일어나지 않았습니다.", 1600);
-            renderUI(g, actions);
-            return;
-          }
-        }
-
-        node.cleared = true;
-        node.kind = "EMPTY";
-        (node as any).lastClearedMove = tmNow;
-        if (actualKind === "ELITE") (node as any).noRespawn = true;
-
-        logMsg(g, "이동 후 전투 시작 (시간 +1)");
-
-        if (actualKind === "ELITE") {
-          spawnEncounter(g, { forceBoss: false, forceElite: true });
-        } else {
-          spawnEncounter(g, { forceBoss: false });
-        }
-        startCombat(g);
-        renderUI(g, actions);
-        return;
-      }
-
-      renderUI(g, actions);
     },
 
 
@@ -816,6 +965,12 @@ export function makeUIActionsImpl(
         return;
       }
 
+      const snap = getChoiceSnapshot(g);
+      if (snap && dispatchChoiceSnapshot(g, key, snap)) {
+        actions.onAutoAdvance();
+        return;
+      }
+
       logMsg(g, `선택 처리 불가: handler 없음 (kind=${kind}, key=${key})`);
     },
     onAutoAdvance: () => {
@@ -838,6 +993,12 @@ export function makeUIActionsImpl(
       if (isTargeting(g)) return;
       if (g.phase !== "PLACE") return;
       if (side === "back" && g.backSlotDisabled?.[idx]) return;
+      if (side === "front" && isFrontSlotLockedByLivingChain(g, idx)) {
+        pushUiToast(g, "WARN", "살아있는 사슬: 전열 2번 슬롯은 사용할 수 없습니다.", 1600);
+        logMsg(g, "살아있는 사슬: 전열 2번 슬롯 봉인");
+        renderUI(g, actions);
+        return;
+      }
 
       placeCard(g, cardUid, side, idx);
       g.selectedHandCardUid = null;
@@ -856,6 +1017,12 @@ export function makeUIActionsImpl(
       if (isTargeting(g)) return;
       if (g.phase !== "PLACE") return;
       if (toSide === "back" && g.backSlotDisabled?.[toIdx]) return;
+      if (toSide === "front" && isFrontSlotLockedByLivingChain(g, toIdx)) {
+        pushUiToast(g, "WARN", "살아있는 사슬: 전열 2번 슬롯은 사용할 수 없습니다.", 1600);
+        logMsg(g, "살아있는 사슬: 전열 2번 슬롯 봉인");
+        renderUI(g, actions);
+        return;
+      }
 
       const fromSlots = fromSide === "front" ? g.frontSlots : g.backSlots;
       const toSlots = toSide === "front" ? g.frontSlots : g.backSlots;
@@ -965,23 +1132,10 @@ export function makeUIActionsImpl(
       ],
     };
 
-    choiceHandler = (kk: string) => {
-      choiceHandler = null;
-      if (kk.startsWith("pick:")) {
-        const payload = kk.slice("pick:".length);
-        const [defId, upStr] = payload.split(":");
-        const upgrade = Number(upStr ?? "0") || 0;
-        addCardToDeck(g, defId, { upgrade });
-      } else {
-        logMsg(g, "카드 보상 생략");
-      }
-
-      closeChoiceOrPop(g);
-      g.choice = null;
-      if (!g.run.finished) g.phase = "NODE";
-      renderUI(g, actions);
+    setChoiceHandler(g, (kk: string) => {
+      handleRewardPickChoice(g, kk);
       return;
-    };
+    }, { id: "REWARD_PICK" });
 
 
     renderUI(g, actions);
@@ -1013,7 +1167,7 @@ export function makeUIActionsImpl(
     if (candidates.length === 0) {
       logMsg(g, "강화할 수 있는 카드가 없습니다.");
       g.choice = null;
-      choiceHandler = null;
+      setChoiceHandler(g, null, null);
 
       if (opts?.onSkip) opts.onSkip();
       else renderUI(g, actions);
@@ -1053,7 +1207,7 @@ export function makeUIActionsImpl(
       ],
     };
 
-    choiceHandler = (k: string) => {
+    setChoiceHandler(g, (k: string) => {
 
       if (k === "skip") {
         logMsg(g, "강화 취소");
@@ -1080,7 +1234,7 @@ export function makeUIActionsImpl(
 
       closeChoiceOrPop(g);
       renderUI(g, actions);
-    };
+    }, { id: "UPGRADE_PICK" });
 
 
     renderUI(g, actions);

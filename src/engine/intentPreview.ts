@@ -153,6 +153,14 @@ export function buildIntentPreview(
         break;
       }
 
+      case "suppliesIfPlayerBackFull": {
+        const backCount = g.backSlots?.filter(Boolean).length ?? 0;
+        if (backCount >= 3) {
+          pushApply(applies, { target: "player", kind: "supplies", amount: act.n });
+        }
+        break;
+      }
+
       case "damagePlayerByDeckSize": {
         hitRaws.push(Math.max(0, previewDeckSizeDamage(g, act) + atkRamp));
         break;

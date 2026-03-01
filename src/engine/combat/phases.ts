@@ -35,6 +35,11 @@ function getSlotCols(g: GameState): number {
   return Math.max(getSlotCap(g, "front"), getSlotCap(g, "back"));
 }
 
+function isFrontSlotLockedByEnemies(g: GameState, idx: number): boolean {
+  if (idx !== 1) return false;
+  return aliveEnemies(g).some((e) => e.id === "living_chain");
+}
+
 function enemyAtkRampPerTurnFromDef(def: EnemyData | undefined): number {
   const ps = (def?.passives ?? []) as any[];
   let best = 0;
@@ -55,7 +60,17 @@ function resetCombatSlots(g: GameState) {
   g.backSlotDisabled = Array.from({ length: cols }, () => false);
 }
 
+function clearAllCardFlippedState(g: GameState) {
+  for (const inst of Object.values(g.cards)) {
+    if (!inst) continue;
+    delete (inst as any).flipped;
+  }
+  delete (g as any)._flipAllCombatOriginal;
+}
+
 export function startCombat(g: GameState) {
+  clearAllCardFlippedState(g);
+
   g.combatTurn = 1;
   g.time = (g.time ?? 0) + 1;
   logMsg(g, "전투: 시간 +1");
@@ -133,6 +148,7 @@ export function startCombat(g: GameState) {
 
   g.player.immuneToDisruptThisTurn = false;
   g.player.nullifyDamageThisTurn = false;
+  g.player.incomingDamageReductionThisTurn = 0;
 
   g.intentsRevealedThisTurn = false;
   g.disruptIndexThisTurn = null;
@@ -220,6 +236,11 @@ export function placeCard(g: GameState, cardUid: string, side: Side, idx: number
   if (idx < 0 || idx >= cap) return;
   if (idx >= slots.length) return;
   if (slots[idx]) return;
+  if (side === "front" && isFrontSlotLockedByEnemies(g, idx)) {
+    logMsg(g, `전열 ${idx + 1}번 칸은 봉인되어 배치할 수 없음`);
+    pushUiToast(g, "WARN", "살아있는 사슬: 전열 2번 슬롯은 사용할 수 없습니다.", 1600);
+    return;
+  }
 
   g.hand = g.hand.filter((x) => x !== cardUid);
   slots[idx] = cardUid;
@@ -466,6 +487,12 @@ export function resolveFront(g: GameState) {
     const uid = g.frontSlots[i];
     if (!uid) continue;
 
+    if (isFrontSlotLockedByEnemies(g, i)) {
+      const def0 = getCardDefFor(g, uid);
+      logMsg(g, `전열 ${i + 1}번 [${def0.name}] 봉인으로 무효`);
+      continue;
+    }
+
     const def = getCardDefFor(g, uid);
     resolvePlayerEffects({ game: g, side: "front", cardUid: uid }, getEffectiveEffectsForSide(g, uid, "front"));
     autoFlipSynthAfterResolve(g, uid);
@@ -664,6 +691,18 @@ function resolveEnemyEffect(g: GameState, enemy: EnemyState, act: EnemyEffect) {
         logMsg(g, `압류: S = ${s} → 피해 없음`);
       }
       break;
+    }
+
+    case "suppliesIfPlayerBackFull": {
+      const backCount = g.backSlots.filter(Boolean).length;
+      const need = 3;
+      if (backCount >= need) {
+        g.player.supplies = clampMin(g.player.supplies + act.n, 0);
+        logMsg(g, `적 효과: 후열 ${need}장 조건 충족 → 보급 S ${act.n >= 0 ? "+" : ""}${act.n} (현재 ${g.player.supplies})`);
+      } else {
+        logMsg(g, `적 효과: 후열 ${backCount}/${need}장 → 보급 변화 없음`);
+      }
+      return;
     }
     default: {
      const _exhaustive: never = act;
@@ -996,4 +1035,5 @@ export function _clearSlotsForVictory(g: GameState) {
 
 export function _cleanupBattleTransientForVictory(g: GameState) {
   cleanupBattleTransient(g);
+  clearAllCardFlippedState(g);
 }
