@@ -5,6 +5,7 @@ import { buildContent } from "./content";
 import { render, createOrLoadGame, isDraggingNow, makeUIActions } from "./ui/ui";
 import { applyAssetVarsOnce } from "./ui/assets";
 import { isMobileLike } from "./ui/uiFit";
+import { installMusicUnlock } from "./ui/audio/music";
 
 const content = buildContent();
 let g = createOrLoadGame(content);
@@ -172,6 +173,7 @@ setAssetCssVars();
 injectFontFaces();
 
 applyAssetVarsOnce();
+installMusicUnlock();
 installUiFit();
 installLayoutMode();
 

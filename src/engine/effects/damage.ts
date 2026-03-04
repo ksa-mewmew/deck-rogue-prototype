@@ -244,6 +244,10 @@ export function applyDamageToPlayer(
 
     finalDamage = modifyDamageByRelics(g, { ...base, phase: "FINAL", current: postBlock });
     formula = `식: ${raw}(기본) → ${preStatus}(보정) → max(0, ${preStatus} - ${incomingReduction}(받은 피해 감소)) = ${afterIncomingReduction} → max(0, ${afterIncomingReduction} - ${weak}(약화) + ${pv}(취약)) = ${afterStatus} → ${postStatus}(상태후) → ${preBlock}(방어전) - ${blockUsed}(방어) = ${afterBlock} → ${postBlock}(방어후) → ${finalDamage}(최종)`;
+  } else if (kind === "BLEED") {
+    const postStatus = modifyDamageByRelics(g, { ...base, phase: "POST_STATUS", current: afterIncomingReduction, afterStatus: afterIncomingReduction });
+    finalDamage = modifyDamageByRelics(g, { ...base, phase: "FINAL", current: postStatus });
+    formula = `식: ${raw}(기본) → ${preStatus}(보정) → max(0, ${preStatus} - ${incomingReduction}(받은 피해 감소)) = ${afterIncomingReduction} → ${postStatus}(상태후) → ${finalDamage}(최종, 방어 무시)`;
   } else {
     const postStatus = modifyDamageByRelics(g, { ...base, phase: "POST_STATUS", current: afterIncomingReduction, afterStatus: afterIncomingReduction });
     finalDamage = modifyDamageByRelics(g, { ...base, phase: "FINAL", current: postStatus });

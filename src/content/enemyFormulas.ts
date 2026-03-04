@@ -39,6 +39,11 @@ export function calcDamagePlayerFormula(g: GameState, e: EnemyState, kind: Damag
       const hand = Math.max(0, Number(g.hand?.length ?? 0) || 0);
       return { raw: Math.max(0, Math.min(30, 6 + 2 * hand)), hits: 1 };
     }
+
+    case "supply_blocker": {
+      const supplies = Math.max(0, Number(g.player.supplies ?? 0) || 0);
+      return { raw: Math.max(0, 10 + supplies * 2), hits: 1 };
+    }
   }
 }
 

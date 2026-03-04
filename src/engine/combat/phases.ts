@@ -8,14 +8,12 @@ import { runRelicHook, checkRelicUnlocks, getUnlockProgress, isRelicActive } fro
 import { revealIntentsAndDisrupt } from "./intents";
 import { checkEndConditions } from "./victory";
 import {
-  GOD_LINES,
   applyFaithCombatStartHooks,
   applyFaithOnCardUsedHooks,
   applyFaithUpkeepEndTurnHooks,
   applyMadnessCombatStartHooks,
   applyWingArteryEvery5Turns,
   combatStartDrawDeltaFromFaith,
-  ensureFaith,
   getPatronGodOrNull,
   wingArteryBaseSuppliesBonus,
 } from "../faith";
@@ -132,18 +130,6 @@ export function startCombat(g: GameState) {
   if (baseBonus !== 0) {
     const signed = `${baseBonus >= 0 ? "+" : ""}${baseBonus}`;
     logMsg(g, `후원 효과: 시작 보급 ${signed} (현재 ${g.player.supplies})`);
-  }
-
-  {
-    const patron = getPatronGodOrNull(g);
-    if (patron === "forge_master") {
-      const f = ensureFaith(g);
-      if (!f.forgeIntroShown) {
-        f.forgeIntroShown = true;
-        pushUiToast(g, "INFO", GOD_LINES.forge_master.firstBattle, 2000);
-        logMsg(g, GOD_LINES.forge_master.firstBattle);
-      }
-    }
   }
 
   g.player.immuneToDisruptThisTurn = false;
@@ -498,6 +484,29 @@ export function resolveFront(g: GameState) {
     autoFlipSynthAfterResolve(g, uid);
   }
 
+  {
+    const patron = getPatronGodOrNull(g);
+    if (patron === "twin_heart") {
+      const list: string[] = ((g as any)._placedUidsThisTurn as string[]) ?? [];
+      if (list.length > 0) {
+        const uid = list[(Math.random() * list.length) | 0];
+        const z = String(g.cards[uid]?.zone ?? "");
+        const side0 = (z === "front" || z === "back")
+          ? z
+          : String(((g as any)._placedSideThisTurn ?? {})[uid] ?? "") as any;
+        if (side0 === "front" || side0 === "back") {
+          const other: Side = side0 === "front" ? "back" : "front";
+
+          const inst = g.cards[uid];
+          if (inst) {
+            logMsg(g, `쌍둥이 심장: [${cardNameWithUpgrade(g, uid)}] 반대열 효과 발동 (${other})`);
+            resolvePlayerEffects({ game: g, side: other, cardUid: uid, sourceLabel: "쌍둥이 심장", reason: "OTHER" }, mapSelectTargetsToRandom(getEffectiveEffectsForSide(g, uid, other)));
+          }
+        }
+      }
+    }
+  }
+
   g.phase = "ENEMY";
 }
 
@@ -715,28 +724,6 @@ export function upkeepEndTurn(g: GameState) {
   if (g.phase !== "UPKEEP") return;
 
   applyFaithUpkeepEndTurnHooks(g);
-
-  {
-    const patron = getPatronGodOrNull(g);
-    if (patron === "twin_heart") {
-      const list: string[] = ((g as any)._placedUidsThisTurn as string[]) ?? [];
-      if (list.length > 0) {
-        const uid = list[(Math.random() * list.length) | 0];
-        const side0 = String(((g as any)._placedSideThisTurn ?? {})[uid] ?? g.cards[uid]?.zone ?? "") as any;
-        const other: Side = side0 === "front" ? "back" : "front";
-
-        const inst = g.cards[uid];
-        if (inst) {
-          const z0 = inst.zone;
-          (inst as any).zone = other;
-          pushUiToast(g, "INFO", "두 심장이 같은 박자를 냅니다.", 1400);
-          logMsg(g, `쌍둥이 심장: [${cardNameWithUpgrade(g, uid)}] 반대열 효과 발동 (${other})`);
-          resolvePlayerEffects({ game: g, side: other, cardUid: uid, sourceLabel: "쌍둥이 심장", reason: "OTHER" }, mapSelectTargetsToRandom(getEffectiveEffectsForSide(g, uid, other)));
-          (inst as any).zone = z0;
-        }
-      }
-    }
-  }
 
   logMsg(g, "=== 유지비 / 상태 처리 ===");
 

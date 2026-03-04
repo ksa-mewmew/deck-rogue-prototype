@@ -952,6 +952,12 @@ html, body, #app,
   mix-blend-mode: normal !important;
 }
 
+.dragLayer .dragCardPreview,
+.dragLayer .dragCardPreview *{
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
 
 .kwRun, .kwBadge{
   display: inline-flex;

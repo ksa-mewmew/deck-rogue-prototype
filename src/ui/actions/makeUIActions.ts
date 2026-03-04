@@ -89,13 +89,14 @@ export function makeUIActionsImpl(
     payload?: Record<string, any>;
   };
   let choiceHandlerSnapshot: ChoiceHandlerSnapshot | null = null;
-  let nodePickLock = false;
+  let nodePickLockedUntil = 0;
 
 
   let targetPickLock = false;
 
   type ChoiceFrame = {
     choice: GameState["choice"];
+    ctx: GameState["choiceCtx"];
     handler: ((key: string) => void) | null;
     snapshot: ChoiceHandlerSnapshot | null;
   };
@@ -130,16 +131,36 @@ export function makeUIActionsImpl(
     return ((g.run as any).choiceHandlerSnapshot as ChoiceHandlerSnapshot | null) ?? null;
   };
 
+  function isChoiceHandledByApplyChoiceKey(g: GameState): boolean {
+    const ctxKind = String((g as any).choiceCtx?.kind ?? "");
+    if (ctxKind.length > 0) return true;
+    const kind = String(g.choice?.kind ?? "");
+    return kind === "REWARD" || kind === "UPGRADE_PICK" || kind === "RELIC" || kind === "FAITH" || kind === "GOD_TEMPT" || kind === "MADNESS_TEMPT";
+  }
+
+  function reconcileOrphanChoiceState(g: GameState): boolean {
+    if (!g.choice) return false;
+
+    const hasRuntimeHandler = !!choiceHandler || !!getChoiceSnapshot(g);
+    if (hasRuntimeHandler) return false;
+    if (isChoiceHandledByApplyChoiceKey(g)) return false;
+
+    logMsg(g, "선택 상태 복구: 처리 핸들러가 사라진 선택창을 정리합니다.");
+    clearChoiceStack(g);
+    return true;
+  }
+
   function clearChoiceStack(g: GameState) {
     choiceStack.length = 0;
     g.choice = null;
+    g.choiceCtx = null;
     setChoiceHandler(g, null, null);
     clearChoiceMeta(g);
     document.querySelector(".choice-overlay")?.remove();
   }
 
   function pushChoice(g: GameState) {
-    choiceStack.push({ choice: g.choice, handler: choiceHandler, snapshot: getChoiceSnapshot(g) });
+    choiceStack.push({ choice: g.choice, ctx: g.choiceCtx, handler: choiceHandler, snapshot: getChoiceSnapshot(g) });
   }
 
   function popChoice(g: GameState) {
@@ -149,6 +170,7 @@ export function makeUIActionsImpl(
       return;
     }
     g.choice = prev.choice;
+    g.choiceCtx = prev.ctx;
     setChoiceHandler(g, prev.handler, prev.snapshot);
   }
 
@@ -158,6 +180,7 @@ export function makeUIActionsImpl(
       return;
     }
     g.choice = null;
+    g.choiceCtx = null;
     setChoiceHandler(g, null, null);
     clearChoiceMeta(g);
     document.querySelector(".choice-overlay")?.remove();
@@ -229,7 +252,6 @@ export function makeUIActionsImpl(
     }
 
     closeChoiceOrPop(g);
-    g.choice = null;
     if (!g.run.finished) g.phase = "NODE";
     renderUI(g, actions);
     return true;
@@ -374,6 +396,200 @@ export function makeUIActionsImpl(
     renderUI(g, actions);
   }
 
+  type PendingTemptNode = { kind: "REST" | "EVENT"; nodeId: string };
+
+  function clearPendingTemptNode(g: GameState) {
+    delete (g.run as any).pendingNodeAfterTempt;
+  }
+
+  function setPendingTemptNode(g: GameState, pending: PendingTemptNode) {
+    (g.run as any).pendingNodeAfterTempt = pending;
+  }
+
+  function tryOpenPreNodeTempt(g: GameState, nodeId: string, kind: "REST" | "EVENT") {
+    const f = ensureFaith(g);
+    if (!f.chosen) return false;
+
+    const tempter = pickTemptingGod(g);
+    const P_TEMPT = 0.25;
+    if (!tempter || Math.random() >= P_TEMPT) return false;
+
+    setPendingTemptNode(g, { kind, nodeId });
+    openGodTemptChoice(g, tempter);
+    return true;
+  }
+
+  function openRestNodeChoice(g: GameState, node: any, nodeId: string, tmNow: number, allowTempt: boolean) {
+    if (allowTempt && tryOpenPreNodeTempt(g, nodeId, "REST")) return true;
+
+    node.cleared = true;
+    node.kind = "EMPTY";
+    (node as any).lastClearedMove = tmNow;
+    const highF = (g.player.fatigue ?? 0) >= 10;
+
+    onEnterRestExplorationHooks(g);
+
+    const patron = getPatronGodOrNull(g);
+    const dreamHostile = isHostile(g, "dream_shadow");
+    const forgeHostile = isForgeHostile(g);
+
+    const healDetail =
+      dreamHostile ? "회복량 0" :
+      patron === "dream_shadow" ? "항상 최대 체력 (F +3)" :
+      "HP +15";
+
+    const upgradeDetail =
+      forgeHostile ? "(불가)" :
+      (patron === "dream_shadow" || dreamHostile) ? "카드 1장 강화 (피로만큼 피해)" :
+      "카드 1장 강화";
+
+    const optionsBase = [
+      { key: "rest:heal", label: "회복", detail: healDetail },
+      { key: "rest:clear_f", label: "정비", detail: "F -3" },
+      { key: "rest:upgrade", label: "강화", detail: upgradeDetail },
+      { key: "rest:skip", label: "떠나기" },
+    ];
+
+    const canSynth = canRetortFusionSynthAtRest(g);
+    if (canSynth) {
+      optionsBase.splice(optionsBase.length - 1, 0, { key: "rest:synth", label: "합성", detail: "카드 1장에 효과 부여 (폭주/설치/선천성/뒤집기/소모 제거)" });
+    }
+
+    const options = forgeHostile ? optionsBase.filter((o) => o.key !== "rest:upgrade") : optionsBase;
+
+    g.choice = {
+      kind: "EVENT",
+      title: "휴식",
+      art: assetUrl("assets/events/event_rest.png"),
+      prompt: highF ? "피로가 너무 높아 시간이 더 걸릴 수 있습니다." : "캠프에 잠시 머문다.",
+      options,
+    } as any;
+
+    g.choiceCtx = { kind: "REST", highF } as any;
+    return true;
+  }
+
+  function openEventNodeChoice(g: GameState, node: any, nodeId: string, tmNow: number, allowTempt: boolean) {
+    if (allowTempt && tryOpenPreNodeTempt(g, nodeId, "EVENT")) return true;
+
+    node.cleared = true;
+    node.kind = "EMPTY";
+    (node as any).lastClearedMove = tmNow;
+
+    const runAny2: any = g.run;
+    runAny2.ominousProphecySeen ??= false;
+
+    const seen = (runAny2.eventsSeen ?? {}) as Record<string, number>;
+    const blockedRunOnce = (id: string) => id === "impossible_plan" && (Number(seen[id] ?? 0) || 0) > 0;
+
+    const OMEN_CHANCE = 0.3;
+    let ev = pickEventByMadness(g);
+
+    if (runAny2.ominousProphecySeen === true) {
+      for (let i = 0; i < 50 && ((ev as any).id === "ominous_prophecy" || blockedRunOnce((ev as any).id)); i++) {
+        ev = pickEventByMadness(g);
+      }
+    } else {
+      if (Math.random() < OMEN_CHANCE) {
+        ev = getEventById("ominous_prophecy") ?? ev;
+      }
+      if (blockedRunOnce((ev as any).id)) {
+        for (let i = 0; i < 60 && blockedRunOnce((ev as any).id); i++) {
+          ev = pickEventByMadness(g);
+        }
+      }
+    }
+
+    {
+      const lastEventId: string | null | undefined = (runAny2.lastEventId as any) ?? null;
+      if (lastEventId && (ev as any)?.id === lastEventId) {
+        for (let i = 0; i < 60; i++) {
+          const cand = pickEventByMadness(g);
+          const cid = (cand as any)?.id;
+          if (!cid) continue;
+          if (runAny2.ominousProphecySeen === true && cid === "ominous_prophecy") continue;
+          if (blockedRunOnce(cid)) continue;
+          if (cid !== lastEventId) {
+            ev = cand;
+            break;
+          }
+        }
+      }
+    }
+
+    if (blockedRunOnce((ev as any)?.id)) {
+      for (let i = 0; i < 80; i++) {
+        const cand = pickEventByMadness(g);
+        const cid = (cand as any)?.id;
+        if (!cid || blockedRunOnce(cid)) continue;
+        if (runAny2.ominousProphecySeen === true && cid === "ominous_prophecy") continue;
+        ev = cand;
+        break;
+      }
+    }
+
+    if ((ev as any)?.id === "ominous_prophecy") {
+      runAny2.ominousProphecySeen = true;
+    }
+
+    if (!ev) return true;
+
+    {
+      const runAnyEv = g.run as any;
+      runAnyEv.eventsSeen ??= {};
+      const cur = Number(runAnyEv.eventsSeen[ev.id] ?? 0) || 0;
+      runAnyEv.eventsSeen[ev.id] = cur + 1;
+      runAnyEv.lastEventId = ev.id;
+    }
+
+    const opts = ev.options(g);
+
+    g.choice = {
+      kind: "EVENT",
+      title: ev.name,
+      prompt: ev.prompt,
+      art: (ev as any).art ?? null,
+      options: opts.map((o) => ({ key: o.key, label: o.label, detail: o.detail })),
+    };
+
+    (g.run as any).activeEventId = ev.id;
+
+    setChoiceHandler(g, (key: string) => {
+      const picked = opts.find((o) => o.key === key);
+      if (!picked) return;
+
+      const up = getUnlockProgress(g);
+      up.eventPicks += 1;
+      checkRelicUnlocks(g);
+
+      const outcome: EventOutcome = picked.apply(g);
+      handleEventOutcome(g, outcome);
+      return;
+    }, { id: "EVENT_BY_ID", payload: { eventId: ev.id } });
+
+    return true;
+  }
+
+  function resumePendingNodeAfterTempt(g: GameState) {
+    const pending = ((g.run as any).pendingNodeAfterTempt ?? null) as PendingTemptNode | null;
+    if (!pending) return false;
+    if (g.choice || g.phase !== "NODE") return false;
+
+    const { map } = ensureGraphRuntime(g);
+    if (map.pos !== pending.nodeId) {
+      clearPendingTemptNode(g);
+      return false;
+    }
+
+    const node = map.nodes[pending.nodeId] ?? (map.nodes[pending.nodeId] = { id: pending.nodeId, kind: pending.kind, visited: true } as any);
+    const tmNow = Number((g.run as any).timeMove ?? 0) || 0;
+    clearPendingTemptNode(g);
+
+    if (pending.kind === "REST") return openRestNodeChoice(g, node, pending.nodeId, tmNow, false);
+    if (pending.kind === "EVENT") return openEventNodeChoice(g, node, pending.nodeId, tmNow, false);
+    return false;
+  }
+
   
   const actions = {
 
@@ -417,6 +633,8 @@ export function makeUIActionsImpl(
         g.usedThisTurn = Math.max(0, g.usedThisTurn - 1);
         if (side === "front") g.frontPlacedThisTurn = Math.max(0, g.frontPlacedThisTurn - 1);
         g.placedUidsThisTurn = (g.placedUidsThisTurn ?? []).filter((u) => u !== uidHere);
+        const sideMap = ((g as any)._placedSideThisTurn ??= {});
+        delete sideMap[uidHere];
       }
 
       g.hand.push(uidHere);
@@ -525,6 +743,8 @@ export function makeUIActionsImpl(
         g.usedThisTurn = Math.max(0, g.usedThisTurn - 1);
         if (fromSide === "front") g.frontPlacedThisTurn = Math.max(0, g.frontPlacedThisTurn - 1);
         g.placedUidsThisTurn = (g.placedUidsThisTurn ?? []).filter((u) => u !== uid);
+        const sideMap = ((g as any)._placedSideThisTurn ??= {});
+        delete sideMap[uid];
       }
 
       g.hand.push(uid);
@@ -568,6 +788,10 @@ export function makeUIActionsImpl(
       const g = getG();
       if (g.run.finished) return;
 
+      if (reconcileOrphanChoiceState(g)) {
+        renderUI(g, actions);
+      }
+
       if (g.choice) {
         const choiceOverlayVisible = !!document.querySelector(".choice-overlay");
         if (!choiceOverlayVisible) {
@@ -578,19 +802,22 @@ export function makeUIActionsImpl(
 
       if (g.choice) {
         logMsg(g, "이동 불가: 선택 창이 열려 있습니다.");
+        renderUI(g, actions);
         return;
       }
       if (g.phase !== "NODE") {
         logMsg(g, `이동 불가: 현재 페이즈가 NODE가 아닙니다. (${g.phase})`);
+        renderUI(g, actions);
         return;
       }
 
-      if (nodePickLock) {
+      const now = Date.now();
+      if (now < nodePickLockedUntil) {
         logMsg(g, "이동 불가: 입력 잠금 중입니다. 잠시 후 다시 시도하세요.");
+        renderUI(g, actions);
         return;
       }
-      nodePickLock = true;
-      setTimeout(() => (nodePickLock = false), 180);
+      nodePickLockedUntil = now + 180;
 
       const runAny = g.run as any;
       const { map } = ensureGraphRuntime(g);
@@ -599,6 +826,7 @@ export function makeUIActionsImpl(
       const neigh = map.edges[from] ?? [];
       if (!neigh.includes(toId)) {
         logMsg(g, `이동 불가: 인접 노드가 아닙니다. (${from} → ${toId})`);
+        renderUI(g, actions);
         return;
       }
 
@@ -753,50 +981,7 @@ export function makeUIActionsImpl(
       }
 
       if (actualKind === "REST") {
-        node.cleared = true;
-        node.kind = "EMPTY";
-        (node as any).lastClearedMove = tmNow;
-        const highF = (g.player.fatigue ?? 0) >= 10;
-
-        onEnterRestExplorationHooks(g);
-
-        const patron = getPatronGodOrNull(g);
-        const dreamHostile = isHostile(g, "dream_shadow");
-        const forgeHostile = isForgeHostile(g);
-
-        const healDetail =
-          dreamHostile ? "회복량 0" :
-          patron === "dream_shadow" ? "항상 최대 체력 (F +3)" :
-          "HP +15";
-
-        const upgradeDetail =
-          forgeHostile ? "(불가)" :
-          (patron === "dream_shadow" || dreamHostile) ? "카드 1장 강화 (피로만큼 피해)" :
-          "카드 1장 강화";
-
-        const optionsBase = [
-          { key: "rest:heal", label: "회복", detail: healDetail },
-          { key: "rest:clear_f", label: "정비", detail: "F -3" },
-          { key: "rest:upgrade", label: "강화", detail: upgradeDetail },
-          { key: "rest:skip", label: "떠나기" },
-        ];
-
-        const canSynth = canRetortFusionSynthAtRest(g);
-        if (canSynth) {
-          optionsBase.splice(optionsBase.length - 1, 0, { key: "rest:synth", label: "합성", detail: "카드 1장에 효과 부여 (폭주/설치/선천성/뒤집기/소모 제거)" });
-        }
-
-        const options = forgeHostile ? optionsBase.filter((o) => o.key !== "rest:upgrade") : optionsBase;
-
-        g.choice = {
-          kind: "EVENT",
-          title: "휴식",
-          art: assetUrl("assets/events/event_rest.png"),
-          prompt: highF ? "피로가 너무 높아 시간이 더 걸릴 수 있습니다." : "캠프에 잠시 머문다.",
-          options,
-        } as any;
-
-        g.choiceCtx = { kind: "REST", highF } as any;
+        openRestNodeChoice(g, node, toId, tmNow, true);
         renderUI(g, actions);
         return;
       }
@@ -814,139 +999,33 @@ export function makeUIActionsImpl(
       }
 
       if (actualKind === "EVENT") {
-        node.cleared = true;
-        node.kind = "EMPTY";
-        (node as any).lastClearedMove = tmNow;
-        const runAny2: any = g.run;
-        runAny2.ominousProphecySeen ??= false;
-
-        {
-          const f = ensureFaith(g);
-          if (f.chosen) {
-            const tempter = pickTemptingGod(g);
-            const P_TEMPT = 0.25;
-            if (tempter && Math.random() < P_TEMPT) {
-              openGodTemptChoice(g, tempter);
-              renderUI(g, actions);
-              return;
-            }
-          }
-        }
-
-        const OMEN_CHANCE = 0.3;
-        let ev = pickEventByMadness(g);
-
-        if (runAny2.ominousProphecySeen === true) {
-          for (let i = 0; i < 50 && (ev as any).id === "ominous_prophecy"; i++) {
-            ev = pickEventByMadness(g);
-          }
-        } else {
-          if (Math.random() < OMEN_CHANCE) {
-            ev = getEventById("ominous_prophecy") ?? ev;
-          }
-        }
-
-        {
-          const lastEventId: string | null | undefined = (runAny2.lastEventId as any) ?? null;
-          if (lastEventId && (ev as any)?.id === lastEventId) {
-            for (let i = 0; i < 60; i++) {
-              const cand = pickEventByMadness(g);
-              const cid = (cand as any)?.id;
-              if (!cid) continue;
-              if (runAny2.ominousProphecySeen === true && cid === "ominous_prophecy") continue;
-              if (cid !== lastEventId) {
-                ev = cand;
-                break;
-              }
-            }
-          }
-        }
-
-        if ((ev as any)?.id === "ominous_prophecy") {
-          runAny2.ominousProphecySeen = true;
-        }
-
-        if (!ev) {
-          renderUI(g, actions);
-          return;
-        }
-
-        {
-          const runAnyEv = g.run as any;
-          runAnyEv.eventsSeen ??= {};
-          const cur = Number(runAnyEv.eventsSeen[ev.id] ?? 0) || 0;
-          runAnyEv.eventsSeen[ev.id] = cur + 1;
-          runAnyEv.lastEventId = ev.id;
-        }
-
-        let opts = ev.options(g);
-
-
-        /*const { tier } = madnessP(g);
-        if (tier >= 2 && !opts.some((o) => o.key === "mad:whisper")) {
-          opts = [
-            ...opts,
-            {
-              key: "mad:whisper",
-              label: "속삭임에 귀 기울인다.",
-              detail: "무언가를 얻는다. 그리고 무언가를 잃는다.",
-              apply: (gg: GameState) => {
-                const r = Math.random();
-                if (r < 0.34) {
-                  gg.player.hp = Math.min(gg.player.maxHp, gg.player.hp + 10);
-                  logMsg(gg, "속삭임: HP +10");
-                } else if (r < 0.67) {
-                  gg.player.fatigue += 1;
-                  logMsg(gg, "속삭임: F +1 (대가)");
-                } else {
-                  addCardToDeck(gg, "mad_echo", { upgrade: 0 });
-                  logMsg(gg, "속삭임: [메아리]를 얻었다.");
-                }
-                return "NONE" as any;
-              },
-            } as any,
-          ];
-        }*/
-
-        g.choice = {
-          kind: "EVENT",
-          title: ev.name,
-          prompt: ev.prompt,
-          art: (ev as any).art ?? null,
-          options: opts.map((o) => ({ key: o.key, label: o.label, detail: o.detail })),
-        };
-
-        (g.run as any).activeEventId = ev.id;
-
-        setChoiceHandler(g, (key: string) => {
-          const picked = opts.find((o) => o.key === key);
-          if (!picked) return;
-
-
-          const up = getUnlockProgress(g);
-          up.eventPicks += 1;
-          checkRelicUnlocks(g);
-
-          const outcome: EventOutcome = picked.apply(g);
-          handleEventOutcome(g, outcome);
-          return;
-        }, { id: "EVENT_BY_ID", payload: { eventId: ev.id } });
-
+        openEventNodeChoice(g, node, toId, tmNow, true);
         renderUI(g, actions);
         return;
       }
+
+      renderUI(g, actions);
+      return;
 
     },
 
 
     onChooseChoice: (key: string) => {
       const g = getG();
+      if (reconcileOrphanChoiceState(g)) {
+        renderUI(g, actions);
+      }
       if (!g.choice) return;
 
       const kind = g.choice.kind;
 
       if (applyChoiceKey(g, key)) {
         const justEnteredCombat = kind === "EVENT" && key === "startBattle";
+
+        if (resumePendingNodeAfterTempt(g)) {
+          renderUI(g, actions);
+          return;
+        }
 
         renderUI(g, actions);
 
@@ -959,6 +1038,11 @@ export function makeUIActionsImpl(
 
         const justEnteredCombat = kind === "EVENT" && key === "startBattle";
 
+        if (resumePendingNodeAfterTempt(g)) {
+          renderUI(g, actions);
+          return;
+        }
+
         renderUI(g, actions);
 
         if (!justEnteredCombat) actions.onAutoAdvance();
@@ -967,6 +1051,10 @@ export function makeUIActionsImpl(
 
       const snap = getChoiceSnapshot(g);
       if (snap && dispatchChoiceSnapshot(g, key, snap)) {
+        if (resumePendingNodeAfterTempt(g)) {
+          renderUI(g, actions);
+          return;
+        }
         actions.onAutoAdvance();
         return;
       }
@@ -1055,6 +1143,11 @@ export function makeUIActionsImpl(
 
       g.cards[a].zone = toSide;
       if (b) g.cards[b].zone = fromSide;
+      {
+        const sideMap = ((g as any)._placedSideThisTurn ??= {});
+        sideMap[a] = toSide;
+        if (b) sideMap[b] = fromSide;
+      }
 
       if (fromSide !== toSide) {
         if (fromSide === "front") g.frontPlacedThisTurn = Math.max(0, g.frontPlacedThisTurn - 1);
@@ -1106,6 +1199,26 @@ export function makeUIActionsImpl(
     },
   };
 
+  {
+    const bindKey = "__deckrogueUiResumeResyncBound";
+    if (!(window as any)[bindKey]) {
+      const onResume = () => {
+        const g = getG();
+        reconcileOrphanChoiceState(g);
+        clearDrag();
+        updateSlotHoverUI(null);
+        renderUI(g, actions);
+      };
+
+      window.addEventListener("focus", onResume, { passive: true });
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") onResume();
+      }, { passive: true });
+
+      (window as any)[bindKey] = true;
+    }
+  }
+
 
   function openRewardPick(g: GameState, actions: any, title: string, prompt: string) {
 
@@ -1131,6 +1244,7 @@ export function makeUIActionsImpl(
         { key: "skip", label: "생략" },
       ],
     };
+    g.choiceCtx = null;
 
     setChoiceHandler(g, (kk: string) => {
       handleRewardPickChoice(g, kk);
@@ -1206,6 +1320,7 @@ export function makeUIActionsImpl(
         { key: "skip", label: "취소" },
       ],
     };
+    g.choiceCtx = null;
 
     setChoiceHandler(g, (k: string) => {
 

@@ -117,6 +117,7 @@ const MAD_REWARD_POOL: RewardEntry[] = [
 
 export const REWARD_POOL: RewardEntry[] = [
   { id: "smoke", weight: 0 },
+  { id: "impossible_plan", weight: 0 },
 
   { id: "redeploy", weight: 3 },
   { id: "secret_strike", weight: 3 },
@@ -144,7 +145,6 @@ export const REWARD_POOL: RewardEntry[] = [
   { id: "scribe_hand", weight: 12 },
   { id: "innate_march_shield", weight: 12 },
   { id: "fuel_kindling", weight: 12 },
-  { id: "impossible_plan", weight: 12 },
   { id: "slash_frenzy", weight: 12 },
   { id: "doppelganger", weight: 12 },
 
@@ -164,7 +164,7 @@ export const REWARD_POOL: RewardEntry[] = [
   { id: "heavy_shield", weight: 20 },
   { id: "reinforced_bastion", weight: 20 },
   { id: "improv_arrow", weight: 20 },
-  { id: "low_body_temperature", weight: 20 },
+  //{ id: "low_body_temperature", weight: 20 },
 
 ];
 

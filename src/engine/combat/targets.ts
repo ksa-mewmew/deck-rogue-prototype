@@ -5,9 +5,32 @@ import { checkEndConditions } from "./victory";
 import { checkRelicUnlocks, getUnlockProgress } from "../relics";
 import { calcDamageEnemyFormulaForTarget } from "../../content/formulas";
 import { getPatronGodOrNull } from "../faith";
+import { getCardDefFor } from "../../content/cards";
 
 export function isTargeting(g: GameState) {
   return g.pendingTarget != null || (g.pendingTargetQueue?.length ?? 0) > 0;
+}
+
+function isInstallSourceDamage(g: GameState, req: any): boolean {
+  const uid = String(req?.sourceCardUid ?? "");
+  if (!uid) return false;
+
+  let def: any;
+  try {
+    def = getCardDefFor(g, uid) as any;
+  } catch {
+    return false;
+  }
+
+  if (!Array.isArray(def?.tags) || !def.tags.includes("INSTALL")) return false;
+
+  const when = String(def?.installWhen ?? "BOTH").toUpperCase();
+  if (when === "BOTH") return true;
+
+  const reason = String(req?.reason ?? "").toUpperCase();
+  if (when === "FRONT") return reason === "FRONT";
+  if (when === "BACK") return reason === "BACK";
+  return false;
 }
 
 function calcDamageForTargetSelection(g: GameState, req: any, target: any): number {
@@ -63,7 +86,14 @@ export function resolveTargetSelection(g: GameState, enemyIndex: number): boolea
 
   if (req.kind === "damageSelect") {
     const amount = calcDamageForTargetSelection(g, req, target);
-    applyDamageToEnemy(g, target, amount);
+    const key = "_playerDamageFromInstall";
+    const prev = (g as any)[key];
+    (g as any)[key] = isInstallSourceDamage(g, req);
+    try {
+      applyDamageToEnemy(g, target, amount);
+    } finally {
+      (g as any)[key] = prev;
+    }
   } else if (req.kind === "statusSelect") {
     applyStatusTo(target, req.key, req.n, g, "PLAYER");
     if (req.key === "bleed" && req.n > 0) {

@@ -29,5 +29,5 @@ export function addBlock(g: GameState, n: number) {
 
   g.player.block += amount;
   (g as any)._gainedBlockThisTurn = true;
-  logMsg(g, `방어(블록) +${amount} (현재 ${g.player.block})`);
+  logMsg(g, `방어(블록) +${amount}`);
 }

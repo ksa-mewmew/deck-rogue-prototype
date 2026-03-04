@@ -524,7 +524,7 @@ export function assetUrl(ref: string): string {
   if (!ref) return ref;
   if (/^(https?:|data:|blob:)/i.test(ref)) return ref;
 
-  const toWebpIfImage = (s: string) => s.replace(/\.(png|jpe?g)(?=([?#].*)?$)/i, ".webp");
+  const toWebpIfImage = (s: string) => s.replace(/\.(png|jpe?g)(?=([?#].*)?$)/i, ".png");
 
   const normalized0 = ref.replace(/^public\//, "");
   const normalized = toWebpIfImage(normalized0);

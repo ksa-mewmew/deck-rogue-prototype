@@ -275,7 +275,7 @@ export function grantRelic(g: GameState, id: string, source: RelicGrantSource = 
   if (!def?.unlock) {
     st.active = true;
     st.pending = false;
-    g.run.relicUnlocked[id] = true;
+    (g.run.relicUnlocked ??= {})[id] = true;
     logMsg(g, `유물 획득: ${def?.name ?? id}`);
     pushUiToast(g, "RELIC", `유물 획득: ${def?.name ?? id}`, 2000);
     return;
@@ -339,7 +339,7 @@ export function applyPendingRelicActivations(g: GameState) {
     st.active = true;
     st.activatedAtNode = g.run.nodePickCount;
 
-    g.run.relicUnlocked[id] = true;
+    (g.run.relicUnlocked ??= {})[id] = true;
 
     const def = RELICS_BY_ID[id] as RelicDef | undefined;
     def?.onActivate?.(g);

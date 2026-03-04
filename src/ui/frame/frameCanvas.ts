@@ -3,9 +3,6 @@ import { drawNineSlice } from "../nineslice";
 let frameCanvas: HTMLCanvasElement | null = null;
 let frameCtx: CanvasRenderingContext2D | null = null;
 
-let frameCanvas: HTMLCanvasElement | null = null;
-let frameCtx: CanvasRenderingContext2D | null = null;
-
 function ensureFrameCanvas(): CanvasRenderingContext2D {
   if (frameCanvas && frameCtx) return frameCtx;
 

@@ -1,6 +1,6 @@
 import type { DungeonMap, GameState, MapNode, NodeType } from "../../engine/types";
 import { logMsg, pushUiToast } from "../../engine/rules";
-import { GOD_LINES, getPatronGodOrNull, isHostile } from "../../engine/faith";
+import { getPatronGodOrNull, isHostile } from "../../engine/faith";
 import { getUiScaleNow } from "../settings/uiSettings";
 import { div, divText, h3, p, mkButton } from "../dom";
 
@@ -707,8 +707,9 @@ function visionParamsFromState(g: GameState): VisionParams {
   {
     const patron = getPatronGodOrNull(g);
     if (patron === "bright_darkness") {
-      presenceR = Math.max(presenceR, 4);
-      typeR = Math.max(typeR, 4);
+      presenceR = 99;
+      typeR = 99;
+      detailR = 99;
     }
   }
 
@@ -1505,15 +1506,6 @@ export function renderNodeSelect(root: HTMLElement, g: GameState, actions: any) 
     const key = `${String(map.pos ?? "")}::${Number(runAny.timeMove ?? 0) || 0}`;
     if (runAny._bdNodeToastKey !== key) {
       runAny._bdNodeToastKey = key;
-      const patron = getPatronGodOrNull(g);
-      if (patron === "bright_darkness") {
-        pushUiToast(g, "INFO", GOD_LINES.bright_darkness.nodeSelect, 1800);
-        logMsg(g, GOD_LINES.bright_darkness.nodeSelect);
-      }
-      if (isHostile(g, "bright_darkness")) {
-        pushUiToast(g, "WARN", GOD_LINES.bright_darkness.hostileMap, 2200);
-        logMsg(g, GOD_LINES.bright_darkness.hostileMap);
-      }
     }
   }
   renderMapNodeSelect(root, g, actions);

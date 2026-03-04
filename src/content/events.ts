@@ -33,6 +33,7 @@ const RUN_ONCE_EVENT_IDS = new Set<string>([
   "goblin_ambush_low_supplies",
   "rat_circle",
   "tilted_dice_table",
+  "impossible_plan",
 ]);
 
 export function pickRandomEvent(): EventDef {
@@ -456,6 +457,33 @@ export const EVENTS: EventDef[] = [
     },
   },
 
+  {
+    id: "impossible_plan",
+    name: "불가능한 계획",
+    prompt: "누군가 남긴 계획서를 보았습니다만, 이는 불가능합니다.",
+    art: `assets/events/event_impossible_plan.png`,
+    options: (g) => [
+      {
+        key: "impossible_plan:take",
+        label: "가져간다",
+        detail: "불가능한 계획 카드 획득. 💤 F +2.",
+        apply: (gg) => {
+          addCardToDeck(gg, "impossible_plan", { upgrade: 0 });
+          addFatigue(gg, 2);
+          logMsg(gg, "불가능한 계획 카드를 얻었다. (💤 F +2)");
+          return "NONE";
+        },
+      },
+      {
+        key: "impossible_plan:leave",
+        label: "계획서를 찢는다",
+        apply: (gg) => {
+          logMsg(gg, "불가능한 계획: 계획서를 찢었다.");
+          return "NONE";
+        },
+      },
+    ],
+  },
 
 
 ] as const;

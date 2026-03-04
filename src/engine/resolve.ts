@@ -646,10 +646,17 @@ export function resolvePlayerEffects(ctx: ResolveCtx, effects: PlayerEffect[]) {
         const def = getCardDefFor(g, uid0);
         const inst0 = g.cards[uid0];
         const flipped0 = Boolean((inst0 as any)?.flipped);
+        const flippedRaw0 = (inst0 as any)?.flipped;
         const eff = !flipped0 ? def.front : def.back;
         logMsg(g, `재배치: [[${cardNameWithUpgrade(g, uid0)}]]의 전열 효과를 추가 발동${flipped0 ? "(뒤집힘)" : ""}`);
 
         resolvePlayerEffects({ game: g, side: "front", cardUid: uid0 }, eff);
+
+        const instAfter: any = g.cards[uid0] as any;
+        if (instAfter) {
+          if (flippedRaw0 === undefined) delete instAfter.flipped;
+          else instAfter.flipped = flippedRaw0;
+        }
         break;
       }
       case "addCardToHand": {

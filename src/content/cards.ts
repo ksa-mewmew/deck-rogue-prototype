@@ -585,11 +585,11 @@ export const CARDS: CardData[] = [
     ],
   },
 
-  {
+  /*{
     id: "low_body_temperature",
     name: "낮은 체온",
     rarity: "COMMON",
-    frontText: "자신의 약화 1, 취약 1 제거, S가 2 이하면 대신 약화/취약/출혈 2 제거",
+    frontText: "자신의 약화, 취약 1 감소, S가 2 이하면 대신 약화, 취약, 출혈 2 감소",
     backText: "드로우 1, S가 2 이하면 대신 이번 턴 받는 피해 -2",
     front: [
       {
@@ -616,7 +616,7 @@ export const CARDS: CardData[] = [
     ],
     upgrades: [
       {
-        frontText: "자신의 약화 1, 취약 1 제거, S가 2 이하면 대신 약화/취약/출혈 3 제거",
+        frontText: "자신의 약화, 취약 2 감소, S가 2 이하면 대신 약화, 취약, 출혈 3 제거",
         backText: "드로우 1, S가 2 이하면 대신 드로우 2, 이번 턴 받는 피해 -3",
         front: [
           {
@@ -628,8 +628,8 @@ export const CARDS: CardData[] = [
               { op: "statusPlayer", key: "bleed", n: -3 },
             ],
             else: [
-              { op: "statusPlayer", key: "weak", n: -1 },
-              { op: "statusPlayer", key: "vuln", n: -1 },
+              { op: "statusPlayer", key: "weak", n: -2 },
+              { op: "statusPlayer", key: "vuln", n: -2 },
             ],
           },
         ],
@@ -643,7 +643,7 @@ export const CARDS: CardData[] = [
         ],
       },
     ],
-  },
+  },*/
 
   // SPECIAL
   {
@@ -651,17 +651,17 @@ export const CARDS: CardData[] = [
     name: "붕대",
     rarity: "SPECIAL",
     exhaustWhen: "BOTH",
-    frontText: "HP +4, 소모",
-    backText: "HP +4, S -1, 소모",
-    front: [{ op: "heal", n: 4 }],
-    back: [{ op: "supplies", n: -1 }, { op: "heal", n: 4 }],
+    frontText: "HP +4, S -1, 소모",
+    backText: "HP +4, S -2, 소모",
+    front: [{ op: "supplies", n: -1 }, { op: "heal", n: 4 }],
+    back: [{ op: "supplies", n: -2 }, { op: "heal", n: 4 }],
 
     upgrades: [
       {
-        frontText: "HP +4, 출혈 제거, 소모",
-        front: [{ op: "heal", n: 4 }, { op: "clearStatusSelf", key: "bleed" }],
-        backText: "HP +4, 출혈 제거, S -1, 소모",
-        back: [{ op: "supplies", n: -1 }, { op: "heal", n: 4 }, { op: "clearStatusSelf", key: "bleed" }],
+        frontText: "HP +4, 출혈 제거, S -1, 소모",
+        front: [{ op: "supplies", n: -1 }, { op: "heal", n: 4 }, { op: "clearStatusSelf", key: "bleed" }],
+        backText: "HP +4, 출혈 제거, S -2, 소모",
+        back: [{ op: "supplies", n: -2 }, { op: "heal", n: 4 }, { op: "clearStatusSelf", key: "bleed" }],
       },
     ]
   },
@@ -948,7 +948,7 @@ export const CARDS: CardData[] = [
     tags: ["INSTALL"],
     installWhen: "BACK",
     frontText: "무작위 피해 7, 🗡️ 칼부림만큼 추가 반복, 🗡️ 칼부림을 0으로",
-    backText: "[설치] S -1, 🗡️ 칼부림 +1",
+    backText: "S -1, 🗡️ 칼부림 +1 (설치)",
     front: [{ op: "damageEnemyRepeatByStatus", target: "random", n: 7, key: "slash", reset: true }],
     back: [{ op: "supplies", n: -1 }, { op: "statusPlayer", key: "slash", n: 1 }],
     upgrades: [
@@ -1150,15 +1150,15 @@ export const CARDS: CardData[] = [
     tags: ["INSTALL"],
     installWhen: "BOTH",
     passives: [{ kind: "retainBlockBetweenTurns", side: "front" }],
-    frontText: "턴이 끝날 때 방어가 사라지지 않음 (설치)",
+    frontText: "턴 종료 시 방어 유지, S -1, (설치)",
     backText: "S +1 (설치)",
-    front: [],
+    front: [{ op: "supplies", n: -1 }],
     back: [{ op: "supplies", n: 1 }],
     upgrades: [
       {
-        frontText: "턴이 끝날 때 방어가 사라지지 않음, 방어 +2 (설치)",
+        frontText: "턴 종료 시 방어 유지, 방어 +2, S -1 (설치)",
         backText: "S +1, 방어 +2 (설치)",
-        front: [{ op: "block", n: 2 }],
+        front: [{ op: "supplies", n: -1 }, { op: "block", n: 2 }],
         back: [{ op: "supplies", n: 1 }, { op: "block", n: 2 }],
       },
     ],
@@ -1208,15 +1208,15 @@ export const CARDS: CardData[] = [
     name: "동전 던지기",
     rarity: "RARE",
     frontText: "후열이면 전체 피해 20, 이 카드를 뒤집음",
-    backText: "이 카드를 뒤집음",
+    backText: "",
     front: [ifInBack([{ op: "damageEnemy", target: "all", n: 20 }]), { op: "flipSelf" }],
-    back: [{ op: "flipSelf" }],
+    back: [],
     upgrades: [
       {
         frontText: "후열이면 전체 피해 25, 이 카드를 뒤집음",
-        backText: "이 카드를 뒤집음",
+        backText: "",
         front: [ifInBack([{ op: "damageEnemy", target: "all", n: 25 }]), { op: "flipSelf" }],
-        back: [{ op: "flipSelf" }],
+        back: [],
       },
     ],
   },

@@ -5,6 +5,8 @@ export type UiSettings = {
   uiScaleMobile: number;
   slotCardMode: "FULL" | "NAME_ONLY";
   animMul: number; // 0=즉시, 1=기본, 2=느림
+  musicEnabled: boolean;
+  musicVolume: number; // 0..1
 };
 
 const UISET_KEY = "deckrogue_uiSettings_v1";
@@ -29,6 +31,8 @@ function loadUiSettings(): UiSettings {
         uiScaleMobile: 1.0,
         slotCardMode: "FULL",
         animMul: 1.0,
+        musicEnabled: true,
+        musicVolume: 0.7,
       };
     }
 
@@ -41,6 +45,8 @@ function loadUiSettings(): UiSettings {
       uiScaleMobile: clamp(Number(j.uiScaleMobile ?? 1.0) || 1.0, 0.75, 1.5),
       slotCardMode,
       animMul: clamp(Number(j.animMul ?? 1.0) || 1.0, 0.0, 2.0),
+      musicEnabled: !!(j.musicEnabled ?? true),
+      musicVolume: clamp(Number(j.musicVolume ?? 0.7) || 0.7, 0.0, 1.0),
     };
   } catch {
     return {
@@ -48,6 +54,8 @@ function loadUiSettings(): UiSettings {
       uiScaleMobile: 1.0,
       slotCardMode: "FULL",
       animMul: 1.0,
+      musicEnabled: true,
+      musicVolume: 0.7,
     };
   }
 }
@@ -67,6 +75,7 @@ function saveUiSettings() {
   try {
     localStorage.setItem(UISET_KEY, JSON.stringify(uiSettings));
   } catch {}
+  window.dispatchEvent(new CustomEvent("deckrogue:uiSettingsChanged"));
 }
 
 export function getUiScaleNow() {
@@ -112,7 +121,7 @@ function mkButton(label: string, onClick: () => void) {
   return b;
 }
 
-export function renderSettingsPanel(onChange: () => void, actions: any) {
+export function renderSettingsPanel(onLiveChange: () => void, onCommit: () => void, actions: any) {
   void actions;
 
   const wrap = div("settingsPanel");
@@ -125,8 +134,27 @@ export function renderSettingsPanel(onChange: () => void, actions: any) {
   label.style.cssText = "font-weight:800;";
 
   const getNow = () => (isMobileUiNow() ? uiSettings.uiScaleMobile : uiSettings.uiScaleDesktop);
+  let draftUiScale = getNow();
+  let draftMusicEnabled = uiSettings.musicEnabled;
+  let draftMusicVolume = uiSettings.musicVolume;
 
-  const val = divText("", `${Math.round(getNow() * 100)}%`);
+  const commitDraft = () => {
+    const clampedScale = clamp(draftUiScale, 0.75, 1.5);
+    if (isMobileUiNow()) uiSettings.uiScaleMobile = clampedScale;
+    else uiSettings.uiScaleDesktop = clampedScale;
+
+    uiSettings.musicEnabled = !!draftMusicEnabled;
+    uiSettings.musicVolume = clamp(draftMusicVolume, 0, 1);
+
+    saveUiSettings();
+    applyUiScaleVars();
+    window.dispatchEvent(new CustomEvent("deckrogue:uiFit"));
+
+    onLiveChange();
+    onCommit();
+  };
+
+  const val = divText("", `${Math.round(draftUiScale * 100)}%`);
   val.style.cssText = "opacity:.9; min-width:calc(64 * var(--u)); text-align:right;";
 
   const slider = document.createElement("input");
@@ -134,14 +162,12 @@ export function renderSettingsPanel(onChange: () => void, actions: any) {
   slider.min = "0.75";
   slider.max = "1.25";
   slider.step = "0.01";
-  slider.value = String(getNow());
+  slider.value = String(draftUiScale);
   slider.style.cssText = "flex:1 1 calc(260 * var(--u));";
 
   slider.oninput = () => {
-    const v = Number(slider.value);
-    setUiScaleNow(v);
-    val.textContent = `${Math.round(getNow() * 100)}%`;
-    onChange();
+    draftUiScale = clamp(Number(slider.value) || 1, 0.75, 1.5);
+    val.textContent = `${Math.round(draftUiScale * 100)}%`;
   };
 
   row.appendChild(label);
@@ -154,10 +180,9 @@ export function renderSettingsPanel(onChange: () => void, actions: any) {
 
   const makePreset = (txt: string, v: number) => {
     const b = mkButton(txt, () => {
-      setUiScaleNow(v);
-      slider.value = String(getNow());
-      val.textContent = `${Math.round(getNow() * 100)}%`;
-      onChange();
+      draftUiScale = clamp(v, 0.75, 1.5);
+      slider.value = String(draftUiScale);
+      val.textContent = `${Math.round(draftUiScale * 100)}%`;
     });
     b.style.cssText =
       "padding:calc(8 * var(--u)) calc(12 * var(--u)); border-radius:calc(12 * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.16);" +
@@ -174,10 +199,9 @@ export function renderSettingsPanel(onChange: () => void, actions: any) {
   const resetRow = div("settingsResetRow");
   resetRow.style.cssText = "display:flex; justify-content:flex-end; margin-top:calc(6 * var(--u));";
   const reset = mkButton("스케일 초기화", () => {
-    setUiScaleNow(1.0);
-    slider.value = String(getNow());
-    val.textContent = `${Math.round(getNow() * 100)}%`;
-    onChange();
+    draftUiScale = 1.0;
+    slider.value = String(draftUiScale);
+    val.textContent = `${Math.round(draftUiScale * 100)}%`;
   });
   reset.style.cssText =
     "padding:calc(8 * var(--u)) calc(12 * var(--u)); border-radius:calc(12 * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.16);" +
@@ -196,12 +220,14 @@ export function renderSettingsPanel(onChange: () => void, actions: any) {
   const btnFull = mkButton("전체", () => {
     uiSettings.slotCardMode = "FULL";
     saveUiSettings();
-    onChange();
+    onLiveChange();
+    onCommit();
   });
   const btnName = mkButton("이름만", () => {
     uiSettings.slotCardMode = "NAME_ONLY";
     saveUiSettings();
-    onChange();
+    onLiveChange();
+    onCommit();
   });
 
   btnFull.style.cssText = `padding:calc(8 * var(--u)) calc(12 * var(--u)); border-radius:calc(12 * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.16);
@@ -213,6 +239,56 @@ export function renderSettingsPanel(onChange: () => void, actions: any) {
   modeRow.appendChild(btnFull);
   modeRow.appendChild(btnName);
   wrap.appendChild(modeRow);
+
+  const musicRow = div("settingsRow");
+  musicRow.style.cssText = row.style.cssText;
+
+  const musicLabel = divText("", "BGM");
+  musicLabel.style.cssText = "font-weight:800;";
+
+  const musicToggle = divText("", draftMusicEnabled ? "ON" : "OFF");
+  const syncMusicToggleVisual = () => {
+    musicToggle.textContent = draftMusicEnabled ? "ON" : "OFF";
+    musicToggle.style.cssText = `padding:calc(6 * var(--u)) calc(10 * var(--u)); border-radius:calc(10 * var(--u)); background:${draftMusicEnabled ? "rgba(90,220,120,.18)" : "rgba(255,255,255,.06)"}; color:#fff; cursor:pointer; user-select:none;`;
+  };
+  syncMusicToggleVisual();
+
+  musicToggle.onclick = () => {
+    draftMusicEnabled = !draftMusicEnabled;
+    syncMusicToggleVisual();
+  };
+
+  const musicVal = divText("", `${Math.round(draftMusicVolume * 100)}%`);
+  musicVal.style.cssText = "opacity:.9; min-width:calc(64 * var(--u)); text-align:right;";
+
+  const musicSlider = document.createElement("input");
+  musicSlider.type = "range";
+  musicSlider.min = "0";
+  musicSlider.max = "1";
+  musicSlider.step = "0.01";
+  musicSlider.value = String(draftMusicVolume);
+  musicSlider.style.width = "min(360px, 70vw)";
+  musicSlider.oninput = () => {
+    draftMusicVolume = clamp(Number(musicSlider.value) || 0, 0, 1);
+    musicVal.textContent = `${Math.round(draftMusicVolume * 100)}%`;
+  };
+
+  musicRow.appendChild(musicLabel);
+  musicRow.appendChild(musicToggle);
+  musicRow.appendChild(musicSlider);
+  musicRow.appendChild(musicVal);
+  wrap.appendChild(musicRow);
+
+  const applyRow = div("settingsApplyRow");
+  applyRow.style.cssText = "display:flex; justify-content:flex-end; margin-top:calc(8 * var(--u));";
+  const applyBtn = mkButton("적용", () => {
+    commitDraft();
+  });
+  applyBtn.style.cssText =
+    "padding:calc(8 * var(--u)) calc(14 * var(--u)); border-radius:calc(12 * var(--u)); border:calc(1 * var(--u)) solid rgba(255,255,255,.2);" +
+    "background:rgba(255,255,255,.12); color:#fff; cursor:pointer; font-weight:700;";
+  applyRow.appendChild(applyBtn);
+  wrap.appendChild(applyRow);
 
   return wrap;
 }

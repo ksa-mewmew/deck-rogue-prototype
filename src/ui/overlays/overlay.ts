@@ -13,7 +13,7 @@ export function renderOverlayLayer(
   overlay: Overlay | null,
   actions: any,
   deps: {
-    renderSettingsPanel: (onChange: () => void, actions: any) => HTMLElement;
+    renderSettingsPanel: (onLiveChange: () => void, onCommit: () => void, actions: any) => HTMLElement;
     onAfterSettingsChange: () => void;
     renderRealCardForOverlay: (g: GameState, uid: string, onPick?: (uid: string) => void) => HTMLElement;
     getCardDefByUid: (g: GameState, uid: string) => any;
@@ -91,6 +91,7 @@ export function renderOverlayLayer(
     panel.appendChild(
       deps.renderSettingsPanel(() => {
         deps.onAfterSettingsChange();
+      }, () => {
         actions.rerender?.();
       }, actions)
     );

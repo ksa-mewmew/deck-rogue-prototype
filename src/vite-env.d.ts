@@ -14,3 +14,10 @@ interface ImportMeta {
 interface WindowEventMap {
 	"deckrogue:layout": Event
 }
+
+declare module "*audio/music" {
+	export type MusicMode = "explore" | "boss"
+	export function installMusicUnlock(): void
+	export function syncMusicFromGame(g: any): void
+	export function getDesiredMusicMode(g: any): MusicMode
+}

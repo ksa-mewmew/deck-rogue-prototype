@@ -427,7 +427,8 @@ export type DamagePlayerFormulaKind =
   | "gloved_hunter"
   | "goblin_assassin"
   | "old_monster_corpse"
-  | "punishing_one";
+  | "punishing_one"
+  | "supply_blocker";
 
 export type DamageContext = {
   phase: DamagePhase;

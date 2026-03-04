@@ -176,7 +176,7 @@ function addToDeck(g: GameState, defId: string, n: number) {
 }
 
 export function makeBasicDeck(g: GameState) {
-  addToDeck(g, "field_ration", 2);
+  addToDeck(g, "field_ration", 0);
   addToDeck(g, "maintenance", 2);
   addToDeck(g, "scout", 2);
   addToDeck(g, "shield", 2);

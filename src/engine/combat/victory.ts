@@ -145,8 +145,8 @@ export function checkEndConditions(g: GameState) {
       const curGold = Number(runAny.gold ?? 0) || 0;
 
       const T = Number(runAny.timeMove ?? 0) + (g.time ?? 0);
-      const tier = Math.min(3, Math.floor(Math.max(0, T) / 15));
-      let gainGold = 6 + tier;
+      const tier = Math.min(4, Math.floor(Math.max(0, T) / 14));
+      let gainGold = 5 + tier;
       if (g.run.lastBattleWasElite) gainGold += 10;
       if (wasBoss) gainGold += 30;
 

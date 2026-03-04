@@ -562,11 +562,6 @@ export function openShopChoice(g: GameState, nodeId: string) {
     pushUiToast(g, "WARN", GOD_LINES.first_human.shop, 2200);
     logMsg(g, GOD_LINES.first_human.shop);
   }
-  if (isHostile(g, "card_dealer") && !(shop as any)._cardDealerHostileShopToastShown) {
-    (shop as any)._cardDealerHostileShopToastShown = true;
-    pushUiToast(g, "WARN", GOD_LINES.card_dealer.hostileShop, 2200);
-    logMsg(g, GOD_LINES.card_dealer.hostileShop);
-  }
 
   const options: ChoiceOption[] = [];
   let sep = 0;

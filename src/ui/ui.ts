@@ -53,6 +53,7 @@ import {
   renderStageCornerResourceHud as renderStageCornerResourceHudScreen,
 } from "./screens/combatScreen";
 import { renderNodeSelect as renderNodeSelectScreen } from "./screens/nodeSelectScreen";
+import { syncMusicFromGame } from "./audio/music";
 
 const floatFxRt = createFloatFxRuntime();
 const uiToastsRt = createUiToastsRuntime();
@@ -462,6 +463,7 @@ export function render(g: GameState, actions: UIActions) {
   }
   setCurrentG(g);
   setCurrentActions(actions);
+  syncMusicFromGame(g);
   clearAllHover();
 
   setDevConsoleCtx({
@@ -575,7 +577,7 @@ export function render(g: GameState, actions: UIActions) {
       render(getCurrentG() ?? g, actions);
     },
   }, {
-    renderSettingsPanel: (onChange, a) => renderSettingsPanel(onChange, a),
+    renderSettingsPanel: (onLiveChange, onCommit, a) => renderSettingsPanel(onLiveChange, onCommit, a),
     onAfterSettingsChange: () => {
       const currentG = getCurrentG();
       if (currentG) {
@@ -584,7 +586,6 @@ export function render(g: GameState, actions: UIActions) {
         alignEnemyHudToViewportCenter();
         applyUiScaleVars();
       }
-      actions.rerender();
     },
     renderRealCardForOverlay,
     getCardDefByUid,

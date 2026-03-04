@@ -49,7 +49,7 @@ export const GODS: GodDisplay[] = [
     patronPlus: "전투: 선두 적에게 피해를 줄 때 피해 +25%",
     patronMinus: "대상 지정: 선두 적만 대상으로 지정 가능",
     temptation: "다음 정예/보스 전투 시작: 모든 적 취약 3",
-    hostile: "정예/보스 전투 시작: 자신 취약/약화/교란 2",
+    hostile: "정예/보스 전투 시작 시 자신 취약/약화/교란 2",
   },
   {
     id: "retort_fusion",
@@ -67,34 +67,34 @@ export const GODS: GodDisplay[] = [
     patronPlus: "빚 문서 1장당 첫 턴 드로우 +1, 방어도 +3",
     patronMinus: "전투 종료: 20% 확률로 빚 문서 1장 추가",
     temptation: "덱에 빚 문서 1장 추가, 다음 3전투 드로우 +2",
-    hostile: "배교: 빚 문서 2장 추가 / 전투 시작: 빚 문서 1장당 HP -1",
+    hostile: "빚 문서 2장 추가 / 전투 시작 시 빚 문서 1장당 HP -1",
   },
   {
     id: "bright_darkness",
     name: "밝은 어둠",
     art: "assets/gods/bright_darkness.png",
-    patronPlus: "지도: 이웃 노드 정보가 더 멀리 표시(시야 4)",
+    patronPlus: "지도: 모든 노드의 정보가 표시됨",
     patronMinus: "전투 시작: 자신 취약 1",
-    temptation: "다음 4개 노드 내용 즉시 공개, 피로도 +1",
-    hostile: "지도: 노드 정보가 전부 ? / 전투 시작: 자신 취약 2",
+    temptation: "다음 노드 4개 내용 즉시 공개, 피로도 -2",
+    hostile: "지도: 노드 정보가 전부 ? / 전투 시작 시 자신 취약 2",
   },
   {
     id: "twin_heart",
     name: "쌍둥이 심장",
     art: "assets/gods/twin_heart.png",
-    patronPlus: "턴 종료: 사용한 카드 중 무작위 1장의 반대쪽 열 효과가 발동",
+    patronPlus: "전열 단계 마지막: 사용한 카드 중 무작위 1장의 반대쪽 열 효과가 발동 (대상은 무작위)",
     patronMinus: "턴 시작: S -1",
     temptation: "카드 보상 1회",
-    hostile: "전투 시작: 교란 5",
+    hostile: "전투 시작 시 교란 5",
   },
   {
     id: "indifferent_one",
     name: "아무렇지 않은 자",
     art: "assets/gods/indifferent_one.png",
     patronPlus: "턴 종료: 카드 1장 이하 사용 시 HP +2, 방어 +6",
-    patronMinus: "턴: 5장 이상 사용 시 피로도 +1 (전투 당 1회)",
-    temptation: "즉시 피로도 -5, 다음 전투 드로우 -1",
-    hostile: "턴: 4장 이상 사용 시 피로도 +1, HP -3 (전투 당 3회)",
+    patronMinus: "카드 5장 이상 사용 시 피로도 +1 (전투 당 1회)",
+    temptation: "즉시 피로도 0",
+    hostile: "카드 4장 이상 사용 시 피로도 +1, HP -3 (전투 당 3회)",
   },
   {
     id: "armored_tiger",
@@ -103,16 +103,16 @@ export const GODS: GodDisplay[] = [
     patronPlus: "전투 시작: 첫 턴에 방어 10, 그 다음 턴에 방어 5",
     patronMinus: "턴 종료: 방어를 얻지 못했으면 HP -2",
     temptation: "최대 체력 +5, 피로도 +2",
-    hostile: "전투 시작: 취약 2, 드로우 -1",
+    hostile: "전투 시작 시 취약 2, 드로우 -1",
   },
   {
     id: "first_human",
     name: "첫 번째 인간",
     art: "assets/gods/first_human.png",
-    patronPlus: "전투 보상: 카드 제시 +1",
+    patronPlus: "전투 카드 보상 제시 +1",
     patronMinus: "상점: 비용 +50%",
     temptation: "카드 1장 선택 복제, 피로도 +3",
-    hostile: "전투 보상: 카드 제시 -1 / 상점: 비용 +50%",
+    hostile: "전투 카드 보상 제시 -1 / 상점: 비용 +50%",
   },
   {
     id: "card_dealer",
@@ -130,14 +130,14 @@ export const GODS: GodDisplay[] = [
     patronPlus: "전투 시작: 모든 적 취약 3",
     patronMinus: "방어도 획득량 -10%",
     temptation: "다음 3전투 동안 전투 시작 드로우 +1",
-    hostile: "매 전투 첫 턴: 자신 취약 3",
+    hostile: "전투 시작 시 자신 취약 3",
   },
   {
     id: "wave_breath",
     name: "파도의 숨결",
     art: "assets/gods/wave_breath.png",
-    patronPlus: "처음 사용하는 대상을 선택하는 카드가 모든 적 대상",
-    patronMinus: "그 외 대상을 선택하는 카드는 무작위 적 대상",
+    patronPlus: "처음 사용하는 대상 지정 카드가 모든 적 대상",
+    patronMinus: "그 외 대상 지정 카드는 무작위 적 대상",
     temptation: "다음 전투: 처음 사용하는 대상을 선택하는 카드가 모든 적 대상",
     hostile: "모든 대상 지정 카드가 무작위 적 대상",
   },
@@ -148,83 +148,85 @@ export const GODS: GodDisplay[] = [
     patronPlus: "시작: 화살/강력한 화살/방패가 강화된 채로 시작",
     patronMinus: "시작 S 6",
     temptation: "무작위 카드 1장 제거 후 2장 강화",
-    hostile: "강화 불가 / 휴식 시 카드 1장 무작위 제거",
+    hostile: "휴식-강화 불가 / 휴식 시 카드 1장 무작위 제거",
   },
 ];
 
 export const GOD_LINES = {
   dream_shadow: {
     restHeal: "악몽을 꾸었습니까?",
-    restUpgrade: "망치를 들 기운이 나지 않는군요.",
-    tempt: "낮잠에서도 악몽은 찾아옵니다.",
+    restUpgrade: "망치가 이상합니다. 아주 이상합니다.",
+    tempt: "낮잠에도 악몽은 있습니다.",
     hostileRest: "꿈그림자가 당신의 휴식을 방해합니다.",
   },
   wing_artery: {
     moveNoTime: "당신은 떨어지는 핏방울보다 빠릅니다.",
     every5Turns: "날개가 시들고 있습니다.",
     tempt: "정신을 차려보니 이곳입니다.",
-    apostasy: "새가 날개를 잃었군요.",
+    hostileStart: "새가 제 날개를 꺾습니다.",
   },
   master_spear: {
-    tempt: "창끝이 꿰뚫습니다.",
-    hostileCombat: "틈이 보입니다.",
+    tempt: "창끝이 마음을 꿰뚫습니다.",
     targetOnlyFront: "맨 앞의 적만 지정할 수 있습니다.",
   },
   retort_fusion: {
-    tempt: "레토르트는 다음 휴식을 약속합니다.",
-    hostile: "레토르트가 당신의 덱을 밀봉합니다.",
+    tempt: "다음 휴식이 기대되지 않습니까?",
+    hostileStart: "당신을 밀봉합니다.",
   },
   nameless_vow: {
-    tempt: "서약은 빚으로 남습니다.",
+    tempt: "서약이 빚으로 남습니다.",
     victoryDebt: "서약은 공짜가 아닙니다.",
-    hostileStart: "빚이 숨을 막습니다.",
+    hostileStart: "빚이 당신을 짓누릅니다.",
   },
   bright_darkness: {
-    nodeSelect: "빛이 당신을 인도합니다.",
+    choice: "어둠이 당신을 인도합니다.",
     combatStart: "너무 밝아 숨을 곳이 없습니다.",
-    tempt: "보이게 해주마. 대신 눈을 내어라.",
-    hostileMap: "어둠이 당신의 눈을 먹었습니다.",
+    tempt: "어둠이 보입니다. 그곳은 편안합니다.",
+    hostileStart: "빛이 당신의 눈을 잡아먹었습니다.",
   },
   twin_heart: {
-    tempt: "심장이 당신의 선택을 부릅니다.",
+    tempt: "무언가 발견하자 심장이 미치도록 뜁니다. 반대일까요?",
+    hostileCombatStart: "몸의 박자가 어긋납니다.",
   },
   indifferent_one: {
-    endTurnZero: "아무 일도 없었습니다.",
-    at5Cards: "움직임이 과합니다.",
-    tempt: "가만히 있어도, 굴러갑니다.",
-    hostileFirstUse: "괜히 움직였군요.",
+    endTurnZero: "아무 일도 없었습니까?",
+    at5Cards: "침착하십시오.",
+    tempt: "모든 것은 가만히 있어도 굴러갑니다.",
+    hostileFirstUse: "침착하십시오.",
+    hostileStart: "이제 움직일 때군요.",
   },
   armored_tiger: {
     combatStart: "이빨은 벼려졌고, 갑옷은 닫혔습니다.",
     endTurnNoBlock: "호랑이는 당신을 대신 잡아먹습니다.",
-    tempt: "무거워져라. 살아남아라.",
-    hostileCombat: "틈이 보입니다.",
+    tempt: "무거운 것이 살아남습니다.",
+    hostileCombat: "갑옷의 틈이 보입니다.",
   },
   first_human: {
     reward: "배웁니다. 따라합니다.",
-    shop: "순수주의자인 당신은 고블린이 달갑지 않습니다.",
-    tempt: "첫 번째는 항상, 다시 태어납니다.",
+    shop: "지식은 살 수 없습니다.",
+    tempt: "두 번째로 첫 번째가 되었습니다.",
     hostileReward: "지식은 잊힙니다.",
   },
   card_dealer: {
     combatStart: "판을 깔아드리죠.",
-    victoryFee: "수수료는 당연히 받습니다.",
+    victoryFee: "수수료는 받습니다.",
     tempt: "오늘만 외상입니다.",
-    hostileShop: "딜러를 배신하고도 돈이 남아있군요?",
+    hostileStart: "황금이 모두 돌이 되었습니다. 이런 걸 바랐습니까?",
   },
   rabbit_hunt: {
     combatStart: "먼저 잡습니다.",
-    blockGain: "가벼운 방패는 잘 부러집니다.",
-    tempt: "더 빨리. 더 깊이.",
-    hostileCombatStart: "이번엔 당신이 쫓깁니다.",
+    tempt: "더 빨리, 더 깊이.",
+    hostileCombatStart: "이제 당신이 쫓깁니다.",
   },
   wave_breath: {
-    tempt: "파도가 당신의 손을 바꿉니다.",
+    combatStart: "파도가 다가옵니다.",
+    tempt: "파도가 당신의 손을 잡습니다.",
+    hostileStart: "파도를 읽을 수 없습니다.",
   },
   forge_master: {
-    firstBattle: "당신의 철은 누구보다 단단합니다.",
-    tempt: "화마가 철을 굽습니다.",
-    hostileRestEnter: "불이 붙지 않습니다. 당신을 따르지 않습니다.",
+    choice: "당신의 철은 누구보다도 단단합니다.",
+    tempt: "화마가 철을 굽기도 합니다.",
+    hostileRestEnter: "불이 당신을 따르지 않습니다.",
   },
   madness: {
     accept: "당신은 그 힘을 받아들이기로 했습니다.",
@@ -423,13 +425,17 @@ export function setHostile(g: GameState, id: GodId, msg?: string) {
   f.hostile[id] = true;
   if (id === "retort_fusion") {
     applyRetortFusionHostileOnce(g);
-    pushUiToast(g, "WARN", GOD_LINES.retort_fusion.hostile, 2200);
-    logMsg(g, GOD_LINES.retort_fusion.hostile);
   }
   if (id === "nameless_vow") {
     addCardToDeck(g, "debt_paper", { upgrade: 0 });
     addCardToDeck(g, "debt_paper", { upgrade: 0 });
     logMsg(g, "무명의 서약(배교): 빚 문서 2장 추가");
+  }
+
+  const hostileStart = String(((GOD_LINES as any)[id] as any)?.hostileStart ?? "");
+  if (hostileStart) {
+    pushUiToast(g, "WARN", hostileStart, 2200);
+    logMsg(g, hostileStart);
   }
   if (msg) {
     pushUiToast(g, "WARN", msg, 2200);
@@ -517,6 +523,16 @@ export function chooseStartingGod(g: GameState, god: GodId) {
 
   f.hostile = {};
 
+  if (god === "bright_darkness") {
+    pushUiToast(g, "INFO", (GOD_LINES as any).bright_darkness.choice, 2200);
+    logMsg(g, (GOD_LINES as any).bright_darkness.choice);
+  }
+
+  if (god === "forge_master") {
+    pushUiToast(g, "INFO", (GOD_LINES as any).forge_master.choice, 2200);
+    logMsg(g, (GOD_LINES as any).forge_master.choice);
+  }
+
   if (god === "forge_master") {
     const ids = Object.values(g.cards)
       .filter((c) => c.zone === "deck" && (g.content.cardsById[c.defId]?.tags ?? []).includes("FORGE_START"))
@@ -555,6 +571,7 @@ export function openFaithStartChoice(g: GameState) {
 export function pickTemptingGod(g: GameState): Exclude<GodId, "madness"> | null {
   const f = ensureFaith(g);
   if (!f.chosen) return null;
+  if (f.madnessAccepted) return null;
 
   const focus = f.focus;
   const hostile = f.hostile ?? {};
@@ -593,6 +610,7 @@ export function acceptTemptation(g: GameState, tempter: Exclude<GodId, "madness"
 export function openGodTemptChoice(g: GameState, tempter: Exclude<GodId, "madness">) {
   const f = ensureFaith(g);
   if (!f.chosen) return;
+  if (f.madnessAccepted) return;
   if (!f.offered.includes(tempter)) return;
   if (tempter === f.focus) return;
   if (f.hostile?.[tempter]) return;
@@ -629,9 +647,9 @@ function temptationDetail(id: Exclude<GodId, "madness">): string {
   if (id === "master_spear") return "다음 정예/보스 전투 시작: 모든 적 취약 3";
   if (id === "retort_fusion") return "다음 휴식에서 합성 가능";
   if (id === "nameless_vow") return "덱에 빚 문서 1장 추가, 다음 3전투 드로우 +2";
-  if (id === "bright_darkness") return "다음 4개 노드의 내용이 즉시 공개, 피로도 +1";
+  if (id === "bright_darkness") return "다음 노드 4개 내용 즉시 공개, 피로도 -2";
   if (id === "twin_heart") return "카드 보상 1회";
-  if (id === "indifferent_one") return "즉시 피로도 -5, 대신 다음 전투 드로우 -1";
+  if (id === "indifferent_one") return "즉시 피로도 0";
   if (id === "armored_tiger") return "최대 체력 +5, 피로도 +2";
   if (id === "first_human") return "카드 1장 선택 복제, 피로도 +3";
   if (id === "card_dealer") return "골드 +40, 덱에 ‘빚 문서’(저주) 1장 추가";
@@ -681,45 +699,41 @@ export function applyTemptationEffect(g: GameState, tempter: Exclude<GodId, "mad
     const map: any = (g.run as any).map as any;
     const pos = String(map?.pos ?? "");
     const edges: Record<string, string[]> = (map?.edges ?? {}) as any;
-    const seen: Record<string, 0 | 1 | 2 | 3> = (map.seen ??= {});
+    const seen: Record<string, 0 | 1 | 2 | 3> = map ? (map.seen ?? (map.seen = {})) : {};
 
-    const MAX_D = 4;
-    const dist: Record<string, number> = {};
+    const MAX_REVEAL = 4;
+    const revealed: string[] = [];
+    const visited: Record<string, true> = {};
     const q: string[] = [];
+
     if (pos) {
-      dist[pos] = 0;
       q.push(pos);
+      visited[pos] = true;
     }
-    while (q.length) {
+
+    while (q.length > 0 && revealed.length < MAX_REVEAL) {
       const cur = q.shift()!;
-      const d = dist[cur] ?? 0;
-      if (d >= MAX_D) continue;
       for (const nx of edges[cur] ?? []) {
-        if (dist[nx] != null) continue;
-        dist[nx] = d + 1;
+        if (visited[nx]) continue;
+        visited[nx] = true;
         q.push(nx);
+
+        if ((seen[nx] ?? 0) < 3) {
+          seen[nx] = 3;
+          revealed.push(nx);
+          if (revealed.length >= MAX_REVEAL) break;
+        }
       }
     }
 
-    let revealed = 0;
-    for (const id of Object.keys(dist)) {
-      if (id === pos) continue;
-      if ((dist[id] ?? 999) > MAX_D) continue;
-      if ((seen[id] ?? 0) >= 3) continue;
-      seen[id] = 3;
-      revealed += 1;
-    }
-
-    g.player.fatigue = (g.player.fatigue ?? 0) + 1;
-    logMsg(g, `유혹: 거리 ${MAX_D}까지 노드 ${revealed}개 공개, 피로 +1`);
+    g.player.fatigue = Math.max(0, (g.player.fatigue ?? 0) - 2);
+    logMsg(g, `유혹: 다음 노드 ${revealed.length}개 공개, 피로 -2`);
     return;
   }
 
   if (tempter === "indifferent_one") {
-    g.player.fatigue = Math.max(0, (g.player.fatigue ?? 0) - 5);
-    const runAny = g.run as any;
-    runAny.nextCombatDrawDelta = (Number(runAny.nextCombatDrawDelta ?? 0) || 0) - 1;
-    logMsg(g, "유혹: 피로 -5, 다음 전투 드로우 -1");
+    g.player.fatigue = 0;
+    logMsg(g, "유혹: 피로 0");
     return;
   }
 
@@ -846,11 +860,6 @@ export function acceptMadness(g: GameState, offerBoon: 1 | 2 | 3) {
 
   const betrayed = f.focus;
   setHostile(g, betrayed);
-
-  if (betrayed === "wing_artery") {
-    pushUiToast(g, "WARN", GOD_LINES.wing_artery.apostasy, 2200);
-    logMsg(g, GOD_LINES.wing_artery.apostasy);
-  }
 
   logMsg(g, `배교: ${godName(betrayed)} 적대`);
 }
@@ -1061,11 +1070,10 @@ export function applyFaithCombatStartHooks(g: GameState) {
     }
 
     if (isHostile(g, "master_spear") && isEliteOrBoss) {
-      applyStatusTo(g.player as any, "vuln", 2, g, "SYSTEM");
-      applyStatusTo(g.player as any, "weak", 2, g, "SYSTEM");
-      applyStatusTo(g.player as any, "disrupt", 2, g, "SYSTEM");
-      pushUiToast(g, "WARN", (GOD_LINES as any).master_spear.hostileCombat, 1800);
-      logMsg(g, "달인의 창(적대): 정예/보스 시작 취약/약화/교란 2");
+      applyStatusTo(g.player as any, "vuln", 3, g, "SYSTEM");
+      applyStatusTo(g.player as any, "weak", 3, g, "SYSTEM");
+      applyStatusTo(g.player as any, "disrupt", 3, g, "SYSTEM");
+      logMsg(g, "달인의 창(적대): 정예/보스 시작 취약/약화/교란 3");
     }
 
     if (patron === "nameless_vow" || isHostile(g, "nameless_vow")) {
@@ -1085,10 +1093,14 @@ export function applyFaithCombatStartHooks(g: GameState) {
 
       if (isHostile(g, "nameless_vow") && debtCount > 0) {
         applyDamageToPlayer(g, debtCount, "OTHER", "무명의 서약");
-        pushUiToast(g, "WARN", (GOD_LINES as any).nameless_vow.hostileStart, 1800);
         logMsg(g, `무명의 서약(적대): 빚 문서 ${debtCount}장 → 전투 시작 HP -${debtCount}`);
       }
     }
+  }
+
+  if (patron === "wave_breath") {
+    pushUiToast(g, "INFO", (GOD_LINES as any).wave_breath.combatStart, 1800);
+    logMsg(g, (GOD_LINES as any).wave_breath.combatStart);
   }
 
   if (patron === "bright_darkness") {
@@ -1102,7 +1114,12 @@ export function applyFaithCombatStartHooks(g: GameState) {
   }
   if (isHostile(g, "twin_heart")) {
     applyStatusTo(g.player as any, "disrupt", 5, g, "SYSTEM");
+    pushUiToast(g, "WARN", (GOD_LINES as any).twin_heart.hostileCombatStart, 1800);
+    logMsg(g, (GOD_LINES as any).twin_heart.hostileCombatStart);
     logMsg(g, "쌍둥이 심장(적대): 전투 시작 교란 5");
+  }
+  if (patron === "twin_heart") {
+    pushUiToast(g, "INFO", "두 심장이 같은 박자를 냅니다.", 1400);
   }
   if (patron === "armored_tiger") {
     g.player.block = (g.player.block ?? 0) + 10;

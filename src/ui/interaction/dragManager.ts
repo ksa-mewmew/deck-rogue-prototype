@@ -1,5 +1,6 @@
 import type { GameState, Side } from "../../engine/types";
 import { isTargeting } from "../../engine/combat";
+import { placeCard } from "../../engine/combat/phases";
 import { getCardDefByIdWithUpgrade } from "../../content/cards";
 import { logMsg, pushUiToast } from "../../engine/rules";
 import { updateSlotHoverUI } from "../slots";
@@ -53,6 +54,29 @@ export type DragManager = {
 let bound = false;
 let drag: DragState = null;
 let hoverSlot: SlotDrop | null = null;
+
+function resolveHandCardSizePx() {
+  const handCard = document.querySelector<HTMLElement>(".hand .card");
+  if (handCard) {
+    const hr = handCard.getBoundingClientRect();
+    if (hr.width > 0 && hr.height > 0) return { w: hr.width, h: hr.height };
+  }
+
+  const probe = document.createElement("div");
+  probe.style.position = "fixed";
+  probe.style.left = "-99999px";
+  probe.style.top = "-99999px";
+  probe.style.width = "var(--handCardW)";
+  probe.style.height = "var(--handCardH)";
+  probe.style.pointerEvents = "none";
+  probe.style.opacity = "0";
+  document.body.appendChild(probe);
+  const r = probe.getBoundingClientRect();
+  probe.remove();
+
+  if (r.width > 0 && r.height > 0) return { w: r.width, h: r.height };
+  return { w: 0, h: 0 };
+}
 
 function closestWithDatasetKeys(el: HTMLElement, keys: string[]): HTMLElement | null {
   let cur: HTMLElement | null = el;
@@ -137,6 +161,7 @@ export function initDragManager(p: {
     suppressHover(250);
     clearCardHoverPreview();
     setHandScrollLocked(true);
+    ev.preventDefault();
 
     const target = ev.currentTarget as HTMLElement;
     try {
@@ -151,24 +176,9 @@ export function initDragManager(p: {
     const grabDX = r ? ev.clientX - r.left : 20;
     const grabDY = r ? ev.clientY - r.top : 20;
 
-    const css = getComputedStyle(document.documentElement);
-    const handW = parseFloat(css.getPropertyValue("--handCardW")) || undefined;
-    const handH = parseFloat(css.getPropertyValue("--handCardH")) || undefined;
-    const mobile = document.body.classList.contains("mobile");
-    let slotW: number | undefined;
-    let slotH: number | undefined;
-
-    const slotCardEl =
-      document.querySelector<HTMLElement>(".slot .slotCardInner") ??
-      document.querySelector<HTMLElement>(".slot > .card") ??
-      null;
-    if (slotCardEl) {
-      const sr = slotCardEl.getBoundingClientRect();
-      if (sr.width > 0 && sr.height > 0) {
-        slotW = sr.width;
-        slotH = sr.height;
-      }
-    }
+    const handSize = resolveHandCardSizePx();
+    const handW = handSize.w > 0 ? handSize.w : undefined;
+    const handH = handSize.h > 0 ? handSize.h : undefined;
 
     drag = {
       kind: init.kind,
@@ -184,8 +194,8 @@ export function initDragManager(p: {
       dragging: false,
 
       previewEl: undefined,
-      previewW: mobile ? r?.width ?? handW ?? slotW : slotW ?? r?.width ?? handW,
-      previewH: mobile ? r?.height ?? handH ?? slotH : slotH ?? r?.height ?? handH,
+      previewW: handW ?? r?.width,
+      previewH: handH ?? r?.height,
       grabDX,
       grabDY,
     };
@@ -205,18 +215,16 @@ export function initDragManager(p: {
       clone.style.height = "100%";
       clone.style.margin = "0";
       clone.style.boxSizing = "border-box";
+      clone.style.webkitUserSelect = "none";
+      clone.style.userSelect = "none";
 
       clone.style.opacity = "1";
       clone.style.filter = "none";
       clone.style.transform = "none";
       clone.style.backgroundColor = "transparent";
 
-      const cardInnerMul = sourceStyle.getPropertyValue("--cardInnerMul").trim();
-      const slotTextScale = sourceStyle.getPropertyValue("--slotTextScale").trim();
-      if (cardInnerMul) clone.style.setProperty("--cardInnerMul", cardInnerMul);
-      if (slotTextScale) clone.style.setProperty("--slotTextScale", slotTextScale);
-      clone.style.fontSize = sourceStyle.fontSize;
-      clone.style.lineHeight = sourceStyle.lineHeight;
+      clone.style.removeProperty("--cardInnerMul");
+      clone.style.removeProperty("--slotTextScale");
 
       drag.previewEl = clone;
     }
@@ -373,15 +381,22 @@ export function initDragManager(p: {
                   const handIdx =
                     drag.fromHandIndex != null && drag.fromHandIndex >= 0 ? drag.fromHandIndex : g2.hand.indexOf(drag.cardUid);
 
-                  const realIdx = g2.hand.indexOf(drag.cardUid);
-                  if (realIdx >= 0) g2.hand.splice(realIdx, 1);
+                  slots[idx] = null;
 
-                  slots[idx] = drag.cardUid;
-                  g2.cards[drag.cardUid].zone = side;
+                  const placed = (g2.placedUidsThisTurn ?? []).includes(uidHere);
+                  if (placed) {
+                    g2.usedThisTurn = Math.max(0, g2.usedThisTurn - 1);
+                    if (side === "front") g2.frontPlacedThisTurn = Math.max(0, g2.frontPlacedThisTurn - 1);
+                    g2.placedUidsThisTurn = (g2.placedUidsThisTurn ?? []).filter((u) => u !== uidHere);
+                    const sideMap = ((g2 as any)._placedSideThisTurn ??= {});
+                    delete sideMap[uidHere];
+                  }
 
                   const insertAt = handIdx != null && handIdx >= 0 && handIdx <= g2.hand.length ? handIdx : g2.hand.length;
                   g2.hand.splice(insertAt, 0, uidHere);
                   g2.cards[uidHere].zone = "hand";
+
+                  placeCard(g2, drag.cardUid, side, idx);
 
                   g2.selectedHandCardUid = null;
 

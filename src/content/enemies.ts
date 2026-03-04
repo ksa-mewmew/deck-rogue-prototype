@@ -123,11 +123,11 @@ export const ENEMIES = [
     intents: [
       {
         label: "하중 인장",
-        acts: [{ op: "damagePlayerByDeckSize", base: 5, per: 2, div: 6, cap: 18 }],
+        acts: [{ op: "damagePlayerByDeckSize", base: 8, per: 2, div: 6, cap: 18 }],
       },
       {
-        label: "압축: 7 피해",
-        acts: [{ op: "damagePlayer", n: 7 }],
+        label: "압축: 10 피해",
+        acts: [{ op: "damagePlayer", n: 10 }],
       },
       {
         label: "놓치게 만들기: S -3",
@@ -160,16 +160,12 @@ export const ENEMIES = [
     maxHp: 30,
     intents: [
       {
-        label: "호령: 취약 +2",
-        acts: [{ op: "statusPlayer", key: "vuln", n: 2 }],
+        label: "호령: 취약 +3",
+        acts: [{ op: "statusPlayer", key: "vuln", n: 3 }],
       },
       {
         label: "발로 차기: 7 피해",
         acts: [{ op: "damagePlayer", n: 7 }],
-      },
-      {
-        label: "전술 지시: 약화 +2",
-        acts: [{ op: "statusPlayer", key: "weak", n: 2 }],
       },
     ],
   },
@@ -177,7 +173,7 @@ export const ENEMIES = [
   {
     id: "goblin_archer",
     name: "고블린 궁수",
-    maxHp: 15,
+    maxHp: 18,
     intents: [
       {
         label: "조준: 2 피해, 3번",
@@ -188,8 +184,8 @@ export const ENEMIES = [
         ],
       },
       {
-        label: "연사: 1 피해 (타수가 증가합니다!)",
-        acts: [{ op: "damagePlayerRampHits", n: 1, baseHits: 1, everyTurns: 1, capHits: 10 }],
+        label: "연사: 2 피해 (타수가 증가합니다!)",
+        acts: [{ op: "damagePlayerRampHits", n: 1, baseHits: 2, everyTurns: 1, capHits: 20 }],
       },
     ],
   },
@@ -230,7 +226,7 @@ export const ENEMIES = [
   {
     id: "old_monster_corpse",
     name: "오래된 괴물 사체",
-    maxHp: 30,
+    maxHp: 40,
     passives: [
       {
         id: "rotten_rage",
@@ -278,7 +274,7 @@ export const ENEMIES = [
   {
     id: "gloved_hunter",
     name: "장갑 낀 사냥꾼",
-    maxHp: 52,
+    maxHp: 56,
     intents: [
       {
         label: "가늠: 취약 +3",
@@ -298,7 +294,7 @@ export const ENEMIES = [
   {
     id: "debt_collector",
     name: "장부 수금관",
-    maxHp: 55,
+    maxHp: 44,
     intents: [
       { label: "수금: S -3", acts: [{ op: "supplies", n: -3 }] },
       { label: "압류: (S가 0이면) 15 피해", acts: [{ op: "damagePlayerIfSuppliesZero", n: 15 }] },
@@ -318,9 +314,26 @@ export const ENEMIES = [
   },
 
   {
+    id: "supply_blocker",
+    name: "보급 차단자",
+    maxHp: 75,
+    intentRules: { noRepeatIntentIndexes: [0, 1] },
+    intents: [
+      {
+        label: "차단 사격: 12 피해, S -3",
+        acts: [{ op: "damagePlayer", n: 12 }, { op: "supplies", n: -3 }],
+      },
+      {
+        label: "보급 폭발: 10 + 현재 S×2 피해",
+        acts: [{ op: "damagePlayerFormula", kind: "supply_blocker" }],
+      },
+    ],
+  },
+
+  {
     id: "archive_censor",
     name: "서고의 검열관",
-    maxHp: 34,
+    maxHp: 39,
     intents: [
       {
         label: "검열 주문: 교란 +2",
@@ -369,8 +382,8 @@ export const ENEMIES = [
     isBoss: true,
     intents: [
       { label: "중력 수축: 약화 +3", acts: [{ op: "statusPlayer", key: "weak", n: 3 }] },
-      { label: "특이점 생성", acts: [{ op: "damagePlayerByDeckSize", base: 8, per: 3, div: 5, cap: 30 }] },
-      { label: "천장 붕괴: 11 피해", acts: [{ op: "damagePlayer", n: 11 },] },
+      { label: "특이점 생성", acts: [{ op: "damagePlayerByDeckSize", base: 8, per: 3, div: 4, cap: 99 }] },
+      { label: "천장 붕괴: 11 피해", acts: [{ op: "damagePlayer", n: 11 }] },
     ],
   },
 
@@ -379,9 +392,9 @@ export const ENEMIES = [
     id: "boss_cursed_wall",
     name: "저주받은 벽",
     omen: "움직이지 않는다. 닳아간다.",
-    maxHp: 160,
+    maxHp: 130,
     isBoss: true,
-    intentRules: { noRepeatIntentIndexes: [0] },
+    intentRules: { noRepeatIntentIndexes: [0, 2] },
     intents: [
       { label: "저주의 기운: 출혈 +3", acts: [{ op: "statusPlayer", key: "bleed", n: 3 }] },
       { label: "저주의 기운: F +1", acts: [{ op: "fatiguePlayer", n: 1 }] },
@@ -393,11 +406,11 @@ export const ENEMIES = [
     id: "boss_giant_orc",
     name: "거대한 오크",
     omen: "거대한 짐승이 기다린다. 힘을 깎아야 한다.",
-    maxHp: 90,
+    maxHp: 100,
     isBoss: true,
     intentRules: { noRepeatIntentIndexes: [1] },
     intents: [
-      { label: "내려치기: 취약 +2, 10 피해", acts: [{ op: "statusPlayer", key: "vuln", n: 2 }, { op: "damagePlayer", n: 15 }] },
+      { label: "내려치기: 취약 +2, 10 피해", acts: [{ op: "statusPlayer", key: "vuln", n: 2 }, { op: "damagePlayer", n: 10 }] },
       { label: "단단한 피부: 다음 턴 동안 피해를 입지 않음", acts: [{ op: "enemyImmuneNextTurn" }] },
       { label: "타고난 회복: 자신 HP 15 회복", acts: [{ op: "enemyHealSelf", n: 15 }]},
       {
@@ -414,15 +427,15 @@ export const ENEMIES = [
     id: "boss_soul_stealer",
     name: "영혼 강탈자",
     omen: "행동하지 않으면 종말이 온다.",
-    maxHp: 80,
+    maxHp: 90,
     isBoss: true,
     passives: [
       { id: "soul_apocalypse", icon: "☄️", name: "예언된 종말", text: "예언이 3회 누적되면 폭발 가능 상태가 됩니다. 폭발하면 50 피해를 줍니다." },
     ],
     special: { kind: "SOUL_STEALER", warnIntentIndex: 2, warnCap: 3, nukeChance: 0.6, nukeDamage: 50, nukeLabel: "종말: 50 피해" },
     intents: [
-      { label: "허기: 7 피해, S -3", acts: [{ op: "damagePlayer", n: 7 }, { op: "supplies", n: -3 }] },
-      { label: "나태: 7 피해, F +2", acts: [{ op: "damagePlayer", n: 7 }, { op: "fatiguePlayer", n: 2 }] },
+      { label: "허기: 10 피해, S -3", acts: [{ op: "damagePlayer", n: 10 }, { op: "supplies", n: -3 }] },
+      { label: "나태: 10 피해, F +2", acts: [{ op: "damagePlayer", n: 10 }, { op: "fatiguePlayer", n: 2 }] },
       { label: "예언: 카운트 진행", acts: [] },
     ],
   },
